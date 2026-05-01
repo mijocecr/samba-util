@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="SambaUtil.Views.EditUserWindow"
         Width="420" Height="420"
-        Title="Edit User"
+        Title="samba-util"
         CanResize="False">
 
     <Border Padding="20" Background="#1e1e1e" CornerRadius="10">
@@ -46,8 +46,10 @@
 
             <!-- Botones -->
             <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
-                <Button Content="Cancel" Width="90" Click="OnCancel"/>
-                <Button Content="Save" Width="90" Click="OnSave"/>
+                <Button Content="Cancel" Width="90" Click="OnCancel"
+                        HorizontalContentAlignment="Center"/>
+                <Button Content="Save" Width="90" Click="OnSave"
+                        HorizontalContentAlignment="Center"/>
             </StackPanel>
 
         </StackPanel>

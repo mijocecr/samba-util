@@ -31,18 +31,32 @@ public partial class MainWindow : Window
     }
 
     
-    private async void OnStatusTextClicked(object? sender, Avalonia.Input.PointerPressedEventArgs e)
+   
+    private async void OnStatusTextClicked(object? sender, PointerPressedEventArgs e)
     {
+        // 1) Pedir contraseña nuevamente
         await SolicitarPassword();
 
         if (string.IsNullOrWhiteSpace(Credenciales.AdminPassword))
         {
-            StatusText.Text = "No admin password provided.";
+            UpdateStatus("No admin password provided.");
             return;
         }
 
-        StatusText.Text = "Admin password updated.";
+        // 2) Validar contraseña (sin llamar a OnOpened)
+        var result = ShellHelper.EjecutarComoRoot("echo OK");
+
+        if (result.ExitCode != 0)
+        {
+            UpdateStatus("Incorrect admin password.");
+            return;
+        }
+
+        // 3) Contraseña correcta → actualizar estado
+        UpdateStatus("Admin password updated.");
     }
+
+    
 
     public void UpdateStatus(string message)
     {
