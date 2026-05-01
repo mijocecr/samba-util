@@ -71,7 +71,7 @@ public partial class MainWindow : Window
         if (result.ExitCode != 0)
         {
             StatusText.Text = "Incorrect admin password. Samba operations disabled.";
-            Console.WriteLine("[SUDO ERROR] " + result.Error);
+            //Console.WriteLine("[SUDO ERROR] " + result.Error);
             return; // No romper la app
         }
 

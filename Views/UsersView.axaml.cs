@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using System.Collections.Generic;
 using SAMBA_Util.Helpers;
+using SambaUtil.Views;
 
 namespace SAMBA_Util.Views;
 
@@ -124,9 +125,20 @@ public partial class UsersView : UserControl
     }
 
 
-
     private void OnEditUser(object? sender, RoutedEventArgs e)
     {
-        // Pendiente
+        if (sender is Button btn && btn.Tag is string username)
+        {
+            var parentWindow = TopLevel.GetTopLevel(this) as Window;
+
+            if (parentWindow != null)
+            {
+                var win = new EditUserWindow(username);
+                win.ShowDialog(parentWindow);
+            }
+        }
     }
+
+  
+
 }
