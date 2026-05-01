@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using Avalonia.Input;
 using SAMBA_Util.Helpers;
 using SAMBA_Util.Models;
 using SAMBA_Util.ViewModels;
@@ -13,6 +14,20 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+    }
+
+    private void OnUsersTabClicked(object? sender, PointerPressedEventArgs e)
+    {
+        if (UsersViewControl != null)
+        {
+            int count=UsersViewControl.LoadUsers();
+            
+            
+            UpdateStatus($"Loaded {count} users.");
+            
+        }
+        
+        
     }
 
     

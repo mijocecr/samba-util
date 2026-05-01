@@ -67,9 +67,16 @@
                 <views:SharesView x:Name="SharesViewControl"/>
             </TabItem>
 
-            <TabItem Header="Users">
-                <TextBlock Text="Contenido de Users" />
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock Text="Users"
+                               
+                               PointerPressed="OnUsersTabClicked"/>
+                </TabItem.Header>
+
+                <views:UsersView x:Name="UsersViewControl"/>
             </TabItem>
+
 
             <TabItem Header="Status">
                 <TextBlock Text="Contenido de Status" />

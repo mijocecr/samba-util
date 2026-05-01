@@ -1,0 +1,100 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="SAMBA_Util.Views.UsersView">
+
+    <Grid Margin="30" RowDefinitions="Auto,*" RowSpacing="20">
+
+        <!-- FORMULARIO + TÍTULO -->
+        <StackPanel Spacing="12" Grid.Row="0">
+
+            <TextBlock Text="Username" FontSize="16" 
+                       HorizontalAlignment="Center"/>
+            <TextBox x:Name="UsernameBox"
+                     Width="300"
+                     Height="32"
+                     CornerRadius="6"/>
+
+            <TextBlock Text="Password" FontSize="16" 
+                       HorizontalAlignment="Center"/>
+            <TextBox x:Name="PasswordBox"
+                     PasswordChar="*"
+                     PlaceholderText="Leave empty if is not required. (Optional)"
+                     Width="300"
+                     Height="32"
+                     CornerRadius="6"/>
+
+            <Button Content="Add User"
+                    Width="100"
+                    Height="36"
+                    VerticalContentAlignment="Center"
+                    HorizontalContentAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Background="#4A90E2"
+                    Foreground="White"
+                    CornerRadius="6"
+                    Click="OnAddUser"/>
+
+            <Separator/>
+
+            <TextBlock Text="Registered Users"
+                       Margin="0 0 0 10"
+                       FontSize="18"
+                       FontWeight="Bold"/>
+        </StackPanel>
+
+        <!-- LISTA CON SCROLL REAL -->
+        <ScrollViewer Grid.Row="1"
+                      Height="120"
+                      VerticalScrollBarVisibility="Auto">
+
+            <ItemsControl x:Name="UsersList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="#F2F2F2"
+                                CornerRadius="8"
+                                Padding="10"
+                                Margin="0,5">
+
+                            <DockPanel>
+
+                                <TextBlock Text="{Binding}"
+                                           FontSize="16"
+                                           VerticalAlignment="Center"
+                                           DockPanel.Dock="Left"/>
+
+                                <StackPanel Orientation="Horizontal"
+                                            Spacing="10"
+                                            HorizontalAlignment="Right"
+                                            DockPanel.Dock="Right">
+
+                                    <Button Content="Edit"
+                                            HorizontalContentAlignment="Center"
+                                            Tag="{Binding}"
+                                            Width="70"
+                                            Height="30"
+                                            CornerRadius="6"
+                                            Background="#E0E0E0"
+                                            Click="OnEditUser"/>
+
+                                    <Button Content="Delete"
+                                            HorizontalContentAlignment="Center"
+                                            Tag="{Binding}"
+                                            Width="70"
+                                            Height="30"
+                                            CornerRadius="6"
+                                            Background="#D9534F"
+                                            Foreground="White"
+                                            Click="OnDeleteUser"/>
+                                </StackPanel>
+
+                            </DockPanel>
+
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+        </ScrollViewer>
+
+    </Grid>
+</UserControl>
