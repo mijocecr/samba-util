@@ -1,0 +1,46 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="SAMBA_Util.Views.ShareEditorWindow"
+        Width="350" Height="260"
+        Title="Edit Share">
+
+    <StackPanel Margin="15" Spacing="10">
+
+        <TextBlock Text="Name"/>
+        <TextBox x:Name="TxtName"/>
+
+        <TextBlock Text="Path"/>
+
+        <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBox x:Name="TxtPath" Width="220"
+                     IsReadOnly="True"/>
+
+            <Button Content="Browse..."
+                    Width="80"
+                    HorizontalAlignment="Right"
+                    Click="OnBrowseFolder"/>
+        </StackPanel>
+
+
+        <StackPanel Orientation="Horizontal" Spacing="20">
+            <StackPanel>
+                <TextBlock Text="ReadOnly"/>
+                <ToggleSwitch x:Name="TgRO"/>
+            </StackPanel>
+
+            <StackPanel>
+                <TextBlock Text="Guests"/>
+                <ToggleSwitch x:Name="TgGuests"/>
+            </StackPanel>
+        </StackPanel>
+
+        <Button Content="Save"
+                
+                HorizontalAlignment="Right"
+                HorizontalContentAlignment="Center"
+                VerticalContentAlignment="Center"
+                Width="80"
+                Click="OnSave"/>
+
+    </StackPanel>
+</Window>

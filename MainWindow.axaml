@@ -1,0 +1,84 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:views="clr-namespace:SAMBA_Util.Views"
+        
+        mc:Ignorable="d"
+        d:DesignWidth="500"
+        d:DesignHeight="580"
+        Width="500"
+        Height="580"
+        MinHeight="580"
+        MinWidth="500"
+        MaxHeight="580"
+        MaxWidth="500"
+        CanResize="False"
+        Title="samba-util"
+        x:Class="SAMBA_Util.MainWindow">
+
+    <DockPanel>
+
+        <!-- HEADER -->
+        <Border Background="SkyBlue" Padding="10" DockPanel.Dock="Top">
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto">
+
+                <TextBlock 
+                    Grid.Row="0" 
+                    Grid.Column="0"   
+                    Text="Samba Management" 
+                    TextAlignment="Center"
+                    FontSize="26"
+                    FontWeight="Bold"
+                    Margin="10"
+                    VerticalAlignment="Center"
+                />
+
+                <Button Content="Configure"
+                        Grid.Column="1"
+                        Grid.Row="0"
+                        Foreground="Black"
+                        Background="Yellow"
+                        Margin="10"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Right"
+                />
+
+            </Grid>
+        </Border>
+
+        <!-- ⭐ TEXTBLOCK FIJO ABAJO -->
+        
+        <StackPanel></StackPanel>
+        <TextBlock DockPanel.Dock="Bottom"
+                   x:Name="StatusText"
+                   Text="Cerratonix  |  https://github.com/mijocecr"
+                   ToolTip.Tip="Click here to enter the administrator password"
+                   PointerPressed="OnStatusTextClicked"
+                   HorizontalAlignment="Center"
+                   
+                   FontSize="14"
+                   Margin="10 10"
+                   Foreground="Gray"/>
+
+        <!-- CONTENIDO DINÁMICO -->
+        <TabControl>
+            <TabItem Header="Shares">
+                <views:SharesView x:Name="SharesViewControl"/>
+            </TabItem>
+
+            <TabItem Header="Users">
+                <TextBlock Text="Contenido de Users" />
+            </TabItem>
+
+            <TabItem Header="Status">
+                <TextBlock Text="Contenido de Status" />
+            </TabItem>
+
+            <TabItem Header="Logs">
+                <TextBlock Text="Contenido de Logs" />
+            </TabItem>
+        </TabControl>
+
+    </DockPanel>
+</Window>
