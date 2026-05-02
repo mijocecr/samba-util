@@ -5,8 +5,13 @@
     <Style Selector="Window">
         <Setter Property="Background" Value="{StaticResource BackgroundBrush}"/>
         <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
+        <Setter Property="Icon"
+                Value="avares://SAMBA-Util/Assets/Icons/samba-util.png"/>
     </Style>
 
+   
+
+    
     <!-- TextBlock -->
     <Style Selector="TextBlock">
         <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
