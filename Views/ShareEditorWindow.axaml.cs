@@ -11,14 +11,10 @@ public partial class ShareEditorWindow : Window
 
     public bool Saved { get; private set; } = false;
 
-    
-    
     // ⭐ Constructor vacío (solo para el diseñador)
     public ShareEditorWindow()
     {
         InitializeComponent();
-
-        // Evita nulls si el diseñador intenta guardar
         _original = new Share();
     }
 
@@ -28,10 +24,26 @@ public partial class ShareEditorWindow : Window
         InitializeComponent();
         _original = share;
 
+        // BASIC
         TxtName.Text = share.Name;
         TxtPath.Text = share.Path;
         TgRO.IsChecked = share.ReadOnly;
         TgGuests.IsChecked = share.AllowGuests;
+        TgBrowseable.IsChecked = share.Browseable;
+        TxtComment.Text = share.Comment;
+
+        // USERS & PERMISSIONS
+        TxtValidUsers.Text = share.ValidUsers;
+        TxtWriteList.Text = share.WriteList;
+        TxtReadList.Text = share.ReadList;
+
+        // FORCE USER/GROUP
+        TxtForceUser.Text = share.ForceUser;
+        TxtForceGroup.Text = share.ForceGroup;
+
+        // MASKS
+        TxtCreateMask.Text = share.CreateMask;
+        TxtDirectoryMask.Text = share.DirectoryMask;
     }
 
     // ⭐ Folder Picker moderno (Avalonia 11)
@@ -50,17 +62,30 @@ public partial class ShareEditorWindow : Window
     }
 
     // ⭐ Guardar cambios
-   
     private void OnSave(object? sender, RoutedEventArgs e)
     {
+        // BASIC
         _original.Name = TxtName.Text;
         _original.Path = TxtPath.Text;
         _original.ReadOnly = TgRO.IsChecked ?? false;
         _original.AllowGuests = TgGuests.IsChecked ?? false;
+        _original.Browseable = TgBrowseable.IsChecked ?? true;
+        _original.Comment = TxtComment.Text ?? "";
+
+        // USERS & PERMISSIONS
+        _original.ValidUsers = TxtValidUsers.Text ?? "";
+        _original.WriteList = TxtWriteList.Text ?? "";
+        _original.ReadList = TxtReadList.Text ?? "";
+
+        // FORCE USER/GROUP
+        _original.ForceUser = TxtForceUser.Text ?? "";
+        _original.ForceGroup = TxtForceGroup.Text ?? "";
+
+        // MASKS
+        _original.CreateMask = TxtCreateMask.Text ?? "0744";
+        _original.DirectoryMask = TxtDirectoryMask.Text ?? "0755";
 
         Saved = true;
         Close(_original);   // ⭐ DEVUELVE EL SHARE EDITADO
     }
-
-    
 }

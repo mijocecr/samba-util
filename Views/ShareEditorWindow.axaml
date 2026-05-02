@@ -1,46 +1,87 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="SAMBA_Util.Views.ShareEditorWindow"
-        Width="350" Height="260"
+        Width="380" Height="400"
         Title="Edit Share">
 
-    <StackPanel Margin="15" Spacing="10">
+    <ScrollViewer>
+        <StackPanel Margin="15" Spacing="12">
 
-        <TextBlock Text="Name"/>
-        <TextBox x:Name="TxtName"/>
+            <!-- BASIC SECTION -->
+            <TextBlock Text="Name"/>
+            <TextBox x:Name="TxtName"/>
 
-        <TextBlock Text="Path"/>
-
-        <StackPanel Orientation="Horizontal" Spacing="10">
-            <TextBox x:Name="TxtPath" Width="220"
-                     IsReadOnly="True"/>
-
-            <Button Content="Browse..."
-                    Width="80"
-                    HorizontalAlignment="Right"
-                    Click="OnBrowseFolder"/>
-        </StackPanel>
-
-
-        <StackPanel Orientation="Horizontal" Spacing="20">
-            <StackPanel>
-                <TextBlock Text="ReadOnly"/>
-                <ToggleSwitch x:Name="TgRO"/>
+            <TextBlock Text="Path"/>
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBox x:Name="TxtPath"
+                         Width="240"
+                         IsReadOnly="True"/>
+                <Button Content="Browse..."
+                        Width="90"
+                        Click="OnBrowseFolder"/>
             </StackPanel>
 
-            <StackPanel>
-                <TextBlock Text="Guests"/>
-                <ToggleSwitch x:Name="TgGuests"/>
-            </StackPanel>
-        </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="25">
+                <StackPanel>
+                    <TextBlock Text="Read Only"/>
+                    <ToggleSwitch x:Name="TgRO"/>
+                </StackPanel>
 
-        <Button Content="Save"
+                <StackPanel>
+                    <TextBlock Text="Allow Guests"/>
+                    <ToggleSwitch x:Name="TgGuests"/>
+                </StackPanel>
+
+                <StackPanel>
+                    <TextBlock Text="Browseable"/>
+                    <ToggleSwitch x:Name="TgBrowseable"/>
+                </StackPanel>
+            </StackPanel>
+
+            <TextBlock Text="Comment"/>
+            <TextBox x:Name="TxtComment"/>
+
+            <Grid ColumnDefinitions="Auto,*">
                 
-                HorizontalAlignment="Right"
-                HorizontalContentAlignment="Center"
-                VerticalContentAlignment="Center"
-                Width="80"
-                Click="OnSave"/>
+                <!-- ADVANCED SECTION -->
+                <Expander Grid.Column="0" Header="Advanced Options" IsExpanded="False">
+                    <StackPanel Spacing="10" Margin="5">
 
-    </StackPanel>
+                        <TextBlock Text="Valid Users"/>
+                        <TextBox x:Name="TxtValidUsers"/>
+
+                        <TextBlock Text="Write List"/>
+                        <TextBox x:Name="TxtWriteList"/>
+
+                        <TextBlock Text="Read List"/>
+                        <TextBox x:Name="TxtReadList"/>
+
+                        <TextBlock Text="Force User"/>
+                        <TextBox x:Name="TxtForceUser"/>
+
+                        <TextBlock Text="Force Group"/>
+                        <TextBox x:Name="TxtForceGroup"/>
+
+                        <TextBlock Text="Create Mask"/>
+                        <TextBox x:Name="TxtCreateMask"/>
+
+                        <TextBlock Text="Directory Mask"/>
+                        <TextBox x:Name="TxtDirectoryMask"/>
+
+                    </StackPanel>
+                </Expander>
+
+                <Button Grid.Column="1" Content="Save"
+                        HorizontalAlignment="Right"
+                        HorizontalContentAlignment="Center"
+                        Width="90"
+                        Click="OnSave"/>
+                
+            </Grid>
+            
+          
+           
+
+        </StackPanel>
+    </ScrollViewer>
 </Window>

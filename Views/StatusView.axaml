@@ -1,0 +1,45 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="SAMBA_Util.Views.StatusView">
+
+    <StackPanel Margin="20" Spacing="15">
+
+        <TextBlock Text="Samba Service Status" FontSize="20" FontWeight="Bold"/>
+
+        <!-- Estado de servicios -->
+        <StackPanel Spacing="10">
+
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="smbd:" Width="120"/>
+                <TextBlock x:Name="TxtSmbd" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="nmbd:" Width="120"/>
+                <TextBlock x:Name="TxtNmbd" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="winbind:" Width="120"/>
+                <TextBlock x:Name="TxtWinbind" />
+            </StackPanel>
+
+        </StackPanel>
+
+        <!-- Validación de configuración -->
+        <StackPanel>
+            <TextBlock Text="Configuration Check (testparm)" FontWeight="Bold"/>
+            <TextBlock x:Name="TxtTestparm" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- Botones -->
+        <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button Content="Reload Samba" Click="OnReload"/>
+            <Button Content="Restart Samba" Click="OnRestart"/>
+            <Button Content="Refresh" Click="OnRefresh"/>
+        </StackPanel>
+
+        <TextBlock x:Name="TxtLastUpdate" FontStyle="Italic"/>
+
+    </StackPanel>
+</UserControl>

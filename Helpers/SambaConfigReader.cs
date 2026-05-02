@@ -19,57 +19,118 @@ public static class SambaConfigReader
         {
             var line = rawLine.Trim();
 
+            // Saltar líneas vacías o comentarios
             if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#") || line.StartsWith(";"))
                 continue;
 
-            // Detectar sección
+            // Detectar sección [share]
             if (line.StartsWith("[") && line.EndsWith("]"))
             {
                 var name = line.Trim('[', ']');
 
+                // Ignorar [global]
                 if (name.Equals("global", System.StringComparison.OrdinalIgnoreCase))
                 {
                     current = null;
                     continue;
                 }
 
+                // Guardar el share anterior
                 if (current != null)
                     shares.Add(current);
 
-                current = new Share { Name = name };
+                // Crear nuevo share con defaults reales de Samba
+                current = new Share
+                {
+                    Name = name,
+                    ReadOnly = true,
+                    AllowGuests = false,
+                    Browseable = true,
+                    CreateMask = "0744",
+                    DirectoryMask = "0755"
+                };
+
                 continue;
             }
 
             if (current == null)
                 continue;
 
-            // PATH
-            if (line.StartsWith("path", System.StringComparison.OrdinalIgnoreCase))
-            {
-                var parts = line.Split('=', 2);
-                if (parts.Length == 2)
-                    current.Path = parts[1].Trim();
-            }
+            // Parseo clave = valor
+            var parts = line.Split('=', 2);
+            if (parts.Length != 2)
+                continue;
 
-            // READ ONLY
-            if (line.StartsWith("read only", System.StringComparison.OrdinalIgnoreCase))
-            {
-                var parts = line.Split('=', 2);
-                if (parts.Length == 2)
-                    current.ReadOnly = parts[1].Trim().Equals("yes", System.StringComparison.OrdinalIgnoreCase);
-            }
+            var key = parts[0].Trim().ToLower();
+            var value = parts[1].Trim();
 
-            // GUEST OK
-            if (line.StartsWith("guest ok", System.StringComparison.OrdinalIgnoreCase))
+            switch (key)
             {
-                var parts = line.Split('=', 2);
-                if (parts.Length == 2)
-                    current.AllowGuests = parts[1].Trim().Equals("yes", System.StringComparison.OrdinalIgnoreCase);
+                case "path":
+                    current.Path = value;
+                    break;
+
+                case "read only":
+                case "readonly":
+                    current.ReadOnly = value.Equals("yes", System.StringComparison.OrdinalIgnoreCase) ||
+                                       value.Equals("true", System.StringComparison.OrdinalIgnoreCase);
+                    break;
+
+                case "guest ok":
+                case "public": // alias
+                    current.AllowGuests = value.Equals("yes", System.StringComparison.OrdinalIgnoreCase) ||
+                                          value.Equals("true", System.StringComparison.OrdinalIgnoreCase);
+                    break;
+
+                case "browseable":
+                case "browsable":
+                    current.Browseable = value.Equals("yes", System.StringComparison.OrdinalIgnoreCase) ||
+                                         value.Equals("true", System.StringComparison.OrdinalIgnoreCase);
+                    break;
+
+                case "comment":
+                    current.Comment = value;
+                    break;
+
+                case "valid users":
+                    current.ValidUsers = value;
+                    break;
+
+                case "write list":
+                    current.WriteList = value;
+                    break;
+
+                case "read list":
+                    current.ReadList = value;
+                    break;
+
+                case "force user":
+                    current.ForceUser = value;
+                    break;
+
+                case "force group":
+                    current.ForceGroup = value;
+                    break;
+
+                case "create mask":
+                case "create mode":
+                    current.CreateMask = value;
+                    break;
+
+                case "directory mask":
+                case "directory mode":
+                    current.DirectoryMask = value;
+                    break;
             }
         }
 
+        // Añadir el último share
         if (current != null)
             shares.Add(current);
+
+        // ⭐ VALIDAR PERMISOS DEL SISTEMA DE ARCHIVOS
+        foreach (var s in shares)
+            s.Warning = ShareValidator.ValidateShare(s);
 
         return shares;
     }

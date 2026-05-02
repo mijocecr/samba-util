@@ -85,7 +85,7 @@
 
 
             <TabItem Header="Status">
-                <TextBlock Text="Contenido de Status" />
+                <views:StatusView/>
             </TabItem>
 
             <TabItem Header="Logs">

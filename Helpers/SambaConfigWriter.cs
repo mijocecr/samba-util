@@ -70,16 +70,48 @@ public static class SambaConfigWriter
     }
 
     /// <summary>
-    /// Convierte un Share a texto smb.conf.
+    /// Convierte un Share a texto smb.conf completo.
     /// </summary>
     private static string ShareToText(Share s)
     {
-        return
-$@"[{s.Name}]
-   path = {s.Path}
-   read only = {(s.ReadOnly ? "yes" : "no")}
-   guest ok = {(s.AllowGuests ? "yes" : "no")}
+        // Construcción ordenada y limpia
+        var lines = new List<string>
+        {
+            $"[{s.Name}]",
+            $"   path = {s.Path}",
+            $"   read only = {(s.ReadOnly ? "yes" : "no")}",
+            $"   guest ok = {(s.AllowGuests ? "yes" : "no")}",
+            $"   browseable = {(s.Browseable ? "yes" : "no")}"
+        };
 
-";
+        // Campos opcionales (solo si tienen valor)
+        if (!string.IsNullOrWhiteSpace(s.Comment))
+            lines.Add($"   comment = {s.Comment}");
+
+        if (!string.IsNullOrWhiteSpace(s.ValidUsers))
+            lines.Add($"   valid users = {s.ValidUsers}");
+
+        if (!string.IsNullOrWhiteSpace(s.WriteList))
+            lines.Add($"   write list = {s.WriteList}");
+
+        if (!string.IsNullOrWhiteSpace(s.ReadList))
+            lines.Add($"   read list = {s.ReadList}");
+
+        if (!string.IsNullOrWhiteSpace(s.ForceUser))
+            lines.Add($"   force user = {s.ForceUser}");
+
+        if (!string.IsNullOrWhiteSpace(s.ForceGroup))
+            lines.Add($"   force group = {s.ForceGroup}");
+
+        if (!string.IsNullOrWhiteSpace(s.CreateMask))
+            lines.Add($"   create mask = {s.CreateMask}");
+
+        if (!string.IsNullOrWhiteSpace(s.DirectoryMask))
+            lines.Add($"   directory mask = {s.DirectoryMask}");
+
+        // Línea en blanco final para separar shares
+        lines.Add("");
+
+        return string.Join(Environment.NewLine, lines);
     }
 }
