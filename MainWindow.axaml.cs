@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using SAMBA_Util.Helpers;
 using SAMBA_Util.Models;
 using SAMBA_Util.ViewModels;
@@ -16,6 +17,14 @@ public partial class MainWindow : Window
         InitializeComponent();
     }
 
+    
+    private void OnOpenConfig(object? sender, RoutedEventArgs e)
+    {
+        var win = new ConfigWindow();
+        win.ShowDialog(this);
+    }
+
+    
 
     private void OnStatusRefreshClicked(object? sender, PointerPressedEventArgs e)
     {

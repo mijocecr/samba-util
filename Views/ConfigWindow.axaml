@@ -1,0 +1,27 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="SAMBA_Util.Views.ConfigWindow"
+        Width="450" Height="250"
+        Title="Samba-util Configuration">
+
+    <StackPanel Margin="20" Spacing="15">
+
+        <TextBlock Text="Global Configuration" FontSize="20" FontWeight="Bold"/>
+
+        <StackPanel Spacing="10">
+            <TextBlock Text="Samba config path:"/>
+            <TextBox x:Name="TxtSmbConf" />
+        </StackPanel>
+
+        <StackPanel Spacing="10">
+            <TextBlock Text="Default permissions:"/>
+            <TextBox x:Name="TxtDefaultPerms"/>
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button Content="Save" Click="OnSave" Classes="accent"/>
+            <Button Content="Close" Click="OnClose" Classes="neutral"/>
+        </StackPanel>
+
+    </StackPanel>
+</Window>

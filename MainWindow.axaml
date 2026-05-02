@@ -34,14 +34,22 @@
                     VerticalAlignment="Center"
                 />
 
-                <Button Content="Configure"
+                
+
+                
+                <Button Content="⚙"
                         Grid.Column="1"
                         Grid.Row="0"
-                        Foreground="Black"
-                        Background="Yellow"
+                        Width="30" Height="30"
+                        Click="OnOpenConfig"
+                       FontSize="18"
+                        
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
                         Margin="10"
                         VerticalAlignment="Center"
                         HorizontalAlignment="Right"
+                        ToolTip.Tip="Samba global configuration."
                 />
 
             </Grid>
@@ -95,7 +103,7 @@
             
 
             <TabItem Header="Logs">
-                <TextBlock Text="Contenido de Logs" />
+                <views:LogsView/>
             </TabItem>
         </TabControl>
 
