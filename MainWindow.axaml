@@ -63,9 +63,15 @@
 
         <!-- CONTENIDO DINÁMICO -->
         <TabControl>
-            <TabItem Header="Shares">
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock Text="Shares"
+                             PointerPressed="OnSharesTextClicked"  />
+                    
+                </TabItem.Header>    
                 <views:SharesView x:Name="SharesViewControl"/>
             </TabItem>
+            
 
             <TabItem>
                 <TabItem.Header>

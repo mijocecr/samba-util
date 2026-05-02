@@ -16,6 +16,10 @@ public partial class MainWindow : Window
         InitializeComponent();
     }
 
+    
+    
+    
+    
     private void OnUsersTabClicked(object? sender, PointerPressedEventArgs e)
     {
         if (UsersViewControl != null)
@@ -30,8 +34,12 @@ public partial class MainWindow : Window
         
     }
 
-    
-   
+    private async void OnSharesTextClicked(object? sender, PointerPressedEventArgs e)
+    {
+     int count= SharesViewControl.LoadShares();  
+     StatusText.Text = $"Loaded {count} shares from smb.conf";
+    }
+
     private async void OnStatusTextClicked(object? sender, PointerPressedEventArgs e)
     {
         // 1) Pedir contraseña nuevamente

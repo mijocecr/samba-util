@@ -21,14 +21,17 @@ public partial class SharesView : UserControl
         LoadShares();
     }
 
-    public void LoadShares()
+    public int LoadShares()
     {
         Shares.Clear();
 
         var sharesFromFile = SambaConfigReader.LoadShares();
 
         foreach (var s in sharesFromFile)
+        {
             Shares.Add(s);
+        }
+            return Shares.Count;
     }
 
     public void OnDeleteShare(object? sender, RoutedEventArgs e)
