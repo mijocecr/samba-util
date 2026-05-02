@@ -1,8 +1,9 @@
+using SAMBA_Util.Models;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using SAMBA_Util.Models;
 
 namespace SAMBA_Util.Helpers;
 
@@ -11,70 +12,99 @@ public static class SambaConfigWriter
     private const string SmbConfPath = "/etc/samba/smb.conf";
     private const string TempPath = "/tmp/smb.conf";
 
-    /// <summary>
-    /// Guarda la lista completa de shares en smb.conf usando sudo.
-    /// </summary>
+    private static long _callCountSave = 0;
+    private static long _callCountAdd = 0;
+    private static long _callCountDelete = 0;
+    private static long _callCountUpdate = 0;
+
     public static void SaveAllShares(IEnumerable<Share> shares)
     {
+        var callId = ++_callCountSave;
+        var sw = Stopwatch.StartNew();
+
+        Console.WriteLine($"[WRITE] #{callId} → SaveAllShares iniciado. Shares: {shares.Count()}");
+
         // 1) Generar archivo temporal
+        var swWrite = Stopwatch.StartNew();
         var lines = shares.Select(s => ShareToText(s)).ToList();
         File.WriteAllLines(TempPath, lines);
+        swWrite.Stop();
+        Console.WriteLine($"[WRITE] #{callId} Archivo temporal escrito en {swWrite.ElapsedMilliseconds} ms");
 
         // 2) Copiar a /etc/samba/smb.conf como root
-        ShellHelper.EjecutarComoRoot($"cp \"{TempPath}\" \"{SmbConfPath}\"");
+        var swCopy = Stopwatch.StartNew();
+        var copyResult = ShellHelper.EjecutarComoRoot($"cp \"{TempPath}\" \"{SmbConfPath}\"");
+        swCopy.Stop();
+        Console.WriteLine($"[WRITE] #{callId} Copia a smb.conf en {swCopy.ElapsedMilliseconds} ms");
 
         // 3) Reiniciar Samba
-        ShellHelper.EjecutarComoRoot("systemctl restart smbd");
+        var swRestart = Stopwatch.StartNew();
+        var restartResult = ShellHelper.EjecutarComoRoot("systemctl restart smbd");
+        swRestart.Stop();
+        Console.WriteLine($"[WRITE] #{callId} systemctl restart smbd en {swRestart.ElapsedMilliseconds} ms");
+
+        sw.Stop();
+        Console.WriteLine($"[WRITE] #{callId} ← SaveAllShares completado en {sw.ElapsedMilliseconds} ms");
     }
 
-    /// <summary>
-    /// Agrega un nuevo share.
-    /// </summary>
     public static void AddShare(Share newShare)
     {
+        var callId = ++_callCountAdd;
+        var sw = Stopwatch.StartNew();
+
+        Console.WriteLine($"[WRITE] #{callId} → AddShare('{newShare.Name}')");
+
         var shares = SambaConfigReader.LoadShares();
 
-        // Evitar duplicados
         if (shares.Any(s => s.Name.Equals(newShare.Name, StringComparison.OrdinalIgnoreCase)))
+        {
+            Console.WriteLine($"[WRITE] #{callId} ERROR: duplicado");
             throw new InvalidOperationException($"A share named '{newShare.Name}' already exists.");
+        }
 
         shares.Add(newShare);
 
         SaveAllShares(shares);
+
+        sw.Stop();
+        Console.WriteLine($"[WRITE] #{callId} ← AddShare completado en {sw.ElapsedMilliseconds} ms");
     }
 
-    /// <summary>
-    /// Elimina un share por nombre.
-    /// </summary>
     public static void DeleteShare(string name)
     {
+        var callId = ++_callCountDelete;
+        var sw = Stopwatch.StartNew();
+
+        Console.WriteLine($"[WRITE] #{callId} → DeleteShare('{name}')");
+
         var shares = SambaConfigReader.LoadShares();
         var filtered = shares.Where(s => s.Name != name).ToList();
+
         SaveAllShares(filtered);
+
+        sw.Stop();
+        Console.WriteLine($"[WRITE] #{callId} ← DeleteShare completado en {sw.ElapsedMilliseconds} ms");
     }
 
-    /// <summary>
-    /// Actualiza un share existente.
-    /// </summary>
     public static void UpdateShare(Share updated)
     {
+        var callId = ++_callCountUpdate;
+        var sw = Stopwatch.StartNew();
+
+        Console.WriteLine($"[WRITE] #{callId} → UpdateShare('{updated.Name}')");
+
         var shares = SambaConfigReader.LoadShares();
-
-        var list = shares
-            .Where(s => s.Name != updated.Name)
-            .ToList();
-
+        var list = shares.Where(s => s.Name != updated.Name).ToList();
         list.Add(updated);
 
         SaveAllShares(list);
+
+        sw.Stop();
+        Console.WriteLine($"[WRITE] #{callId} ← UpdateShare completado en {sw.ElapsedMilliseconds} ms");
     }
 
-    /// <summary>
-    /// Convierte un Share a texto smb.conf completo.
-    /// </summary>
     private static string ShareToText(Share s)
     {
-        // Construcción ordenada y limpia
         var lines = new List<string>
         {
             $"[{s.Name}]",
@@ -84,7 +114,6 @@ public static class SambaConfigWriter
             $"   browseable = {(s.Browseable ? "yes" : "no")}"
         };
 
-        // Campos opcionales (solo si tienen valor)
         if (!string.IsNullOrWhiteSpace(s.Comment))
             lines.Add($"   comment = {s.Comment}");
 
@@ -109,7 +138,6 @@ public static class SambaConfigWriter
         if (!string.IsNullOrWhiteSpace(s.DirectoryMask))
             lines.Add($"   directory mask = {s.DirectoryMask}");
 
-        // Línea en blanco final para separar shares
         lines.Add("");
 
         return string.Join(Environment.NewLine, lines);

@@ -13,7 +13,7 @@ public partial class EditUserWindow : Window
     {
         InitializeComponent();
         _username = username;
-
+        base.WindowStartupLocation= WindowStartupLocation.CenterScreen;
         UsernameText.Text = username;
         LoadUserInfo(username);
     }

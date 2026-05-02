@@ -1,19 +1,18 @@
-using Avalonia.Controls;
-using Avalonia.Interactivity;
-using SAMBA_Util.Helpers;
 using System;
 using System.Collections.Generic;
+using System.Net.NetworkInformation;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Controls.Shapes;
-using System.Net.NetworkInformation;
-using System.Net;
+using SAMBA_Util;
+using SAMBA_Util.Helpers;
 
 namespace SAMBA_Util.Views;
 
 public partial class StatusView : UserControl
 {
-    // Servicios posibles según la distro
     private readonly List<string> SmbServices = new() { "smbd", "smb" };
     private readonly List<string> NmbServices = new() { "nmbd", "nmb" };
     private readonly List<string> WinbindServices = new() { "winbind" };
@@ -21,11 +20,14 @@ public partial class StatusView : UserControl
     public StatusView()
     {
         InitializeComponent();
-        RefreshStatus();
+        // ❌ Nada de RefreshStatus aquí
     }
 
     public void RefreshStatus()
     {
+        if (string.IsNullOrWhiteSpace(Credenciales.AdminPassword))
+            return;
+
         TxtSmbd.Text = DetectAndCheckService(SmbServices);
         TxtNmbd.Text = DetectAndCheckService(NmbServices);
         TxtWinbind.Text = DetectAndCheckService(WinbindServices);
@@ -38,29 +40,23 @@ public partial class StatusView : UserControl
         {
             mw.UpdateStatus("Status refreshed");
         }
-        
+
         SetIcon(IconSmbd, TxtSmbd.Text);
         SetIcon(IconNmbd, TxtNmbd.Text);
         SetIcon(IconWinbind, TxtWinbind.Text);
 
         UpdateTestparmStyle(TxtTestparm.Text);
         UpdateIpList();
-
-        
     }
 
-    // Detecta qué servicio existe y devuelve su estado
     private string DetectAndCheckService(List<string> candidates)
     {
         foreach (var svc in candidates)
         {
             var check = ShellHelper.EjecutarComoRoot($"systemctl status {svc}.service");
 
-            // Tu lógica original: funciona, no se toca
             if (check.ExitCode == 0 || check.Stdout.Contains("Loaded:", StringComparison.OrdinalIgnoreCase))
-            {
                 return GetServiceStatus(svc);
-            }
         }
 
         return "Not installed";
@@ -75,24 +71,18 @@ public partial class StatusView : UserControl
             : "Inactive";
     }
 
-   
     private string RunTestparm()
     {
         var result = ShellHelper.EjecutarComoRoot("testparm -s 2>&1");
         var output = (result.Stdout + result.Stderr).Trim();
 
-        // 1. Si testparm dice explícitamente que está OK → está OK
         if (output.Contains("Loaded services file OK", StringComparison.OrdinalIgnoreCase))
             return "✔ Configuration OK";
 
-        // 2. Errores reales de Samba
         if (output.Contains("ERROR:", StringComparison.OrdinalIgnoreCase) ||
             output.Contains("Unknown parameter", StringComparison.OrdinalIgnoreCase))
-        {
             return "❌ Configuration errors detected:\n" + output;
-        }
 
-        // 3. Cualquier otra cosa (warnings, avisos, etc.) → OK
         return "✔ Configuration OK";
     }
 
@@ -103,7 +93,9 @@ public partial class StatusView : UserControl
 
     private void OnReload(object? sender, RoutedEventArgs e)
     {
-        // Recarga TODOS los servicios posibles en TODAS las distros
+        if (string.IsNullOrWhiteSpace(Credenciales.AdminPassword))
+            return;
+
         ShellHelper.EjecutarComoRoot("systemctl reload smb.service");
         ShellHelper.EjecutarComoRoot("systemctl reload smbd.service");
         ShellHelper.EjecutarComoRoot("systemctl reload nmb.service");
@@ -115,7 +107,9 @@ public partial class StatusView : UserControl
 
     private void OnRestart(object? sender, RoutedEventArgs e)
     {
-        // Reinicia TODOS los servicios posibles en TODAS las distros
+        if (string.IsNullOrWhiteSpace(Credenciales.AdminPassword))
+            return;
+
         ShellHelper.EjecutarComoRoot("systemctl restart smb.service");
         ShellHelper.EjecutarComoRoot("systemctl restart smbd.service");
         ShellHelper.EjecutarComoRoot("systemctl restart nmb.service");
@@ -124,9 +118,7 @@ public partial class StatusView : UserControl
 
         RefreshStatus();
     }
-    
-    
-  
+
     private void SetIcon(Ellipse icon, string status)
     {
         if (status.StartsWith("Active"))
@@ -151,9 +143,6 @@ public partial class StatusView : UserControl
         }
     }
 
-    
-    
-
     private List<(string iface, string ip)> GetActiveIPs()
     {
         var list = new List<(string iface, string ip)>();
@@ -171,16 +160,13 @@ public partial class StatusView : UserControl
             foreach (var addr in props.UnicastAddresses)
             {
                 if (addr.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-                {
                     list.Add((ni.Name, addr.Address.ToString()));
-                }
             }
         }
 
         return list;
     }
 
-    
     private void UpdateIpList()
     {
         IpListPanel.Children.Clear();
@@ -205,9 +191,4 @@ public partial class StatusView : UserControl
             );
         }
     }
-
-    
-    
-    
 }
-

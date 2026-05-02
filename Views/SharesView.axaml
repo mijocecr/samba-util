@@ -11,7 +11,7 @@
                 DockPanel.Dock="Top"
                 Margin="0 0 0 15"
                 Width="120"
-                HorizontalAlignment="Left"/>
+                HorizontalAlignment="Right"/>
 
         <!-- Lista de shares -->
         <ListBox x:Name="ListShares"

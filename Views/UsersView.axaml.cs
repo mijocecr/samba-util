@@ -12,6 +12,7 @@ public partial class UsersView : UserControl
     {
         InitializeComponent();
         LoadUsers();
+        
     }
 
     public int LoadUsers()

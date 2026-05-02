@@ -3,6 +3,9 @@
         x:Class="SAMBA_Util.Views.ShareEditorWindow"
         Width="380" Height="400"
         Title="Edit Share"
+        CanMaximize="False"
+        CanResize="False"
+        CanMinimize="False"
         Background="{StaticResource BackgroundBrush}"
         Foreground="{StaticResource ForegroundBrush}">
 

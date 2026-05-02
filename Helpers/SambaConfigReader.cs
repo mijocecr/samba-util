@@ -1,21 +1,32 @@
 using SAMBA_Util.Models;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 
 namespace SAMBA_Util.Helpers;
 
 public static class SambaConfigReader
 {
+    private static long _callCount = 0;
+
     public static List<Share> LoadShares(string filePath = "/etc/samba/smb.conf")
     {
+        var sw = Stopwatch.StartNew();
+        var callId = ++_callCount;
+
+        Console.WriteLine($"[CONF] #{callId} → LoadShares('{filePath}') iniciado");
+
         var shares = new List<Share>();
 
         if (!File.Exists(filePath))
+        {
+            Console.WriteLine($"[CONF] #{callId} Archivo no existe. Tiempo: {sw.ElapsedMilliseconds} ms");
             return shares;
+        }
 
         Share? current = null;
 
-        // ⭐ Leer línea por línea (mucho más rápido que ReadAllLines)
         using var reader = new StreamReader(filePath);
 
         string? rawLine;
@@ -23,27 +34,22 @@ public static class SambaConfigReader
         {
             var line = rawLine.Trim();
 
-            // Saltar líneas vacías o comentarios
             if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#") || line.StartsWith(";"))
                 continue;
 
-            // Detectar sección [share]
             if (line.StartsWith("[") && line.EndsWith("]"))
             {
                 var name = line.Trim('[', ']');
 
-                // Ignorar [global]
-                if (name.Equals("global", System.StringComparison.OrdinalIgnoreCase))
+                if (name.Equals("global", StringComparison.OrdinalIgnoreCase))
                 {
                     current = null;
                     continue;
                 }
 
-                // Guardar el share anterior
                 if (current != null)
                     shares.Add(current);
 
-                // Crear nuevo share con defaults reales de Samba
                 current = new Share
                 {
                     Name = name,
@@ -60,7 +66,6 @@ public static class SambaConfigReader
             if (current == null)
                 continue;
 
-            // Parseo clave = valor
             var parts = line.Split('=', 2);
             if (parts.Length != 2)
                 continue;
@@ -76,20 +81,20 @@ public static class SambaConfigReader
 
                 case "read only":
                 case "readonly":
-                    current.ReadOnly = value.Equals("yes", System.StringComparison.OrdinalIgnoreCase) ||
-                                       value.Equals("true", System.StringComparison.OrdinalIgnoreCase);
+                    current.ReadOnly = value.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
+                                       value.Equals("true", StringComparison.OrdinalIgnoreCase);
                     break;
 
                 case "guest ok":
                 case "public":
-                    current.AllowGuests = value.Equals("yes", System.StringComparison.OrdinalIgnoreCase) ||
-                                          value.Equals("true", System.StringComparison.OrdinalIgnoreCase);
+                    current.AllowGuests = value.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
+                                          value.Equals("true", StringComparison.OrdinalIgnoreCase);
                     break;
 
                 case "browseable":
                 case "browsable":
-                    current.Browseable = value.Equals("yes", System.StringComparison.OrdinalIgnoreCase) ||
-                                         value.Equals("true", System.StringComparison.OrdinalIgnoreCase);
+                    current.Browseable = value.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
+                                         value.Equals("true", StringComparison.OrdinalIgnoreCase);
                     break;
 
                 case "comment":
@@ -128,12 +133,11 @@ public static class SambaConfigReader
             }
         }
 
-        // Añadir el último share
         if (current != null)
             shares.Add(current);
 
-        // ❌ NO validar permisos aquí (es lento)
-        // ✔ Validar solo cuando el usuario abra la pestaña Shares
+        sw.Stop();
+        Console.WriteLine($"[CONF] #{callId} ← LoadShares completado en {sw.ElapsedMilliseconds} ms. Shares: {shares.Count}");
 
         return shares;
     }

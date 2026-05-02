@@ -3,6 +3,9 @@
         x:Class="SAMBA_Util.Views.ConfigWindow"
         Width="450" Height="250"
         Title="Samba-util Configuration"
+        CanResize="False"
+        CanMaximize="False"
+        CanMinimize="False"
         Background="{StaticResource BackgroundBrush}"
         Foreground="{StaticResource ForegroundBrush}">
 

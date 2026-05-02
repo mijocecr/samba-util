@@ -9,6 +9,7 @@ public partial class PasswordDialog : Window
     public PasswordDialog()
     {
         InitializeComponent();
+        base.WindowStartupLocation= WindowStartupLocation.CenterScreen;
     }
     
     private void OnPasswordKeyDown(object? sender, Avalonia.Input.KeyEventArgs e)

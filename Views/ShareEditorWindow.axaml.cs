@@ -16,6 +16,7 @@ public partial class ShareEditorWindow : Window
     {
         InitializeComponent();
         _original = new Share();
+        base.WindowStartupLocation= WindowStartupLocation.CenterScreen;
     }
 
     // ⭐ Constructor real (editar o agregar)

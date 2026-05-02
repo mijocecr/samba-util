@@ -15,6 +15,7 @@ public partial class MainWindow : Window
 {
     public MainWindow()
     {
+        base.WindowStartupLocation = WindowStartupLocation.CenterScreen;
         InitializeComponent();
     }
 
@@ -22,10 +23,9 @@ public partial class MainWindow : Window
     {
         base.OnOpened(e);
 
-        // 1) Mostrar ventana inmediatamente
         StatusText.Text = "Initializing...";
 
-        // 2) Pedir contraseña después de que la ventana ya esté visible
+        // Pedir contraseña después de mostrar la ventana
         await Task.Delay(200);
         await SolicitarPassword();
 
@@ -35,17 +35,26 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 3) Validar contraseña (rápido)
+        // Validar contraseña
         StatusText.Text = "Validating password...";
         var result = ShellHelper.EjecutarComoRoot("echo OK");
 
-        if (result.ExitCode != 0)
+        // 🔥 Manejo de contraseña incorrecta
+        if (result.ExitCode == 1001)
         {
             StatusText.Text = "Incorrect admin password.";
+            await MostrarPasswordIncorrecta();
+            await SolicitarPassword();
             return;
         }
 
-        // 4) Cargar shares en segundo plano (solo una vez)
+        if (result.ExitCode != 0)
+        {
+            StatusText.Text = "Admin password validation failed.";
+            return;
+        }
+
+        // Cargar shares
         StatusText.Text = "Loading Samba configuration...";
 
         var shares = await Task.Run(() =>
@@ -53,7 +62,6 @@ public partial class MainWindow : Window
             return SambaConfigReader.LoadShares();
         });
 
-        // 5) Actualizar UI
         SharesViewControl.SetShares(shares);
         StatusText.Text = $"Loaded {shares.Count} shares.";
     }
@@ -114,5 +122,24 @@ public partial class MainWindow : Window
         });
 
         await dialog.ShowDialog(this);
+    }
+
+    private async Task MostrarPasswordIncorrecta()
+    {
+        var msg = new Window
+        {
+            Width = 350,
+            Height = 150,
+            Title = "Authentication Error",
+            Content = new TextBlock
+            {
+                Text = "Incorrect administrator password.",
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
+            },
+            WindowStartupLocation = WindowStartupLocation.CenterOwner
+        };
+
+        await msg.ShowDialog(this);
     }
 }

@@ -12,6 +12,7 @@ public partial class ConfigWindow : Window
         // Cargar valores actuales
         TxtSmbConf.Text = "/etc/samba/smb.conf";
         TxtDefaultPerms.Text = "0755";
+        base.WindowStartupLocation= WindowStartupLocation.CenterScreen;
     }
 
     private void OnSave(object? sender, RoutedEventArgs e)
