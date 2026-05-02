@@ -15,7 +15,11 @@ public static class SambaConfigReader
 
         Share? current = null;
 
-        foreach (var rawLine in File.ReadAllLines(filePath))
+        // ⭐ Leer línea por línea (mucho más rápido que ReadAllLines)
+        using var reader = new StreamReader(filePath);
+
+        string? rawLine;
+        while ((rawLine = reader.ReadLine()) != null)
         {
             var line = rawLine.Trim();
 
@@ -77,7 +81,7 @@ public static class SambaConfigReader
                     break;
 
                 case "guest ok":
-                case "public": // alias
+                case "public":
                     current.AllowGuests = value.Equals("yes", System.StringComparison.OrdinalIgnoreCase) ||
                                           value.Equals("true", System.StringComparison.OrdinalIgnoreCase);
                     break;
@@ -128,9 +132,8 @@ public static class SambaConfigReader
         if (current != null)
             shares.Add(current);
 
-        // ⭐ VALIDAR PERMISOS DEL SISTEMA DE ARCHIVOS
-        foreach (var s in shares)
-            s.Warning = ShareValidator.ValidateShare(s);
+        // ❌ NO validar permisos aquí (es lento)
+        // ✔ Validar solo cuando el usuario abra la pestaña Shares
 
         return shares;
     }

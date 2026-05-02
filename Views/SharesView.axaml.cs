@@ -5,7 +5,7 @@ using Avalonia;
 using SAMBA_Util.Helpers;
 using SAMBA_Util.Models;
 using System.Collections.ObjectModel;
-using System.Linq;
+using System.Collections.Generic;
 
 namespace SAMBA_Util.Views;
 
@@ -16,11 +16,27 @@ public partial class SharesView : UserControl
     public SharesView()
     {
         InitializeComponent();
-
         ListShares.ItemsSource = Shares;
-        LoadShares();
     }
 
+    // ---------------------------------------------------------
+    //  Recibir shares desde MainWindow (arranque rápido)
+    // ---------------------------------------------------------
+    public void SetShares(List<Share> shares)
+    {
+        Shares.Clear();
+
+        foreach (var s in shares)
+            Shares.Add(s);
+
+        // Validar permisos aquí también
+        foreach (var s in Shares)
+            s.Warning = ShareValidator.ValidateShare(s);
+    }
+
+    // ---------------------------------------------------------
+    //  Carga tradicional (si el usuario lo pide)
+    // ---------------------------------------------------------
     public int LoadShares()
     {
         Shares.Clear();
@@ -30,9 +46,16 @@ public partial class SharesView : UserControl
         foreach (var s in sharesFromFile)
             Shares.Add(s);
 
+        // Validar permisos SOLO cuando el usuario abre la pestaña
+        foreach (var s in Shares)
+            s.Warning = ShareValidator.ValidateShare(s);
+
         return Shares.Count;
     }
 
+    // ---------------------------------------------------------
+    //  ELIMINAR SHARE
+    // ---------------------------------------------------------
     public void OnDeleteShare(object? sender, RoutedEventArgs e)
     {
         if (sender is Button btn && btn.DataContext is Share share)
@@ -45,6 +68,9 @@ public partial class SharesView : UserControl
         }
     }
 
+    // ---------------------------------------------------------
+    //  EDITAR SHARE
+    // ---------------------------------------------------------
     public async void OnEditShare(object? sender, RoutedEventArgs e)
     {
         if (sender is Button btn && btn.DataContext is Share share)
@@ -70,13 +96,16 @@ public partial class SharesView : UserControl
         }
     }
 
+    // ---------------------------------------------------------
+    //  AGREGAR SHARE
+    // ---------------------------------------------------------
     private async void OnAddShare(object? sender, RoutedEventArgs e)
     {
         var newShare = new Share
         {
             Name = "",
             Path = "",
-            ReadOnly = true,       // defaults reales de Samba
+            ReadOnly = true,
             AllowGuests = false,
             Browseable = true,
             CreateMask = "0744",
