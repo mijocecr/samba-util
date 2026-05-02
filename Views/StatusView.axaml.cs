@@ -4,6 +4,10 @@ using SAMBA_Util.Helpers;
 using System;
 using System.Collections.Generic;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Media;
+using Avalonia.Controls.Shapes;
+using System.Net.NetworkInformation;
+using System.Net;
 
 namespace SAMBA_Util.Views;
 
@@ -20,7 +24,7 @@ public partial class StatusView : UserControl
         RefreshStatus();
     }
 
-    private void RefreshStatus()
+    public void RefreshStatus()
     {
         TxtSmbd.Text = DetectAndCheckService(SmbServices);
         TxtNmbd.Text = DetectAndCheckService(NmbServices);
@@ -34,6 +38,15 @@ public partial class StatusView : UserControl
         {
             mw.UpdateStatus("Status refreshed");
         }
+        
+        SetIcon(IconSmbd, TxtSmbd.Text);
+        SetIcon(IconNmbd, TxtNmbd.Text);
+        SetIcon(IconWinbind, TxtWinbind.Text);
+
+        UpdateTestparmStyle(TxtTestparm.Text);
+        UpdateIpList();
+
+        
     }
 
     // Detecta qué servicio existe y devuelve su estado
@@ -83,7 +96,7 @@ public partial class StatusView : UserControl
         return "✔ Configuration OK";
     }
 
-    private void OnRefresh(object? sender, RoutedEventArgs e)
+    public void OnRefresh(object? sender, RoutedEventArgs e)
     {
         RefreshStatus();
     }
@@ -111,4 +124,90 @@ public partial class StatusView : UserControl
 
         RefreshStatus();
     }
+    
+    
+  
+    private void SetIcon(Ellipse icon, string status)
+    {
+        if (status.StartsWith("Active"))
+            icon.Fill = Brushes.LimeGreen;
+        else if (status.StartsWith("Inactive"))
+            icon.Fill = Brushes.Red;
+        else
+            icon.Fill = Brushes.Gray;
+    }
+
+    private void UpdateTestparmStyle(string text)
+    {
+        if (text.StartsWith("✔"))
+        {
+            TestparmBorder.Background = Brushes.DarkGreen;
+            TestparmBorder.BorderBrush = Brushes.LimeGreen;
+        }
+        else
+        {
+            TestparmBorder.Background = Brushes.DarkRed;
+            TestparmBorder.BorderBrush = Brushes.OrangeRed;
+        }
+    }
+
+    
+    
+
+    private List<(string iface, string ip)> GetActiveIPs()
+    {
+        var list = new List<(string iface, string ip)>();
+
+        foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+        {
+            if (ni.OperationalStatus != OperationalStatus.Up)
+                continue;
+
+            if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback)
+                continue;
+
+            var props = ni.GetIPProperties();
+
+            foreach (var addr in props.UnicastAddresses)
+            {
+                if (addr.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                {
+                    list.Add((ni.Name, addr.Address.ToString()));
+                }
+            }
+        }
+
+        return list;
+    }
+
+    
+    private void UpdateIpList()
+    {
+        IpListPanel.Children.Clear();
+
+        var ips = GetActiveIPs();
+
+        if (ips.Count == 0)
+        {
+            IpListPanel.Children.Add(new TextBlock { Text = "No active interfaces detected." });
+            return;
+        }
+
+        foreach (var (iface, ip) in ips)
+        {
+            IpListPanel.Children.Add(
+                new TextBlock
+                {
+                    Text = $"{iface}: {ip}",
+                    FontFamily = "Consolas",
+                    FontSize = 14
+                }
+            );
+        }
+    }
+
+    
+    
+    
 }
+

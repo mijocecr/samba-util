@@ -16,8 +16,15 @@ public partial class MainWindow : Window
         InitializeComponent();
     }
 
-    
-    
+
+    private void OnStatusRefreshClicked(object? sender, PointerPressedEventArgs e)
+    {
+        if (StatusViewControl != null)
+        {
+            UpdateStatus("Refreshing...");
+            StatusViewControl.RefreshStatus();
+        }
+    }
     
     
     private void OnUsersTabClicked(object? sender, PointerPressedEventArgs e)
@@ -33,6 +40,9 @@ public partial class MainWindow : Window
         
         
     }
+    
+    
+    
 
     private async void OnSharesTextClicked(object? sender, PointerPressedEventArgs e)
     {

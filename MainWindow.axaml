@@ -83,10 +83,16 @@
                 <views:UsersView x:Name="UsersViewControl"/>
             </TabItem>
 
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock Text="Status"
+                               
+                               PointerPressed="OnStatusRefreshClicked"/>
+                </TabItem.Header>
 
-            <TabItem Header="Status">
-                <views:StatusView/>
+                <views:StatusView x:Name="StatusViewControl"/>
             </TabItem>
+            
 
             <TabItem Header="Logs">
                 <TextBlock Text="Contenido de Logs" />

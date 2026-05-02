@@ -9,37 +9,54 @@
         <!-- Estado de servicios -->
         <StackPanel Spacing="10">
 
+            <!-- smbd -->
             <StackPanel Orientation="Horizontal" Spacing="10">
                 <TextBlock Text="smbd:" Width="120"/>
-                <TextBlock x:Name="TxtSmbd" />
+                <Ellipse x:Name="IconSmbd" Width="12" Height="12" Fill="Gray"/>
+                <TextBlock x:Name="TxtSmbd"/>
             </StackPanel>
 
+            <!-- nmbd -->
             <StackPanel Orientation="Horizontal" Spacing="10">
                 <TextBlock Text="nmbd:" Width="120"/>
-                <TextBlock x:Name="TxtNmbd" />
+                <Ellipse x:Name="IconNmbd" Width="12" Height="12" Fill="Gray"/>
+                <TextBlock x:Name="TxtNmbd"/>
             </StackPanel>
 
+            <!-- winbind -->
             <StackPanel Orientation="Horizontal" Spacing="10">
                 <TextBlock Text="winbind:" Width="120"/>
-                <TextBlock x:Name="TxtWinbind" />
+                <Ellipse x:Name="IconWinbind" Width="12" Height="12" Fill="Gray"/>
+                <TextBlock x:Name="TxtWinbind"/>
             </StackPanel>
 
         </StackPanel>
 
         <!-- Validación de configuración -->
-        <StackPanel>
+        <StackPanel Spacing="5">
             <TextBlock Text="Configuration Check (testparm)" FontWeight="Bold"/>
-            <TextBlock x:Name="TxtTestparm" TextWrapping="Wrap"/>
+
+            <Border x:Name="TestparmBorder"
+                    Padding="10"
+                    CornerRadius="6"
+                    Background="#333"
+                    BorderBrush="#555"
+                    BorderThickness="1">
+                <TextBlock x:Name="TxtTestparm" TextWrapping="Wrap"/>
+            </Border>
         </StackPanel>
 
         <!-- Botones -->
         <StackPanel Orientation="Horizontal" Spacing="10">
-            <Button Content="Reload Samba" Click="OnReload"/>
-            <Button Content="Restart Samba" Click="OnRestart"/>
-            <Button Content="Refresh" Click="OnRefresh"/>
+            <Button Content="Reload Samba" Click="OnReload" Classes="accent"/>
+            <Button Content="Restart Samba" Click="OnRestart" Classes="danger"/>
+            <Button Content="Refresh" Click="OnRefresh" Classes="neutral"/>
         </StackPanel>
 
         <TextBlock x:Name="TxtLastUpdate" FontStyle="Italic"/>
+        <TextBlock Text="Active Network Interfaces" FontWeight="Bold" Margin="0,10,0,0"/>
+
+        <StackPanel x:Name="IpListPanel" Spacing="5"/>
 
     </StackPanel>
 </UserControl>
