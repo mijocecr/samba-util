@@ -15,12 +15,19 @@
         MaxWidth="500"
         CanResize="False"
         Title="samba-util"
+        Background="{StaticResource BackgroundBrush}"
+        Foreground="{StaticResource ForegroundBrush}"
         x:Class="SAMBA_Util.MainWindow">
 
     <DockPanel>
 
         <!-- HEADER -->
-        <Border Background="SkyBlue" Padding="10" DockPanel.Dock="Top">
+        <Border Background="{StaticResource ControlBackgroundBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="10"
+                DockPanel.Dock="Top">
+
             <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto">
 
                 <TextBlock 
@@ -32,79 +39,71 @@
                     FontWeight="Bold"
                     Margin="10"
                     VerticalAlignment="Center"
+                    Foreground="{StaticResource ForegroundBrush}"
                 />
 
-                
-
-                
                 <Button Content="⚙"
                         Grid.Column="1"
                         Grid.Row="0"
                         Width="30" Height="30"
                         Click="OnOpenConfig"
-                       FontSize="18"
-                        
+                        FontSize="18"
                         HorizontalContentAlignment="Center"
                         VerticalContentAlignment="Center"
                         Margin="10"
-                        VerticalAlignment="Center"
-                        HorizontalAlignment="Right"
                         ToolTip.Tip="Samba global configuration."
                 />
 
             </Grid>
         </Border>
 
-        <!-- ⭐ TEXTBLOCK FIJO ABAJO -->
-        
-        <StackPanel></StackPanel>
+
+        <!-- FOOTER -->
         <TextBlock DockPanel.Dock="Bottom"
                    x:Name="StatusText"
                    Text="Cerratonix  |  https://github.com/mijocecr"
                    ToolTip.Tip="Click here to enter the administrator password"
                    PointerPressed="OnStatusTextClicked"
                    HorizontalAlignment="Center"
-                   
                    FontSize="14"
                    Margin="10 10"
-                   Foreground="Gray"/>
+                   Foreground="{StaticResource ForegroundBrush}"/>
+
 
         <!-- CONTENIDO DINÁMICO -->
-        <TabControl>
+        <TabControl Background="{StaticResource BackgroundBrush}">
+            
             <TabItem>
                 <TabItem.Header>
                     <TextBlock Text="Shares"
-                             PointerPressed="OnSharesTextClicked"  />
-                    
-                </TabItem.Header>    
+                               Foreground="{StaticResource ForegroundBrush}"
+                               PointerPressed="OnSharesTextClicked"/>
+                </TabItem.Header>
                 <views:SharesView x:Name="SharesViewControl"/>
             </TabItem>
-            
 
             <TabItem>
                 <TabItem.Header>
                     <TextBlock Text="Users"
-                               
+                               Foreground="{StaticResource ForegroundBrush}"
                                PointerPressed="OnUsersTabClicked"/>
                 </TabItem.Header>
-
                 <views:UsersView x:Name="UsersViewControl"/>
             </TabItem>
 
             <TabItem>
                 <TabItem.Header>
                     <TextBlock Text="Status"
-                               
+                               Foreground="{StaticResource ForegroundBrush}"
                                PointerPressed="OnStatusRefreshClicked"/>
                 </TabItem.Header>
-
                 <views:StatusView x:Name="StatusViewControl"/>
             </TabItem>
-            
 
             <TabItem Header="Logs">
                 <views:LogsView/>
             </TabItem>
+
         </TabControl>
 
     </DockPanel>

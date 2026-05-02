@@ -2,25 +2,44 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="SAMBA_Util.Views.ConfigWindow"
         Width="450" Height="250"
-        Title="Samba-util Configuration">
+        Title="Samba-util Configuration"
+        Background="{StaticResource BackgroundBrush}"
+        Foreground="{StaticResource ForegroundBrush}">
 
     <StackPanel Margin="20" Spacing="15">
 
-        <TextBlock Text="Global Configuration" FontSize="20" FontWeight="Bold"/>
+        <!-- Título -->
+        <TextBlock Text="Global Configuration"
+                   FontSize="20"
+                   FontWeight="Bold"
+                   Foreground="{StaticResource ForegroundBrush}"/>
 
+        <!-- Samba config path -->
         <StackPanel Spacing="10">
-            <TextBlock Text="Samba config path:"/>
-            <TextBox x:Name="TxtSmbConf" />
+            <TextBlock Text="Samba config path:"
+                       Foreground="{StaticResource ForegroundBrush}"/>
+            <TextBox x:Name="TxtSmbConf"
+                     Background="{StaticResource ControlBackgroundBrush}"
+                     BorderBrush="{StaticResource BorderBrush}"
+                     Foreground="{StaticResource ForegroundBrush}"/>
         </StackPanel>
 
+        <!-- Default permissions -->
         <StackPanel Spacing="10">
-            <TextBlock Text="Default permissions:"/>
-            <TextBox x:Name="TxtDefaultPerms"/>
+            <TextBlock Text="Default permissions:"
+                       Foreground="{StaticResource ForegroundBrush}"/>
+            <TextBox x:Name="TxtDefaultPerms"
+                     Background="{StaticResource ControlBackgroundBrush}"
+                     BorderBrush="{StaticResource BorderBrush}"
+                     Foreground="{StaticResource ForegroundBrush}"/>
         </StackPanel>
 
+        <!-- Botones -->
         <StackPanel Orientation="Horizontal" Spacing="10">
-            <Button Content="Save" Click="OnSave" Classes="accent"/>
-            <Button Content="Close" Click="OnClose" Classes="neutral"/>
+            <Button Content="Save"
+                    Click="OnSave"/>
+            <Button Content="Close"
+                    Click="OnClose"/>
         </StackPanel>
 
     </StackPanel>

@@ -2,9 +2,20 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="SAMBA_Util.App"
              RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
 
+    <!-- 1) PRIMERO LOS RECURSOS (COLORES + BRUSHES) -->
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://SAMBA-Util/Styles/GitHubColors.axaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+
+    <!-- 2) LUEGO LOS ESTILOS -->
     <Application.Styles>
         <FluentTheme />
+        <StyleInclude Source="avares://SAMBA-Util/Styles/GitHubStyles.axaml"/>
     </Application.Styles>
+
 </Application>

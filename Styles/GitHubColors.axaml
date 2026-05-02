@@ -1,0 +1,37 @@
+<ResourceDictionary
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ResourceDictionary.ThemeDictionaries>
+
+        <!-- GitHub Light -->
+        <ResourceDictionary x:Key="Light">
+            <Color x:Key="BackgroundColor">#FFFFFF</Color>
+            <Color x:Key="ForegroundColor">#1F2328</Color>
+            <Color x:Key="ControlBackgroundColor">#F6F8FA</Color>
+            <Color x:Key="BorderColor">#D0D7DE</Color>
+            <Color x:Key="HoverColor">#EEF2F6</Color>
+            <Color x:Key="AccentColor">#0969DA</Color>
+        </ResourceDictionary>
+
+        <!-- GitHub Dark -->
+        <ResourceDictionary x:Key="Dark">
+            <Color x:Key="BackgroundColor">#0D1117</Color>
+            <Color x:Key="ForegroundColor">#C9D1D9</Color>
+            <Color x:Key="ControlBackgroundColor">#161B22</Color>
+            <Color x:Key="BorderColor">#30363D</Color>
+            <Color x:Key="HoverColor">#21262D</Color>
+            <Color x:Key="AccentColor">#58A6FF</Color>
+        </ResourceDictionary>
+
+    </ResourceDictionary.ThemeDictionaries>
+
+    <!-- Brushes -->
+    <SolidColorBrush x:Key="BackgroundBrush" Color="{DynamicResource BackgroundColor}"/>
+    <SolidColorBrush x:Key="ForegroundBrush" Color="{DynamicResource ForegroundColor}"/>
+    <SolidColorBrush x:Key="ControlBackgroundBrush" Color="{DynamicResource ControlBackgroundColor}"/>
+    <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource BorderColor}"/>
+    <SolidColorBrush x:Key="HoverBrush" Color="{DynamicResource HoverColor}"/>
+    <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource AccentColor}"/>
+
+</ResourceDictionary>

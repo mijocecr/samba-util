@@ -14,72 +14,90 @@
                 HorizontalAlignment="Left"/>
 
         <!-- Lista de shares -->
-        <ListBox x:Name="ListShares">
+        <ListBox x:Name="ListShares"
+                 Background="{StaticResource BackgroundBrush}"
+                 BorderBrush="{StaticResource BorderBrush}"
+                 BorderThickness="1"
+                 Padding="4">
+
             <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="models:Share">
 
-                    <Border BorderBrush="Gray"
+                    <Border Background="{StaticResource ControlBackgroundBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
                             BorderThickness="1"
                             CornerRadius="6"
-                            Padding="2"
-                            Margin="0 0 0 2">
+                            Padding="8"
+                            Margin="0 0 0 6">
 
-                        <StackPanel Spacing="2">
+                        <StackPanel Spacing="4">
 
                             <!-- Nombre -->
                             <TextBlock Text="{Binding Name}"
                                        FontSize="18"
-                                       FontWeight="Bold"/>
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource ForegroundBrush}"/>
 
                             <!-- Ruta -->
                             <TextBlock Text="{Binding Path}"
                                        FontSize="14"
-                                       Margin="0 2 0 2"/>
+                                       Margin="0 2 0 2"
+                                       Foreground="{StaticResource ForegroundBrush}"/>
 
-                            <!-- Comentario (solo si existe) -->
+                            <!-- Comentario -->
                             <TextBlock Text="{Binding Comment}"
                                        FontStyle="Italic"
                                        FontSize="13"
-                                       Foreground="Gray"
+                                       Foreground="{StaticResource ForegroundBrush}"
+                                       Opacity="0.7"
                                        IsVisible="{Binding Comment, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
                             <!-- Línea de toggles -->
                             <StackPanel Orientation="Horizontal"
                                         Spacing="20"
                                         Margin="0 5 0 5">
 
-                                <StackPanel Orientation="Vertical" Spacing="5">
-                                    <TextBlock Text="ReadOnly:"/>
+                                <StackPanel Orientation="Vertical" Spacing="3">
+                                    <TextBlock Text="ReadOnly:"
+                                               Foreground="{StaticResource ForegroundBrush}"/>
                                     <ToggleSwitch IsChecked="{Binding ReadOnly}"
                                                   IsEnabled="False"/>
                                 </StackPanel>
 
-                                <StackPanel Orientation="Vertical" Spacing="5">
-                                    <TextBlock Text="Guests:"/>
+                                <StackPanel Orientation="Vertical" Spacing="3">
+                                    <TextBlock Text="Guests:"
+                                               Foreground="{StaticResource ForegroundBrush}"/>
                                     <ToggleSwitch IsChecked="{Binding AllowGuests}"
                                                   IsEnabled="False"/>
                                 </StackPanel>
 
                                 <StackPanel Orientation="Vertical" Spacing="3">
-                                    <TextBlock Text="Browse:"/>
+                                    <TextBlock Text="Browse:"
+                                               Foreground="{StaticResource ForegroundBrush}"/>
                                     <ToggleSwitch IsChecked="{Binding Browseable}"
                                                   IsEnabled="False"/>
                                 </StackPanel>
 
                             </StackPanel>
+
                             <!-- Advertencia de permisos -->
                             <TextBlock Text="{Binding Warning}"
-                                       Foreground="OrangeRed"
+                                       Foreground="{StaticResource AccentBrush}"
                                        FontSize="12"
-                                       
+                                       FontWeight="Bold"
                                        IsVisible="{Binding Warning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
-                           
-                            <!-- Usuarios (solo si existen) -->
+                            <!-- Usuarios -->
                             <StackPanel Orientation="Vertical"
                                         Spacing="2"
                                         IsVisible="{Binding ValidUsers, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                                <TextBlock Text="Valid Users:" FontWeight="Bold" FontSize="13"/>
-                                <TextBlock Text="{Binding ValidUsers}" FontSize="13"/>
+                                <TextBlock Text="Valid Users:"
+                                           FontWeight="Bold"
+                                           FontSize="13"
+                                           Foreground="{StaticResource ForegroundBrush}"/>
+                                <TextBlock Text="{Binding ValidUsers}"
+                                           FontSize="13"
+                                           Foreground="{StaticResource ForegroundBrush}"/>
                             </StackPanel>
 
                             <!-- Botones -->
@@ -88,13 +106,13 @@
                                         Spacing="5"
                                         Margin="0 5 0 0">
 
-                                <Button Content="Edit" Width="70"
-                                        Click="OnEditShare"
-                                        HorizontalContentAlignment="Center"/>
+                                <Button Content="Edit"
+                                        Width="70"
+                                        Click="OnEditShare"/>
 
-                                <Button Content="Delete" Width="70"
-                                        Click="OnDeleteShare"
-                                        HorizontalContentAlignment="Center"/>
+                                <Button Content="Delete"
+                                        Width="70"
+                                        Click="OnDeleteShare"/>
 
                             </StackPanel>
 

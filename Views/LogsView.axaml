@@ -4,17 +4,35 @@
 
     <StackPanel Margin="20" Spacing="15">
 
-        <TextBlock Text="Samba Logs" FontSize="20" FontWeight="Bold"/>
+        <!-- Título -->
+        <TextBlock Text="Samba Logs"
+                   FontSize="20"
+                   FontWeight="Bold"
+                   Foreground="{StaticResource ForegroundBrush}"/>
 
+        <!-- Botones -->
         <StackPanel Orientation="Horizontal" Spacing="10">
-            <Button Content="Refresh" Click="OnRefresh" Classes="neutral"/>
-            <Button Content="Open Full Log" Click="OnOpenFull" Classes="accent"/>
+            <Button Content="Refresh"
+                    Click="OnRefresh"/>
+            
+            <Button Content="Open Full Log"
+                    Click="OnOpenFull"/>
         </StackPanel>
 
-        <Border Background="#222" BorderBrush="#555" BorderThickness="1" CornerRadius="6" Padding="10">
+        <!-- Panel de logs -->
+        <Border Background="{StaticResource ControlBackgroundBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="10">
+
             <ScrollViewer x:Name="Scroll" Height="400">
-                <TextBlock x:Name="TxtLogs" FontFamily="Consolas" TextWrapping="Wrap"/>
+                <TextBlock x:Name="TxtLogs"
+                           FontFamily="Consolas"
+                           TextWrapping="Wrap"
+                           Foreground="{StaticResource ForegroundBrush}"/>
             </ScrollViewer>
+
         </Border>
 
     </StackPanel>

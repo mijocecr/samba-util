@@ -2,85 +2,135 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="SAMBA_Util.Views.ShareEditorWindow"
         Width="380" Height="400"
-        Title="Edit Share">
+        Title="Edit Share"
+        Background="{StaticResource BackgroundBrush}"
+        Foreground="{StaticResource ForegroundBrush}">
 
-    <ScrollViewer>
+    <ScrollViewer Background="{StaticResource BackgroundBrush}">
         <StackPanel Margin="15" Spacing="12">
 
             <!-- BASIC SECTION -->
-            <TextBlock Text="Name"/>
-            <TextBox x:Name="TxtName"/>
+            <TextBlock Text="Name"
+                       Foreground="{StaticResource ForegroundBrush}"/>
+            <TextBox x:Name="TxtName"
+                     Background="{StaticResource ControlBackgroundBrush}"
+                     BorderBrush="{StaticResource BorderBrush}"
+                     Foreground="{StaticResource ForegroundBrush}"/>
 
-            <TextBlock Text="Path"/>
+            <TextBlock Text="Path"
+                       Foreground="{StaticResource ForegroundBrush}"/>
             <StackPanel Orientation="Horizontal" Spacing="10">
                 <TextBox x:Name="TxtPath"
                          Width="240"
-                         IsReadOnly="True"/>
+                         IsReadOnly="True"
+                         Background="{StaticResource ControlBackgroundBrush}"
+                         BorderBrush="{StaticResource BorderBrush}"
+                         Foreground="{StaticResource ForegroundBrush}"/>
                 <Button Content="Browse..."
                         Width="90"
                         Click="OnBrowseFolder"/>
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" Spacing="25">
+
                 <StackPanel>
-                    <TextBlock Text="Read Only"/>
+                    <TextBlock Text="Read Only"
+                               Foreground="{StaticResource ForegroundBrush}"/>
                     <ToggleSwitch x:Name="TgRO"/>
                 </StackPanel>
 
                 <StackPanel>
-                    <TextBlock Text="Allow Guests"/>
+                    <TextBlock Text="Allow Guests"
+                               Foreground="{StaticResource ForegroundBrush}"/>
                     <ToggleSwitch x:Name="TgGuests"/>
                 </StackPanel>
 
                 <StackPanel>
-                    <TextBlock Text="Browseable"/>
+                    <TextBlock Text="Browseable"
+                               Foreground="{StaticResource ForegroundBrush}"/>
                     <ToggleSwitch x:Name="TgBrowseable"/>
                 </StackPanel>
+
             </StackPanel>
 
-            <TextBlock Text="Comment"/>
-            <TextBox x:Name="TxtComment"/>
+            <TextBlock Text="Comment"
+                       Foreground="{StaticResource ForegroundBrush}"/>
+            <TextBox x:Name="TxtComment"
+                     Background="{StaticResource ControlBackgroundBrush}"
+                     BorderBrush="{StaticResource BorderBrush}"
+                     Foreground="{StaticResource ForegroundBrush}"/>
 
             <Grid ColumnDefinitions="Auto,*">
-                
+
                 <!-- ADVANCED SECTION -->
-                <Expander Grid.Column="0" Header="Advanced Options" IsExpanded="False">
+                <Expander Grid.Column="0"
+                          Header="Advanced Options"
+                          IsExpanded="False"
+                          Foreground="{StaticResource ForegroundBrush}">
+                    
                     <StackPanel Spacing="10" Margin="5">
 
-                        <TextBlock Text="Valid Users"/>
-                        <TextBox x:Name="TxtValidUsers"/>
+                        <TextBlock Text="Valid Users"
+                                   Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBox x:Name="TxtValidUsers"
+                                 Background="{StaticResource ControlBackgroundBrush}"
+                                 BorderBrush="{StaticResource BorderBrush}"
+                                 Foreground="{StaticResource ForegroundBrush}"/>
 
-                        <TextBlock Text="Write List"/>
-                        <TextBox x:Name="TxtWriteList"/>
+                        <TextBlock Text="Write List"
+                                   Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBox x:Name="TxtWriteList"
+                                 Background="{StaticResource ControlBackgroundBrush}"
+                                 BorderBrush="{StaticResource BorderBrush}"
+                                 Foreground="{StaticResource ForegroundBrush}"/>
 
-                        <TextBlock Text="Read List"/>
-                        <TextBox x:Name="TxtReadList"/>
+                        <TextBlock Text="Read List"
+                                   Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBox x:Name="TxtReadList"
+                                 Background="{StaticResource ControlBackgroundBrush}"
+                                 BorderBrush="{StaticResource BorderBrush}"
+                                 Foreground="{StaticResource ForegroundBrush}"/>
 
-                        <TextBlock Text="Force User"/>
-                        <TextBox x:Name="TxtForceUser"/>
+                        <TextBlock Text="Force User"
+                                   Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBox x:Name="TxtForceUser"
+                                 Background="{StaticResource ControlBackgroundBrush}"
+                                 BorderBrush="{StaticResource BorderBrush}"
+                                 Foreground="{StaticResource ForegroundBrush}"/>
 
-                        <TextBlock Text="Force Group"/>
-                        <TextBox x:Name="TxtForceGroup"/>
+                        <TextBlock Text="Force Group"
+                                   Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBox x:Name="TxtForceGroup"
+                                 Background="{StaticResource ControlBackgroundBrush}"
+                                 BorderBrush="{StaticResource BorderBrush}"
+                                 Foreground="{StaticResource ForegroundBrush}"/>
 
-                        <TextBlock Text="Create Mask"/>
-                        <TextBox x:Name="TxtCreateMask"/>
+                        <TextBlock Text="Create Mask"
+                                   Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBox x:Name="TxtCreateMask"
+                                 Background="{StaticResource ControlBackgroundBrush}"
+                                 BorderBrush="{StaticResource BorderBrush}"
+                                 Foreground="{StaticResource ForegroundBrush}"/>
 
-                        <TextBlock Text="Directory Mask"/>
-                        <TextBox x:Name="TxtDirectoryMask"/>
+                        <TextBlock Text="Directory Mask"
+                                   Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBox x:Name="TxtDirectoryMask"
+                                 Background="{StaticResource ControlBackgroundBrush}"
+                                 BorderBrush="{StaticResource BorderBrush}"
+                                 Foreground="{StaticResource ForegroundBrush}"/>
 
                     </StackPanel>
                 </Expander>
 
-                <Button Grid.Column="1" Content="Save"
+                <Button Grid.Column="1"
+                        Content="Save"
                         HorizontalAlignment="Right"
                         HorizontalContentAlignment="Center"
+                        VerticalAlignment="Top"
                         Width="90"
                         Click="OnSave"/>
                 
             </Grid>
-            
-          
-           
 
         </StackPanel>
     </ScrollViewer>
