@@ -1,3 +1,4 @@
+using System;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using SAMBA_Util.Helpers;
@@ -7,6 +8,8 @@ namespace SAMBA_Util.Views;
 public partial class ConfigWindow : Window
 {
     private ConfigManager.AppConfig _config;
+
+    public event Action? ConfigSaved;
 
     public ConfigWindow()
     {
@@ -19,18 +22,13 @@ public partial class ConfigWindow : Window
         TxtDefaultPerms.Text = _config.DefaultPermissions;
     }
 
-   
     private void OnSave(object? sender, RoutedEventArgs e)
     {
         _config.SmbConfPath = TxtSmbConf.Text?.Trim() ?? "/etc/samba/smb.conf";
 
         // Normalizar permisos
         string perms = TxtDefaultPerms.Text?.Trim() ?? "755";
-
-        // Quitar ceros iniciales
         perms = perms.TrimStart('0');
-
-        // Asegurar que tiene 3 dígitos
         if (perms.Length > 3)
             perms = perms[^3..];
         perms = perms.PadLeft(3, '0');
@@ -38,9 +36,14 @@ public partial class ConfigWindow : Window
         _config.DefaultPermissions = perms;
 
         ConfigManager.Save(_config);
+
+        // 🔥 Notificar a MainWindow
+        ConfigSaved?.Invoke();
+
         Close();
     }
 
+ 
     
     private void OnClose(object? sender, RoutedEventArgs e)
     {

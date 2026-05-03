@@ -70,10 +70,18 @@ public partial class MainWindow : Window
     // EVENTOS
     // ---------------------------
 
-    private void OnOpenConfig(object? sender, RoutedEventArgs e)
+    private async void OnOpenConfig(object? sender, RoutedEventArgs e)
     {
         var win = new ConfigWindow();
-        win.ShowDialog(this);
+
+        // 🔥 Suscribirse al evento para refrescar vistas
+        win.ConfigSaved += () =>
+        {
+            int count = SharesViewControl.LoadShares();
+            UpdateStatus($"Configuration updated. Reloaded {count} shares.");
+        };
+
+        await win.ShowDialog(this);
     }
 
     private void OnStatusRefreshClicked(object? sender, PointerPressedEventArgs e)
