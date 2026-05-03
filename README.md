@@ -64,7 +64,7 @@ cd samba-util
 makepkg -si
 ```
 AppImage (All Linux distributions)
-A portable AppImage build is available in the Releases section. https://github.com/mijocecr/samba-util/releases
+A portable AppImage build is available in the [Releases section] (https://github.com/mijocecr/samba-util/releases)
 
 Make it executable:
 ```bash
