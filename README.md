@@ -1,5 +1,5 @@
 # SAMBA‑Util  
-A modern, cross‑platform graphical tool for managing Samba shares, users, and configuration files.
+A modern, graphical tool for managing Samba shares, users, and configuration files.
 
 SAMBA‑Util provides a clean and intuitive interface built with Avalonia UI, allowing administrators to configure Samba without manually editing `smb.conf` or running complex terminal commands.  
 It is designed for Linux environments and focuses on simplicity, safety, and transparency.
@@ -27,8 +27,7 @@ It is designed for Linux environments and focuses on simplicity, safety, and tra
 - Displays Samba service status and logs
 
 ### 🎨 Modern UI
-- Cross‑platform Avalonia interface  
-- GitHub‑style theme  
+- Avalonia interface  
 - Responsive layout  
 - SVG/PNG icon support  
 - Clean, minimal design
@@ -44,10 +43,45 @@ It is designed for Linux environments and focuses on simplicity, safety, and tra
 
 ---
 
+INSTALLATION
+
+AUR (Arch Linux / Manjaro / EndeavourOS)
+SAMBA‑Util is available in the Arch User Repository.
+
+Install with yay:
+yay -S samba-util
+
+Install with paru:
+paru -S samba-util
+
+Manual AUR clone:
+git clone https://aur.archlinux.org/samba-util.git
+cd samba-util
+makepkg -si
+
+AppImage (All Linux distributions)
+A portable AppImage build is available in the Releases section.
+
+Make it executable:
+chmod +x SAMBA-Util-x86_64.AppImage
+
+Run it:
+./SAMBA-Util-x86_64.AppImage
+
+---
+
 ## 🚀 Running SAMBA‑Util
 
 ### From source:
 ```bash
-git clone https://github.com/youruser/SAMBA-Util.git
-cd SAMBA-Util
+git clone https://github.com/mijocecr/samba-util.git
+cd samba-util
 dotnet run
+```
+
+
+PROJECT STATUS
+
+SAMBA‑Util is stable, safe, and suitable for production use in home servers, homelabs, and small office environments. 
+It focuses on reliability and does not modify any Samba settings outside the user’s explicit actions.
+
