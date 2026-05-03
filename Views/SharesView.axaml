@@ -5,7 +5,6 @@
 
     <DockPanel Margin="0 2 0 0">
 
-        <!-- Botón añadir -->
         <Button Content="+ Add Share"
                 Click="OnAddShare"
                 DockPanel.Dock="Top"
@@ -13,7 +12,6 @@
                 Width="120"
                 HorizontalAlignment="Right"/>
 
-        <!-- Lista de shares -->
         <ListBox x:Name="ListShares"
                  Background="{StaticResource BackgroundBrush}"
                  BorderBrush="{StaticResource BorderBrush}"
@@ -32,19 +30,16 @@
 
                         <StackPanel Spacing="4">
 
-                            <!-- Nombre -->
                             <TextBlock Text="{Binding Name}"
                                        FontSize="18"
                                        FontWeight="Bold"
                                        Foreground="{StaticResource ForegroundBrush}"/>
 
-                            <!-- Ruta -->
                             <TextBlock Text="{Binding Path}"
                                        FontSize="14"
                                        Margin="0 2 0 2"
                                        Foreground="{StaticResource ForegroundBrush}"/>
 
-                            <!-- Comentario -->
                             <TextBlock Text="{Binding Comment}"
                                        FontStyle="Italic"
                                        FontSize="13"
@@ -52,7 +47,6 @@
                                        Opacity="0.7"
                                        IsVisible="{Binding Comment, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
-                            <!-- Línea de toggles -->
                             <StackPanel Orientation="Horizontal"
                                         Spacing="20"
                                         Margin="0 5 0 5">
@@ -80,14 +74,12 @@
 
                             </StackPanel>
 
-                            <!-- Advertencia de permisos -->
                             <TextBlock Text="{Binding Warning}"
                                        Foreground="{StaticResource AccentBrush}"
                                        FontSize="12"
                                        FontWeight="Bold"
                                        IsVisible="{Binding Warning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
-                            <!-- Usuarios -->
                             <StackPanel Orientation="Vertical"
                                         Spacing="2"
                                         IsVisible="{Binding ValidUsers, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
@@ -100,19 +92,28 @@
                                            Foreground="{StaticResource ForegroundBrush}"/>
                             </StackPanel>
 
-                            <!-- Botones -->
                             <StackPanel Orientation="Horizontal"
                                         HorizontalAlignment="Right"
                                         Spacing="5"
                                         Margin="0 5 0 0">
 
                                 <Button Content="Edit"
+                                        VerticalContentAlignment="Center"
+                                        HorizontalContentAlignment="Center"
                                         Width="70"
                                         Click="OnEditShare"/>
 
                                 <Button Content="Delete"
+                                        VerticalContentAlignment="Center"
+                                        HorizontalContentAlignment="Center"
                                         Width="70"
                                         Click="OnDeleteShare"/>
+
+                                <Button Content="Fix Perms"
+                                        VerticalContentAlignment="Center"
+                                        HorizontalContentAlignment="Center"
+                                        Width="90"
+                                        Click="OnFixPermissions"/>
 
                             </StackPanel>
 

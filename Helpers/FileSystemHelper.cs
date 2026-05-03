@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 
 namespace SAMBA_Util.Helpers;
@@ -17,6 +18,13 @@ public static class FileSystemHelper
 
         try
         {
+            // Detectar inexistencia ANTES de llamar a stat
+            if (!File.Exists(path) && !Directory.Exists(path))
+            {
+                Console.WriteLine($"[PERM] #{callId} NO EXISTE");
+                return ("", "", ""); // ← diferencia clara respecto a error
+            }
+
             var result = ShellHelper.EjecutarComoRoot($"stat -c \"%U %G %a\" \"{path}\"");
 
             var output = result.Stdout?.Trim() ?? "";
@@ -37,8 +45,18 @@ public static class FileSystemHelper
 
             if (parts.Length == 3)
             {
-                Console.WriteLine($"[PERM] #{callId} OK → Owner={parts[0]}, Group={parts[1]}, Mode={parts[2]}");
-                return (parts[0], parts[1], parts[2]);
+                string owner = parts[0];
+                string group = parts[1];
+                string mode = parts[2];
+
+                // Normalizar modo a 3 dígitos
+                mode = new string(mode.Where(char.IsDigit).ToArray());
+
+                if (mode.Length > 3)
+                    mode = mode[^3..]; // últimos 3 dígitos
+
+                Console.WriteLine($"[PERM] #{callId} OK → Owner={owner}, Group={group}, Mode={mode}");
+                return (owner, group, mode);
             }
             else
             {

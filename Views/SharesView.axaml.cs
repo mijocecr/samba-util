@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia;
@@ -138,4 +139,40 @@ public partial class SharesView : UserControl
             }
         }
     }
+
+    // ---------------------------------------------------------
+    //  FIX PERMISSIONS (nuevo)
+    // ---------------------------------------------------------
+    private async void OnFixPermissions(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is Share share)
+        {
+            var config = ConfigManager.Load();
+            string perms = config.DefaultPermissions ?? "0755";
+
+            try
+            {
+                // Ejecutar chmod
+                var result = ShellHelper.EjecutarComoRoot($"chmod {perms} \"{share.Path}\"");
+
+                // 🔥 Volver a leer permisos reales desde el sistema
+                var (owner, group, mode) = FileSystemHelper.GetPermissions(share.Path);
+
+                // 🔥 Revalidar usando los permisos recién leídos
+                share.Warning = ShareValidator.ValidateShare(share);
+
+                // 🔥 Forzar refresco visual del ListBox
+                ListShares.ItemsSource = null;
+                ListShares.ItemsSource = Shares;
+
+                if (TopLevel.GetTopLevel(this) is MainWindow main)
+                    main.UpdateStatus($"Permissions fixed for '{share.Name}'");
+            }
+            catch (Exception ex)
+            {
+                share.Warning = $"Error fixing permissions: {ex.Message}";
+            }
+        }
+    }
+
 }

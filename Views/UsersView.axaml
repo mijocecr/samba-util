@@ -86,12 +86,16 @@
                                             Width="70"
                                             Height="30"
                                             HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"
+                                            
                                             Click="OnEditUser"/>
 
                                     <Button Content="Delete"
                                             Tag="{Binding}"
                                             Width="70"
                                             Height="30"
+                                            VerticalContentAlignment="Center"
+                                            
                                             HorizontalContentAlignment="Center"
                                             Click="OnDeleteUser"/>
 

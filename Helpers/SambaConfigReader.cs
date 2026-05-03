@@ -10,6 +10,12 @@ public static class SambaConfigReader
 {
     private static long _callCount = 0;
 
+    private static bool IsTrue(string v) =>
+        v.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
+        v.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+        v.Equals("1") ||
+        v.Equals("y", StringComparison.OrdinalIgnoreCase);
+
     public static List<Share> LoadShares(string filePath = "/etc/samba/smb.conf")
     {
         var sw = Stopwatch.StartNew();
@@ -71,7 +77,7 @@ public static class SambaConfigReader
                 continue;
 
             var key = parts[0].Trim().ToLower();
-            var value = parts[1].Trim();
+            var value = parts[1].Trim().Trim('"');
 
             switch (key)
             {
@@ -81,20 +87,22 @@ public static class SambaConfigReader
 
                 case "read only":
                 case "readonly":
-                    current.ReadOnly = value.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
-                                       value.Equals("true", StringComparison.OrdinalIgnoreCase);
+                    current.ReadOnly = IsTrue(value);
+                    break;
+
+                case "writeable":
+                case "writable":
+                    current.ReadOnly = !IsTrue(value);
                     break;
 
                 case "guest ok":
                 case "public":
-                    current.AllowGuests = value.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
-                                          value.Equals("true", StringComparison.OrdinalIgnoreCase);
+                    current.AllowGuests = IsTrue(value);
                     break;
 
                 case "browseable":
                 case "browsable":
-                    current.Browseable = value.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
-                                         value.Equals("true", StringComparison.OrdinalIgnoreCase);
+                    current.Browseable = IsTrue(value);
                     break;
 
                 case "comment":

@@ -11,12 +11,16 @@ public static class SambaConfigWriter
 {
     private const string SmbConfPath = "/etc/samba/smb.conf";
     private const string TempPath = "/tmp/smb.conf";
+    private const string BackupPath = "/etc/samba/smb.conf.bak";
 
     private static long _callCountSave = 0;
     private static long _callCountAdd = 0;
     private static long _callCountDelete = 0;
     private static long _callCountUpdate = 0;
 
+    // ---------------------------------------------------------
+    //  GUARDAR TODOS LOS SHARES
+    // ---------------------------------------------------------
     public static void SaveAllShares(IEnumerable<Share> shares)
     {
         var callId = ++_callCountSave;
@@ -24,29 +28,51 @@ public static class SambaConfigWriter
 
         Console.WriteLine($"[WRITE] #{callId} → SaveAllShares iniciado. Shares: {shares.Count()}");
 
-        // 1) Generar archivo temporal
-        var swWrite = Stopwatch.StartNew();
-        var lines = shares.Select(s => ShareToText(s)).ToList();
-        File.WriteAllLines(TempPath, lines);
-        swWrite.Stop();
-        Console.WriteLine($"[WRITE] #{callId} Archivo temporal escrito en {swWrite.ElapsedMilliseconds} ms");
+        // 1) Leer smb.conf original para preservar [global] y parámetros desconocidos
+        var originalLines = File.Exists(SmbConfPath)
+            ? File.ReadAllLines(SmbConfPath).ToList()
+            : new List<string>();
 
-        // 2) Copiar a /etc/samba/smb.conf como root
-        var swCopy = Stopwatch.StartNew();
+        var globalSection = ExtractGlobalSection(originalLines);
+
+        // 2) Generar archivo temporal
+        var output = new List<string>();
+
+        // Escribir sección global preservada
+        output.AddRange(globalSection);
+        output.Add("");
+
+        // Escribir shares
+        foreach (var s in shares)
+        {
+            output.AddRange(ShareToLines(s));
+            output.Add("");
+        }
+
+        File.WriteAllLines(TempPath, output);
+
+        // 3) Backup
+        ShellHelper.EjecutarComoRoot($"cp \"{SmbConfPath}\" \"{BackupPath}\"");
+
+        // 4) Copiar archivo temporal
         var copyResult = ShellHelper.EjecutarComoRoot($"cp \"{TempPath}\" \"{SmbConfPath}\"");
-        swCopy.Stop();
-        Console.WriteLine($"[WRITE] #{callId} Copia a smb.conf en {swCopy.ElapsedMilliseconds} ms");
 
-        // 3) Reiniciar Samba
-        var swRestart = Stopwatch.StartNew();
-        var restartResult = ShellHelper.EjecutarComoRoot("systemctl restart smbd");
-        swRestart.Stop();
-        Console.WriteLine($"[WRITE] #{callId} systemctl restart smbd en {swRestart.ElapsedMilliseconds} ms");
+        if (copyResult.ExitCode != 0)
+        {
+            Console.WriteLine($"[WRITE] #{callId} ERROR al copiar smb.conf");
+            return;
+        }
+
+        // 5) Reiniciar Samba
+        ShellHelper.EjecutarComoRoot("systemctl restart smbd");
 
         sw.Stop();
         Console.WriteLine($"[WRITE] #{callId} ← SaveAllShares completado en {sw.ElapsedMilliseconds} ms");
     }
 
+    // ---------------------------------------------------------
+    //  AÑADIR SHARE
+    // ---------------------------------------------------------
     public static void AddShare(Share newShare)
     {
         var callId = ++_callCountAdd;
@@ -70,6 +96,9 @@ public static class SambaConfigWriter
         Console.WriteLine($"[WRITE] #{callId} ← AddShare completado en {sw.ElapsedMilliseconds} ms");
     }
 
+    // ---------------------------------------------------------
+    //  ELIMINAR SHARE
+    // ---------------------------------------------------------
     public static void DeleteShare(string name)
     {
         var callId = ++_callCountDelete;
@@ -86,6 +115,9 @@ public static class SambaConfigWriter
         Console.WriteLine($"[WRITE] #{callId} ← DeleteShare completado en {sw.ElapsedMilliseconds} ms");
     }
 
+    // ---------------------------------------------------------
+    //  ACTUALIZAR SHARE
+    // ---------------------------------------------------------
     public static void UpdateShare(Share updated)
     {
         var callId = ++_callCountUpdate;
@@ -103,43 +135,76 @@ public static class SambaConfigWriter
         Console.WriteLine($"[WRITE] #{callId} ← UpdateShare completado en {sw.ElapsedMilliseconds} ms");
     }
 
-    private static string ShareToText(Share s)
+    // ---------------------------------------------------------
+    //  PRESERVAR [global]
+    // ---------------------------------------------------------
+    private static List<string> ExtractGlobalSection(List<string> lines)
     {
-        var lines = new List<string>
+        var result = new List<string>();
+        bool insideGlobal = false;
+
+        foreach (var line in lines)
         {
-            $"[{s.Name}]",
-            $"   path = {s.Path}",
-            $"   read only = {(s.ReadOnly ? "yes" : "no")}",
-            $"   guest ok = {(s.AllowGuests ? "yes" : "no")}",
-            $"   browseable = {(s.Browseable ? "yes" : "no")}"
-        };
+            if (line.Trim().StartsWith("[global]", StringComparison.OrdinalIgnoreCase))
+            {
+                insideGlobal = true;
+                result.Add(line);
+                continue;
+            }
+
+            if (insideGlobal)
+            {
+                if (line.Trim().StartsWith("[") && !line.Trim().StartsWith("[global]"))
+                    break;
+
+                result.Add(line);
+            }
+        }
+
+        return result.Count > 0 ? result : new List<string> { "[global]" };
+    }
+
+    // ---------------------------------------------------------
+    //  SHARE → LÍNEAS DE smb.conf
+    // ---------------------------------------------------------
+    private static IEnumerable<string> ShareToLines(Share s)
+    {
+        yield return $"[{s.Name}]";
+        yield return $"   path = {EscapePath(s.Path)}";
+        yield return $"   read only = {(s.ReadOnly ? "yes" : "no")}";
+        yield return $"   guest ok = {(s.AllowGuests ? "yes" : "no")}";
+        yield return $"   browseable = {(s.Browseable ? "yes" : "no")}";
 
         if (!string.IsNullOrWhiteSpace(s.Comment))
-            lines.Add($"   comment = {s.Comment}");
+            yield return $"   comment = {s.Comment}";
 
         if (!string.IsNullOrWhiteSpace(s.ValidUsers))
-            lines.Add($"   valid users = {s.ValidUsers}");
+            yield return $"   valid users = {s.ValidUsers}";
 
         if (!string.IsNullOrWhiteSpace(s.WriteList))
-            lines.Add($"   write list = {s.WriteList}");
+            yield return $"   write list = {s.WriteList}";
 
         if (!string.IsNullOrWhiteSpace(s.ReadList))
-            lines.Add($"   read list = {s.ReadList}");
+            yield return $"   read list = {s.ReadList}";
 
         if (!string.IsNullOrWhiteSpace(s.ForceUser))
-            lines.Add($"   force user = {s.ForceUser}");
+            yield return $"   force user = {s.ForceUser}";
 
         if (!string.IsNullOrWhiteSpace(s.ForceGroup))
-            lines.Add($"   force group = {s.ForceGroup}");
+            yield return $"   force group = {s.ForceGroup}";
 
         if (!string.IsNullOrWhiteSpace(s.CreateMask))
-            lines.Add($"   create mask = {s.CreateMask}");
+            yield return $"   create mask = {s.CreateMask}";
 
         if (!string.IsNullOrWhiteSpace(s.DirectoryMask))
-            lines.Add($"   directory mask = {s.DirectoryMask}");
+            yield return $"   directory mask = {s.DirectoryMask}";
+    }
 
-        lines.Add("");
-
-        return string.Join(Environment.NewLine, lines);
+    // ---------------------------------------------------------
+    //  ESCAPAR RUTAS CON ESPACIOS
+    // ---------------------------------------------------------
+    private static string EscapePath(string path)
+    {
+        return path.Contains(' ') ? $"\"{path}\"" : path;
     }
 }
