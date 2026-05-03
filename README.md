@@ -91,3 +91,10 @@ PROJECT STATUS
 SAMBA‑Util is stable, safe, and suitable for production use in home servers, homelabs, and small office environments. 
 It focuses on reliability and does not modify any Samba settings outside the user’s explicit actions.
 
+---
+
+<img width="1280" height="720" alt="banner" src="https://github.com/user-attachments/assets/e0303aaf-dd37-4b93-b7b8-089845606720" />
+
+---
+
+
