@@ -26,18 +26,38 @@ public partial class ConfigWindow : Window
     {
         _config.SmbConfPath = TxtSmbConf.Text?.Trim() ?? "/etc/samba/smb.conf";
 
-        // Normalizar permisos
         string perms = TxtDefaultPerms.Text?.Trim() ?? "755";
+
+        // 🔥 Validación: solo números y longitud 3
+        if (!int.TryParse(perms, out _) || perms.Length < 3 || perms.Length > 4)
+        {
+            var msg = new Window
+            {
+                Width = 350,
+                Height = 150,
+                Title = "Invalid Permissions",
+                Content = new TextBlock
+                {
+                    Text = "Invalid permission format. Use values like 755 or 644.",
+                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
+                },
+                WindowStartupLocation = WindowStartupLocation.CenterOwner
+            };
+
+            msg.ShowDialog(this);
+            return;
+        }
+
+        // 🔥 Normalizar (quitar ceros iniciales)
         perms = perms.TrimStart('0');
-        if (perms.Length > 3)
-            perms = perms[^3..];
         perms = perms.PadLeft(3, '0');
 
         _config.DefaultPermissions = perms;
 
         ConfigManager.Save(_config);
 
-        // 🔥 Notificar a MainWindow
+        // Notificar a MainWindow
         ConfigSaved?.Invoke();
 
         Close();
