@@ -49,25 +49,32 @@ AUR (Arch Linux / Manjaro / EndeavourOS)
 SAMBA‑Util is available in the Arch User Repository.
 
 Install with yay:
+```bash
 yay -S samba-util
-
+```
 Install with paru:
+```bash
 paru -S samba-util
-
+```
 Manual AUR clone:
+
+```bash
 git clone https://aur.archlinux.org/samba-util.git
 cd samba-util
 makepkg -si
-
+```
 AppImage (All Linux distributions)
 A portable AppImage build is available in the Releases section.
+https://github.com/mijocecr/samba-util/releases
 
 Make it executable:
+```bash
 chmod +x SAMBA-Util-x86_64.AppImage
-
+```
 Run it:
+```bash
 ./SAMBA-Util-x86_64.AppImage
-
+```
 ---
 
 ## 🚀 Running SAMBA‑Util
