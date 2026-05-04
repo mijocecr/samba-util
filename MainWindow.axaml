@@ -105,8 +105,9 @@
             <TabItem>
                 <TabItem.Header>
                     <TextBlock Text="Network"
-                               
+                               PointerPressed="InputElement_OnPointerPressed"
                                Foreground="{StaticResource ForegroundBrush}"/>
+                                 
                 </TabItem.Header>
                 <views:NetworkView/>
             </TabItem>

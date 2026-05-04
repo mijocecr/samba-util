@@ -10,6 +10,9 @@ using Avalonia.Layout;
 using Avalonia.Platform;
 using SAMBA_Util.Helpers;
 
+using Avalonia.Controls.Primitives; // ← IMPORTANTE
+
+
 namespace SAMBA_Util.Views
 {
     public partial class NetworkView : UserControl
@@ -260,36 +263,70 @@ namespace SAMBA_Util.Views
         // ---------------------------------------------------------
         // TARJETA DE SHARE
         // ---------------------------------------------------------
+       
+        
+
         private Control CreateShareItem(NetworkShare share)
         {
-            var panel = new StackPanel { Spacing = 4 };
-
-            panel.Children.Add(new TextBlock
-            {
-                Text = $"Share: {share.Name}",
-                Foreground = Brushes.White
-            });
-
-            var btnPanel = new StackPanel
+            // Fila horizontal: botones + texto de acceso
+            var row = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                Spacing = 8
+                Spacing = 12,
+                VerticalAlignment = VerticalAlignment.Center
             };
 
-            btnPanel.Children.Add(new Button { Content = "Mount", Width = 80 });
-            btnPanel.Children.Add(new Button { Content = "Open", Width = 80 });
+            // Botones
+            row.Children.Add(new Button { Content = "Mount", Width = 80, HorizontalContentAlignment =  HorizontalAlignment.Center });
+            row.Children.Add(new Button { Content = "Open", Width = 80, HorizontalContentAlignment = HorizontalAlignment.Center});
 
-            panel.Children.Add(btnPanel);
+            // Texto de acceso alineado a la derecha
+            row.Children.Add(new TextBlock
+            {
+                Text = $"Access: {share.Access}",
+                Foreground = Brushes.LightGray,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(20, 0, 0, 0)
+            });
 
-            return new Border
+            // Contenedor principal
+            var panel = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = $"Share: {share.Name}",
+                        Foreground = Brushes.White,
+                        FontSize = 16
+                    },
+                    row
+                }
+            };
+
+            var border = new Border
             {
                 Background = new SolidColorBrush(Color.Parse("#1B2838")),
                 Padding = new Thickness(8),
                 CornerRadius = new CornerRadius(6),
                 Child = panel
             };
+
+            // Tooltip con el comentario del share remoto
+            if (!string.IsNullOrWhiteSpace(share.Comment))
+                ToolTip.SetTip(border, share.Comment);
+
+            return border;
         }
 
+        
+        // ---------------------------------------------------------
+
+        
+
+        
         private void Log(string msg)
         {
             Console.WriteLine($"[NetworkView] {msg}");

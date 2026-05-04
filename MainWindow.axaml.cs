@@ -197,5 +197,9 @@ public partial class MainWindow : Window
         return win;
     }
 
-    
+
+    private void InputElement_OnPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        UpdateStatus("Remote Shares");
+    }
 }

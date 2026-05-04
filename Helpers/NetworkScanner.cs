@@ -6,13 +6,14 @@ using System.Threading.Tasks;
 using System.Net.Http;
 using System.Text;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace SAMBA_Util.Helpers
 {
     // ---------------------------------------------------------
-    // OS OVERRIDE MANAGER (XDG + fallback ~/.config)
+    // OS OVERRIDE MANAGER
     // ---------------------------------------------------------
     public static class OsOverrideManager
     {
@@ -88,10 +89,9 @@ namespace SAMBA_Util.Helpers
     // ---------------------------------------------------------
     public static class NetworkScanner
     {
-
         // ---------------------------------------------------------
-// DISCOVER DEVICES (PING SWEEP + MAC + HOSTNAME FILTER)
-// ---------------------------------------------------------
+        // DISCOVER DEVICES (PING SWEEP + MAC + HOSTNAME FILTER)
+        // ---------------------------------------------------------
         public static async Task<List<NetworkDevice>> DiscoverAsync(string ifaceName)
         {
             var devices = new List<NetworkDevice>();
@@ -102,15 +102,12 @@ namespace SAMBA_Util.Helpers
 
             var alive = await PingSweepAsync(subnet);
 
-            // Evitar duplicados por MAC, hostname o IP
             var uniqueHosts = new HashSet<string>();
 
             foreach (var ip in alive)
             {
-                // 1) Intentar obtener MAC
                 string? mac = await GetMacAsync(ip);
 
-                // 2) Intentar obtener hostname
                 string hostname = ip;
                 try
                 {
@@ -120,14 +117,11 @@ namespace SAMBA_Util.Helpers
                 }
                 catch { }
 
-                // 3) Clave compuesta para evitar duplicados
-                //    MAC > Hostname > IP
                 string key = mac ?? hostname ?? ip;
 
                 if (!uniqueHosts.Add(key))
                     continue;
 
-                // 4) Añadir dispositivo único
                 devices.Add(new NetworkDevice
                 {
                     Name = hostname,
@@ -141,9 +135,6 @@ namespace SAMBA_Util.Helpers
             return devices;
         }
 
-        
-        
-        
         // ---------------------------------------------------------
         // GET MAC ADDRESS USING ARP
         // ---------------------------------------------------------
@@ -160,7 +151,7 @@ namespace SAMBA_Util.Helpers
         }
 
         // ---------------------------------------------------------
-        // OS DETECTION PIPELINE + ROUTER + OVERRIDE
+        // OS DETECTION PIPELINE
         // ---------------------------------------------------------
         public static async Task<string> DetectOSAsync(string ip, string name)
         {
@@ -198,9 +189,6 @@ namespace SAMBA_Util.Helpers
             return "Other";
         }
 
-        // ---------------------------------------------------------
-        // ROUTER DETECTION
-        // ---------------------------------------------------------
         private static bool IsRouter(string ip, string hostname)
         {
             if (hostname == "_gateway")
@@ -226,9 +214,6 @@ namespace SAMBA_Util.Helpers
             return false;
         }
 
-        // ---------------------------------------------------------
-        // SMB OS-LEVEL
-        // ---------------------------------------------------------
         private static async Task<string> DetectFromSMB(string ip)
         {
             string output = "";
@@ -251,9 +236,6 @@ namespace SAMBA_Util.Helpers
             return null;
         }
 
-        // ---------------------------------------------------------
-        // SSH BANNER
-        // ---------------------------------------------------------
         private static async Task<string> DetectFromSSH(string ip)
         {
             try
@@ -279,8 +261,7 @@ namespace SAMBA_Util.Helpers
                 if (banner.Contains("freebsd") || banner.Contains("openbsd") || banner.Contains("netbsd"))
                     return "BSD";
 
-                if (banner.Contains("linux") || banner.Contains("ubuntu") || banner.Contains("debian") ||
-                    banner.Contains("arch") || banner.Contains("fedora") || banner.Contains("centos"))
+                if (banner.Contains("linux"))
                     return "Linux";
 
                 if (banner.Contains("openssh"))
@@ -294,9 +275,6 @@ namespace SAMBA_Util.Helpers
             }
         }
 
-        // ---------------------------------------------------------
-        // HTTP HEADERS
-        // ---------------------------------------------------------
         private static async Task<string> DetectFromHTTP(string ip)
         {
             try
@@ -317,7 +295,7 @@ namespace SAMBA_Util.Helpers
                     if (server.Contains("darwin"))
                         return "macOS";
 
-                    if (server.Contains("freebsd") || server.Contains("openbsd") || server.Contains("netbsd"))
+                    if (server.Contains("freebsd"))
                         return "BSD";
 
                     if (server.Contains("nginx") || server.Contains("apache"))
@@ -334,9 +312,6 @@ namespace SAMBA_Util.Helpers
             }
         }
 
-        // ---------------------------------------------------------
-        // TTL HEURISTIC
-        // ---------------------------------------------------------
         private static async Task<string> DetectFromTTL(string ip)
         {
             try
@@ -363,9 +338,6 @@ namespace SAMBA_Util.Helpers
             }
         }
 
-        // ---------------------------------------------------------
-        // PORT CHECK
-        // ---------------------------------------------------------
         private static async Task<bool> IsPortOpen(string ip, int port)
         {
             try
@@ -387,7 +359,42 @@ namespace SAMBA_Util.Helpers
         }
 
         // ---------------------------------------------------------
-        // GET REAL SMB SHARES
+        // SHARE ACCESS DETECTION
+        // ---------------------------------------------------------
+        private static async Task<string> DetectShareAccess(string ip, string share)
+        {
+            // 1. Probar lectura
+            string readTest = await ShellHelper.RunAsync(
+                $"smbclient //{ip}/{share} -N -c \"ls\""
+            );
+
+            if (readTest.Contains("NT_STATUS_ACCESS_DENIED"))
+                return "Requires credentials";
+
+            if (!readTest.Contains("NT_STATUS") && readTest.Contains("blocks"))
+            {
+                // 2. Probar escritura
+                string writeTest = await ShellHelper.RunAsync(
+                    $"smbclient //{ip}/{share} -N -c \"put /dev/null __test\""
+                );
+
+                if (!writeTest.Contains("NT_STATUS"))
+                {
+                    await ShellHelper.RunAsync(
+                        $"smbclient //{ip}/{share} -N -c \"del __test\""
+                    );
+
+                    return "Read/Write (Anonymous)";
+                }
+
+                return "Read Only (Anonymous)";
+            }
+
+            return "No Access";
+        }
+
+        // ---------------------------------------------------------
+        // GET SHARES (REMOTE)
         // ---------------------------------------------------------
         public static async Task<List<NetworkShare>> GetSharesAsync(string ip)
         {
@@ -426,10 +433,20 @@ namespace SAMBA_Util.Helpers
                     {
                         string name = parts[0];
 
-                        if (name == "IPC$" || name == "print$" || name == "ADMIN$")
+                        if (name is "IPC$" or "print$" or "ADMIN$")
                             continue;
 
-                        shares.Add(new NetworkShare(name));
+                        var share = new NetworkShare(name);
+
+                        // Comentario del share
+                        string comment = string.Join(" ", parts.Skip(2));
+                        if (!string.IsNullOrWhiteSpace(comment))
+                            share.Comment = comment;
+
+                        // Acceso real
+                        share.Access = await DetectShareAccess(ip, name);
+
+                        shares.Add(share);
                     }
                 }
             }
@@ -474,7 +491,7 @@ namespace SAMBA_Util.Helpers
         // ---------------------------------------------------------
         // SUBNET FROM INTERFACE
         // ---------------------------------------------------------
-        private static string GetSubnetFromInterface(string ifaceName)
+        private static string? GetSubnetFromInterface(string ifaceName)
         {
             foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
             {
@@ -510,5 +527,20 @@ namespace SAMBA_Util.Helpers
         public string Source { get; set; } = "";
     }
 
-    public record NetworkShare(string Name);
+    // ---------------------------------------------------------
+    // SHARE MODEL (CORRECTO)
+    // ---------------------------------------------------------
+    public class NetworkShare
+    {
+        public string Name { get; set; }
+
+        public string? Comment { get; set; }
+
+        public string Access { get; set; } = "Unknown";
+
+        public NetworkShare(string name)
+        {
+            Name = name;
+        }
+    }
 }
