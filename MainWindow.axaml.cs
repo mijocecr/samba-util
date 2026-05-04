@@ -4,6 +4,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.Threading;
 using SAMBA_Util.Helpers;
 using SAMBA_Util.Models;
@@ -111,6 +113,162 @@ public partial class MainWindow : Window
     // ---------------------------
     // UTILIDADES
     // ---------------------------
+    
+    public async Task<(string user, string pass)?> ShowCredentialsDialog()
+    {
+        var dialog = new Window
+        {
+            Width = 350,
+            Height = 200,
+            Background = new SolidColorBrush(Color.Parse("#1B2838")),
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Title = "Credentials Required",
+            CanResize = false
+        };
+
+        var userBox = new TextBox { Watermark = "Username" };
+        var passBox = new TextBox { Watermark = "Password", PasswordChar = '•' };
+
+        var okBtn = new Button { Content = "OK", Width = 80 , HorizontalContentAlignment = HorizontalAlignment.Center};
+        var cancelBtn = new Button { Content = "Cancel", Width = 80 , HorizontalContentAlignment = HorizontalAlignment.Center};
+
+        var panel = new StackPanel
+        {
+            Margin = new Thickness(20),
+            Spacing = 10,
+            Children =
+            {
+                new TextBlock { Text = "Enter credentials", Foreground = Brushes.White },
+                userBox,
+                passBox,
+                new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 10,
+                    Children = { okBtn, cancelBtn }
+                }
+            }
+        };
+
+        dialog.Content = panel;
+
+        TaskCompletionSource<(string, string)?> tcs = new();
+
+        void Accept()
+        {
+            tcs.SetResult((userBox.Text ?? "", passBox.Text ?? ""));
+            dialog.Close();
+        }
+
+        okBtn.Click += (_, __) => Accept();
+        cancelBtn.Click += (_, __) =>
+        {
+            tcs.SetResult(null);
+            dialog.Close();
+        };
+
+        // ⭐ EVENTO ENTER EN USERNAME
+        userBox.KeyDown += (s, e) =>
+        {
+            if (e.Key == Avalonia.Input.Key.Enter)
+                Accept();
+        };
+
+        // ⭐ EVENTO ENTER EN PASSWORD
+        passBox.KeyDown += (s, e) =>
+        {
+            if (e.Key == Avalonia.Input.Key.Enter)
+                Accept();
+        };
+
+        dialog.ShowDialog(this);
+
+        return await tcs.Task;
+    }
+
+
+    //----------------------------
+    public async void ShowErrorDialog(string title, string message)
+    {
+        var dialog = new Window
+        {
+            Width = 400,
+            Height = 220,
+            Background = new SolidColorBrush(Color.Parse("#1B2838")),
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Title = title,
+            CanResize = false
+        };
+
+        var text = new TextBlock
+        {
+            Text = message,
+            Foreground = Brushes.White,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 10)
+        };
+
+        var okBtn = new Button
+        {
+            Content = "OK",
+            Width = 80,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
+        };
+
+        okBtn.Click += (_, __) => dialog.Close();
+
+        dialog.Content = new StackPanel
+        {
+            Margin = new Thickness(20),
+            Spacing = 10,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = title,
+                    Foreground = Brushes.White,
+                    FontSize = 18,
+                    Margin = new Thickness(0,0,0,10)
+                },
+                text,
+                okBtn
+            }
+        };
+
+        await dialog.ShowDialog(this);
+    }
+
+    
+    //----------------------------
+    public void ShowToast(string message)
+    {
+        var toast = new Border
+        {
+            Background = new SolidColorBrush(Color.Parse("#2A475E")),
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(10),
+            Child = new TextBlock
+            {
+                Text = message,
+                Foreground = Brushes.White
+            }
+        };
+
+        ToastLayer.Children.Add(toast);
+
+        Task.Run(async () =>
+        {
+            await Task.Delay(3000);
+            Dispatcher.UIThread.Post(() =>
+            {
+                ToastLayer.Children.Remove(toast);
+            });
+        });
+    }
+
+    
+    
+    //----------------------------
 
     public void UpdateStatus(string message)
     {

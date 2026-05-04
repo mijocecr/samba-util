@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net.NetworkInformation;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -264,63 +265,212 @@ namespace SAMBA_Util.Views
         // TARJETA DE SHARE
         // ---------------------------------------------------------
        
-        
+       private Control CreateShareItem(NetworkShare share)
+{
+    var main = (MainWindow)TopLevel.GetTopLevel(this);
 
-        private Control CreateShareItem(NetworkShare share)
+    // ---------------------------------------------------------
+    // RUTA DE MONTAJE SEGURA (sin root)
+    // ~/.local/share/samba-util/mounts/<IP>/<Share>
+    // ---------------------------------------------------------
+    string baseDir = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "samba-util", "mounts"
+    );
+
+    string mountPoint = Path.Combine(baseDir, share.IP, share.Name);
+    Directory.CreateDirectory(mountPoint);
+
+    // ---------------------------------------------------------
+    // BOTÓN MOUNT / UNMOUNT (dinámico)
+    // ---------------------------------------------------------
+    var mountBtn = new Button
+    {
+        Width = 80,
+        HorizontalContentAlignment = HorizontalAlignment.Center,
+        VerticalContentAlignment = VerticalAlignment.Center
+    };
+
+    void UpdateMountButton()
+    {
+        mountBtn.Content = NetworkScanner.IsMounted(mountPoint) ? "Unmount" : "Mount";
+    }
+
+    UpdateMountButton();
+
+    mountBtn.Click += async (_, __) =>
+    {
+        try
         {
-            // Fila horizontal: botones + texto de acceso
-            var row = new StackPanel
+            // -------------------------
+            // UNMOUNT
+            // -------------------------
+            if (NetworkScanner.IsMounted(mountPoint))
             {
-                Orientation = Orientation.Horizontal,
-                Spacing = 12,
-                VerticalAlignment = VerticalAlignment.Center
-            };
+                string cmd = $"sudo umount \"{mountPoint}\"";
+                string result = await ShellHelper.RunAsync(cmd);
 
-            // Botones
-            row.Children.Add(new Button { Content = "Mount", Width = 80, HorizontalContentAlignment =  HorizontalAlignment.Center });
-            row.Children.Add(new Button { Content = "Open", Width = 80, HorizontalContentAlignment = HorizontalAlignment.Center});
-
-            // Texto de acceso alineado a la derecha
-            row.Children.Add(new TextBlock
-            {
-                Text = $"Access: {share.Access}",
-                Foreground = Brushes.LightGray,
-                FontSize = 12,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(20, 0, 0, 0)
-            });
-
-            // Contenedor principal
-            var panel = new StackPanel
-            {
-                Spacing = 4,
-                Children =
+                if (result.Contains("error") || result.Contains("failed"))
                 {
-                    new TextBlock
-                    {
-                        Text = $"Share: {share.Name}",
-                        Foreground = Brushes.White,
-                        FontSize = 16
-                    },
-                    row
+                    main.ShowErrorDialog("Unmount failed", result);
+                    return;
                 }
-            };
 
-            var border = new Border
+                main.ShowToast($"{share.Name} unmounted");
+                UpdateMountButton();
+                return;
+            }
+
+            // -------------------------
+            // MOUNT
+            // -------------------------
+            if (share.Access.Contains("Requires"))
             {
-                Background = new SolidColorBrush(Color.Parse("#1B2838")),
-                Padding = new Thickness(8),
-                CornerRadius = new CornerRadius(6),
-                Child = panel
-            };
+                var cred = await main.ShowCredentialsDialog();
+                if (cred == null)
+                {
+                    main.ShowToast("Mount canceled");
+                    return;
+                }
 
-            // Tooltip con el comentario del share remoto
-            if (!string.IsNullOrWhiteSpace(share.Comment))
-                ToolTip.SetTip(border, share.Comment);
+                CredStore.User = cred.Value.user;
+                CredStore.Password = cred.Value.pass;
+            }
 
-            return border;
+            string options = share.Access.Contains("Anonymous")
+                ? "-o guest"
+                : $"-o username={CredStore.User},password={CredStore.Password}";
+
+            string cmdMount = $"sudo mount.cifs //{share.IP}/{share.Name} \"{mountPoint}\" {options}";
+            string resultMount = await ShellHelper.RunAsync(cmdMount);
+
+            if (resultMount.Contains("mount error") || resultMount.Contains("NT_STATUS"))
+            {
+                main.ShowErrorDialog("Mount failed", resultMount);
+                return;
+            }
+
+            main.ShowToast($"{share.Name} mounted successfully");
+            UpdateMountButton();
         }
+        catch (Exception ex)
+        {
+            main.ShowErrorDialog("Mount/Unmount failed", ex.Message);
+        }
+    };
 
+    // ---------------------------------------------------------
+    // BOTÓN OPEN
+    // ---------------------------------------------------------
+    var openBtn = new Button
+    {
+        Content = "Open",
+        Width = 80,
+        HorizontalContentAlignment = HorizontalAlignment.Center,
+        VerticalContentAlignment = VerticalAlignment.Center
+    };
+
+    openBtn.Click += async (_, __) =>
+    {
+        try
+        {
+            // Si no está montado → montarlo automáticamente
+            if (!NetworkScanner.IsMounted(mountPoint))
+            {
+                if (share.Access.Contains("Requires"))
+                {
+                    var cred = await main.ShowCredentialsDialog();
+                    if (cred == null)
+                    {
+                        main.ShowToast("Opening canceled");
+                        return;
+                    }
+
+                    CredStore.User = cred.Value.user;
+                    CredStore.Password = cred.Value.pass;
+                }
+
+                string options = share.Access.Contains("Anonymous")
+                    ? "-o guest"
+                    : $"-o username={CredStore.User},password={CredStore.Password}";
+
+                string cmd = $"sudo mount.cifs //{share.IP}/{share.Name} \"{mountPoint}\" {options}";
+                string result = await ShellHelper.RunAsync(cmd);
+
+                if (result.Contains("mount error") || result.Contains("NT_STATUS"))
+                {
+                    main.ShowErrorDialog("Open failed", result);
+                    return;
+                }
+
+                UpdateMountButton();
+            }
+
+            // Abrir carpeta
+            await ShellHelper.RunAsync($"xdg-open \"{mountPoint}\"");
+            main.ShowToast($"Abriendo {share.Name}");
+        }
+        catch (Exception ex)
+        {
+            main.ShowErrorDialog("Open failed", ex.Message);
+        }
+    };
+
+    // ---------------------------------------------------------
+    // FILA HORIZONTAL (BOTONES + ACCESS)
+    // ---------------------------------------------------------
+    var row = new StackPanel
+    {
+        Orientation = Orientation.Horizontal,
+        Spacing = 12,
+        VerticalAlignment = VerticalAlignment.Center
+    };
+
+    row.Children.Add(mountBtn);
+    row.Children.Add(openBtn);
+
+    row.Children.Add(new TextBlock
+    {
+        Text = $"Access: {share.Access}",
+        Foreground = Brushes.LightGray,
+        FontSize = 12,
+        VerticalAlignment = VerticalAlignment.Center,
+        Margin = new Thickness(20, 0, 0, 0)
+    });
+
+    // ---------------------------------------------------------
+    // TARJETA COMPLETA
+    // ---------------------------------------------------------
+    var panel = new StackPanel
+    {
+        Spacing = 4,
+        Children =
+        {
+            new TextBlock
+            {
+                Text = $"Share: {share.Name}",
+                Foreground = Brushes.White,
+                FontSize = 16
+            },
+            row
+        }
+    };
+
+    var border = new Border
+    {
+        Background = new SolidColorBrush(Color.Parse("#1B2838")),
+        Padding = new Thickness(8),
+        CornerRadius = new CornerRadius(6),
+        Child = panel
+    };
+
+    if (!string.IsNullOrWhiteSpace(share.Comment))
+        ToolTip.SetTip(border, share.Comment);
+
+    return border;
+}
+
+    
         
         // ---------------------------------------------------------
 

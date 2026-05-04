@@ -55,6 +55,15 @@
                         ToolTip.Tip="Samba global configuration."
                 />
 
+                
+                <StackPanel x:Name="ToastLayer"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Margin="10"
+                            Spacing="5"/>
+
+                
+                
             </Grid>
         </Border>
 

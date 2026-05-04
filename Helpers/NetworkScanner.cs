@@ -13,6 +13,15 @@ using System.Text.RegularExpressions;
 namespace SAMBA_Util.Helpers
 {
     // ---------------------------------------------------------
+    // CREDENCIALES (para Mount/Open)
+    // ---------------------------------------------------------
+    public static class CredStore
+    {
+        public static string User { get; set; } = "guest";
+        public static string Password { get; set; } = "";
+    }
+
+    // ---------------------------------------------------------
     // OS OVERRIDE MANAGER
     // ---------------------------------------------------------
     public static class OsOverrideManager
@@ -90,7 +99,7 @@ namespace SAMBA_Util.Helpers
     public static class NetworkScanner
     {
         // ---------------------------------------------------------
-        // DISCOVER DEVICES (PING SWEEP + MAC + HOSTNAME FILTER)
+        // DISCOVER DEVICES
         // ---------------------------------------------------------
         public static async Task<List<NetworkDevice>> DiscoverAsync(string ifaceName)
         {
@@ -136,7 +145,7 @@ namespace SAMBA_Util.Helpers
         }
 
         // ---------------------------------------------------------
-        // GET MAC ADDRESS USING ARP
+        // GET MAC ADDRESS
         // ---------------------------------------------------------
         private static async Task<string?> GetMacAsync(string ip)
         {
@@ -151,7 +160,7 @@ namespace SAMBA_Util.Helpers
         }
 
         // ---------------------------------------------------------
-        // OS DETECTION PIPELINE
+        // OS DETECTION
         // ---------------------------------------------------------
         public static async Task<string> DetectOSAsync(string ip, string name)
         {
@@ -409,45 +418,52 @@ namespace SAMBA_Util.Helpers
 
                 bool inShareSection = false;
 
-                foreach (var line in lines)
+                foreach (var raw in lines)
                 {
-                    string trimmed = line.Trim();
+                    string line = raw.Trim();
 
-                    if (trimmed.StartsWith("Sharename") || trimmed.StartsWith("Server"))
+                    if (line.StartsWith("Sharename", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("Server", StringComparison.OrdinalIgnoreCase))
                     {
                         inShareSection = true;
                         continue;
                     }
 
-                    if (trimmed.StartsWith("----") || trimmed.StartsWith("Anonymous"))
+                    if (line.StartsWith("----") ||
+                        line.StartsWith("Anonymous") ||
+                        line.StartsWith("Reconnecting", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("SMB1 disabled", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("Domain", StringComparison.OrdinalIgnoreCase))
                         continue;
 
                     if (!inShareSection)
                         continue;
 
-                    if (trimmed.StartsWith("Reconnecting") || trimmed.StartsWith("SMB1 disabled"))
-                        break;
+                    var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length < 2)
+                        continue;
 
-                    var parts = trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length >= 2)
+                    string name = parts[0];
+
+                    if (name is "IPC$" or "print$" or "ADMIN$")
+                        continue;
+
+                    var share = new NetworkShare(name)
                     {
-                        string name = parts[0];
+                        IP = ip
+                    };
 
-                        if (name is "IPC$" or "print$" or "ADMIN$")
-                            continue;
-
-                        var share = new NetworkShare(name);
-
-                        // Comentario del share
+                    if (parts.Length > 2)
+                    {
                         string comment = string.Join(" ", parts.Skip(2));
                         if (!string.IsNullOrWhiteSpace(comment))
                             share.Comment = comment;
-
-                        // Acceso real
-                        share.Access = await DetectShareAccess(ip, name);
-
-                        shares.Add(share);
                     }
+
+                    share.Access = await DetectShareAccess(ip, name);
+
+                    if (!shares.Any(s => s.Name == share.Name))
+                        shares.Add(share);
                 }
             }
             catch (Exception ex)
@@ -456,6 +472,22 @@ namespace SAMBA_Util.Helpers
             }
 
             return shares;
+        }
+
+        // ---------------------------------------------------------
+        // IS MOUNTED
+        // ---------------------------------------------------------
+        public static bool IsMounted(string mountPoint)
+        {
+            try
+            {
+                string mounts = File.ReadAllText("/proc/mounts");
+                return mounts.Contains(mountPoint);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         // ---------------------------------------------------------
@@ -528,15 +560,14 @@ namespace SAMBA_Util.Helpers
     }
 
     // ---------------------------------------------------------
-    // SHARE MODEL (CORRECTO)
+    // SHARE MODEL
     // ---------------------------------------------------------
     public class NetworkShare
     {
         public string Name { get; set; }
-
         public string? Comment { get; set; }
-
         public string Access { get; set; } = "Unknown";
+        public string IP { get; set; }
 
         public NetworkShare(string name)
         {
