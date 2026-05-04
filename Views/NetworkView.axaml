@@ -1,0 +1,52 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="SAMBA_Util.Views.NetworkView">
+
+    <Grid RowDefinitions="Auto,*,*,Auto" Margin="10">
+
+        <!-- Botón Scan -->
+        <Button x:Name="ScanButton"
+                Content="Scan Network"
+                
+                Height="32"
+                HorizontalAlignment="Left"
+                Width="150"
+                Margin="0,0,0,10"/>
+
+        <!-- Lista de dispositivos -->
+        <Border Grid.Row="1"
+                Background="{StaticResource ControlBackgroundBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="10"
+                Margin="0,0,0,10">
+
+            <ScrollViewer>
+                <StackPanel x:Name="DevicesPanel" Spacing="10"/>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Lista de shares -->
+        <Border Grid.Row="2"
+                Background="{StaticResource ControlBackgroundBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="10"
+                Margin="0,0,0,10">
+
+            <ScrollViewer>
+                <StackPanel x:Name="SharesPanel" Spacing="10"/>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Barra de estado -->
+        <TextBlock Grid.Row="3"
+                   x:Name="StatusText"
+                   Text="Ready"
+                   HorizontalAlignment="Center"
+                   Foreground="{StaticResource ForegroundBrush}"
+                   FontSize="14"/>
+    </Grid>
+</UserControl>

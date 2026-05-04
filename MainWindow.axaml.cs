@@ -104,7 +104,7 @@ public partial class MainWindow : Window
 
     private void OnStatusTextClicked(object? sender, PointerPressedEventArgs e)
     {
-        UpdateStatus("Admin password OK.");
+        UpdateStatus("Cerratonix  |  https://github.com/mijocec");
     }
 
     // ---------------------------

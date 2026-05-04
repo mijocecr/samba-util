@@ -63,7 +63,7 @@
         <TextBlock DockPanel.Dock="Bottom"
                    x:Name="StatusText"
                    Text="Cerratonix  |  https://github.com/mijocecr"
-                   ToolTip.Tip="Click here to enter the administrator password"
+                   
                    PointerPressed="OnStatusTextClicked"
                    HorizontalAlignment="Center"
                    FontSize="14"
@@ -101,10 +101,25 @@
                 <views:StatusView x:Name="StatusViewControl"/>
             </TabItem>
 
+            
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock Text="Network"
+                               
+                               Foreground="{StaticResource ForegroundBrush}"/>
+                </TabItem.Header>
+                <views:NetworkView/>
+            </TabItem>
+
+            
+            
             <TabItem Header="Logs">
                 <views:LogsView/>
             </TabItem>
-
+            
+            
+            
+          
         </TabControl>
 
     </DockPanel>
