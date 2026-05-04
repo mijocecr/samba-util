@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -150,4 +151,51 @@ public partial class MainWindow : Window
 
         await msg.ShowDialog(this);
     }
+    
+    
+    
+   
+
+    
+    public Window ShowLoadingDialog(string message)
+    {
+        var progress = new ProgressBar
+        {
+            IsIndeterminate = true,
+            Width = 250,
+            Height = 20,
+            Margin = new Thickness(0, 10, 0, 0)
+        };
+
+        var panel = new StackPanel
+        {
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = message,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                    FontSize = 16
+                },
+                progress
+            }
+        };
+
+        var win = new Window
+        {
+            Width = 350,
+            Height = 150,
+            Title = "Loading",
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Content = panel
+        };
+
+        win.Show(this); // No ShowDialog → no bloquea el hilo
+        return win;
+    }
+
+    
 }

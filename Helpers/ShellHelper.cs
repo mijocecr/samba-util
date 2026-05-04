@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace SAMBA_Util.Helpers;
 
@@ -96,4 +97,50 @@ public static class ShellHelper
 
         return (process.ExitCode, stdout, stderr);
     }
+    
+    
+    // ---------------------------------------------------------
+    // EJECUCIÓN NORMAL (SIN ROOT) PARA SMBCLIENT, ETC.
+    // ---------------------------------------------------------
+    public static async Task<string> RunAsync(string command)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = "/bin/bash",
+            Arguments = $"-c \"{command}\"",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var process = new Process { StartInfo = psi };
+
+        var stdoutBuilder = new StringBuilder();
+        var stderrBuilder = new StringBuilder();
+
+        process.OutputDataReceived += (s, e) =>
+        {
+            if (e.Data != null)
+                stdoutBuilder.AppendLine(e.Data);
+        };
+
+        process.ErrorDataReceived += (s, e) =>
+        {
+            if (e.Data != null)
+                stderrBuilder.AppendLine(e.Data);
+        };
+
+        process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+
+        await process.WaitForExitAsync();
+
+        return stdoutBuilder.ToString() + stderrBuilder.ToString();
+    }
 }
+
+    
+    
+

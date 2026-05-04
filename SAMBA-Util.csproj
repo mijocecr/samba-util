@@ -21,7 +21,38 @@
     <ItemGroup>
       <None Remove="Assets\Icons\samba-util.png" />
       <AvaloniaResource Include="Assets\Icons\samba-util.png">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </AvaloniaResource>
+      <None Remove="Assets\Icons\resource-unix.jpeg" />
+      <AvaloniaResource Include="Assets\Icons\resource-unix.jpeg">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </AvaloniaResource>
+      <None Remove="Assets\Icons\resource-router.jpeg" />
+      <AvaloniaResource Include="Assets\Icons\resource-router.jpeg">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </AvaloniaResource>
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="Assets\Icons\resource-bsd.jpeg" />
+      <AvaloniaResource Include="Assets\Icons\resource-bsd.jpeg">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </AvaloniaResource>
+      <None Remove="Assets\Icons\resource-linux.jpeg" />
+      <AvaloniaResource Include="Assets\Icons\resource-linux.jpeg">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </AvaloniaResource>
+      <None Remove="Assets\Icons\resource-mac.jpeg" />
+      <AvaloniaResource Include="Assets\Icons\resource-mac.jpeg">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </AvaloniaResource>
+      <None Remove="Assets\Icons\resource-other.jpeg" />
+      <AvaloniaResource Include="Assets\Icons\resource-other.jpeg">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </AvaloniaResource>
+      <None Remove="Assets\Icons\resource-windows.jpeg" />
+      <AvaloniaResource Include="Assets\Icons\resource-windows.jpeg">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </AvaloniaResource>
     </ItemGroup>
 </Project>

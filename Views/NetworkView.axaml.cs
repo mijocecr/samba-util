@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Net.NetworkInformation;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
@@ -7,6 +8,7 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Layout;
 using Avalonia.Platform;
+using SAMBA_Util.Helpers;
 
 namespace SAMBA_Util.Views
 {
@@ -15,38 +17,88 @@ namespace SAMBA_Util.Views
         public NetworkView()
         {
             InitializeComponent();
+            LoadInterfaces();
             ScanButton.Click += OnScanClicked;
         }
 
+        // ---------------------------------------------------------
+        // CARGAR INTERFACES EN EL COMBOBOX
+        // ---------------------------------------------------------
+        private void LoadInterfaces()
+        {
+            InterfaceSelector.Items.Clear();
+
+            foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (ni.OperationalStatus != OperationalStatus.Up)
+                    continue;
+
+                if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback)
+                    continue;
+
+                InterfaceSelector.Items.Add(ni.Name);
+            }
+
+            if (InterfaceSelector.Items.Count > 0)
+                InterfaceSelector.SelectedIndex = 0;
+        }
+
+        // ---------------------------------------------------------
+        // SCAN
+        // ---------------------------------------------------------
         private async void OnScanClicked(object? sender, RoutedEventArgs e)
         {
+            var main = (MainWindow)TopLevel.GetTopLevel(this);
+
+            var loading = main.ShowLoadingDialog("Scanning network...");
+
             Log("Starting network scan...");
             StatusText.Text = "Scanning...";
 
             DevicesPanel.Children.Clear();
             SharesPanel.Children.Clear();
 
-            var devices = await FakeScanAsync();
+            var iface = InterfaceSelector.SelectedItem?.ToString();
+
+            if (string.IsNullOrWhiteSpace(iface))
+            {
+                loading.Close();
+                Log("No interface selected.");
+                return;
+            }
+
+            var devices = await NetworkScanner.DiscoverAsync(iface);
+
+            foreach (var dev in devices)
+                dev.OS = await NetworkScanner.DetectOSAsync(dev.IP, dev.Name);
+
+            loading.Close();
 
             Log($"Scan finished. Devices found: {devices.Count}");
 
             foreach (var dev in devices)
-            {
-                Log($"Creating card for device: {dev.Name} ({dev.IP})");
                 DevicesPanel.Children.Add(CreateDeviceCard(dev));
-            }
 
             StatusText.Text = $"Found {devices.Count} devices";
         }
 
         // ---------------------------------------------------------
-        // TARJETA DE DISPOSITIVO (compacta + icono 128 + botón arriba)
+        // TARJETA DE DISPOSITIVO
         // ---------------------------------------------------------
-        private Control CreateDeviceCard(FakeDevice dev)
+        private Control CreateDeviceCard(NetworkDevice dev)
         {
-            Log($"Selecting icon for device: {dev.Name}");
+            Log($"Selecting icon for device: {dev.Name} ({dev.OS})");
 
-            string iconPath = "avares://SAMBA-Util/Assets/Icons/samba-util.png";
+            string iconPath = dev.OS switch
+            {
+                "Windows" => "avares://SAMBA-Util/Assets/Icons/resource-windows.jpeg",
+                "Linux"   => "avares://SAMBA-Util/Assets/Icons/resource-linux.jpeg",
+                "macOS"   => "avares://SAMBA-Util/Assets/Icons/resource-mac.jpeg",
+                "BSD"     => "avares://SAMBA-Util/Assets/Icons/resource-bsd.jpeg",
+                "Unix"    => "avares://SAMBA-Util/Assets/Icons/resource-unix.jpeg",
+                "Router"  => "avares://SAMBA-Util/Assets/Icons/resource-router.jpeg",
+                _         => "avares://SAMBA-Util/Assets/Icons/resource-other.jpeg"
+            };
 
             Image icon;
 
@@ -65,38 +117,46 @@ namespace SAMBA_Util.Views
             }
             catch
             {
-                icon = new Image
-                {
-                    Width = 128,
-                    Height = 128,
-                   // Background = Brushes.Red
-                };
+                icon = new Image { Width = 128, Height = 128 };
             }
 
-            // Panel izquierdo: texto + botón
             var leftPanel = new Grid
             {
                 RowDefinitions = new RowDefinitions("Auto,Auto"),
                 Margin = new Thickness(0, 0, 10, 0)
             };
 
-            // Nombre + IP
             leftPanel.Children.Add(new StackPanel
             {
-                Spacing = 1, // más compacto
+                Spacing = 1,
                 Children =
                 {
-                    new TextBlock { Text = dev.Name, Foreground = Brushes.White, FontSize = 18 },
-                    new TextBlock { Text = dev.IP, Foreground = Brushes.Gray, FontSize = 13 }
+                    new TextBlock
+                    {
+                        Text = dev.Name,
+                        Foreground = Brushes.White,
+                        FontSize = 18
+                    },
+                    new TextBlock
+                    {
+                        Text = dev.IP,
+                        Foreground = Brushes.Gray,
+                        FontSize = 13
+                    },
+                    new TextBlock
+                    {
+                        Text = $"OS: {dev.OS}",
+                        Foreground = Brushes.LightGray,
+                        FontSize = 12
+                    }
                 }
             });
 
-            // Botón justo debajo del nombre
             var btn = new Button
             {
                 Content = "Show Shares",
                 Width = 120,
-                Margin = new Thickness(0, 15, 0, 0) // más compacto
+                Margin = new Thickness(0, 15, 0, 0)
             };
 
             btn.Click += async (_, __) =>
@@ -106,10 +166,22 @@ namespace SAMBA_Util.Views
 
                 SharesPanel.Children.Clear();
 
-                var shares = await FakeSharesAsync(dev);
+                var shares = await NetworkScanner.GetSharesAsync(dev.IP);
 
-                foreach (var share in shares)
-                    SharesPanel.Children.Add(CreateShareItem(share));
+                if (shares.Count == 0)
+                {
+                    SharesPanel.Children.Add(new TextBlock
+                    {
+                        Text = "No SMB shares found.",
+                        Foreground = Brushes.Gray,
+                        FontSize = 14
+                    });
+                }
+                else
+                {
+                    foreach (var share in shares)
+                        SharesPanel.Children.Add(CreateShareItem(share));
+                }
 
                 StatusText.Text = $"Shares loaded for {dev.Name}";
             };
@@ -117,7 +189,6 @@ namespace SAMBA_Util.Views
             Grid.SetRow(btn, 1);
             leftPanel.Children.Add(btn);
 
-            // Grid principal: izquierda (texto+botón) + derecha (icono)
             var header = new Grid
             {
                 ColumnDefinitions = new ColumnDefinitions("*,150"),
@@ -128,20 +199,68 @@ namespace SAMBA_Util.Views
             header.Children.Add(icon);
             Grid.SetColumn(icon, 1);
 
-            // Tarjeta final (compactada)
-            return new Border
+            var border = new Border
             {
                 Background = new SolidColorBrush(Color.Parse("#2A475E")),
-                Padding = new Thickness(8, 6, 8, 6), // altura reducida
+                Padding = new Thickness(8, 6, 8, 6),
                 CornerRadius = new CornerRadius(6),
                 Child = header
             };
+
+            border.ContextMenu = BuildOsContextMenu(dev, border);
+
+            return border;
+        }
+
+        // ---------------------------------------------------------
+        // MENÚ CONTEXTUAL PARA OVERRIDE DE SO
+        // ---------------------------------------------------------
+        private ContextMenu BuildOsContextMenu(NetworkDevice dev, Border card)
+        {
+            var menu = new ContextMenu();
+            var root = new MenuItem { Header = "Identify the right O.S" };
+
+            var osItems = new List<MenuItem>();
+
+            void AddOsItem(string label)
+            {
+                var item = new MenuItem { Header = label };
+                item.Click += (_, __) =>
+                {
+                    OsOverrideManager.SetOverride(dev.IP, label);
+                    dev.OS = label;
+
+                    var parent = DevicesPanel;
+                    int index = parent.Children.IndexOf(card);
+                    if (index >= 0)
+                    {
+                        parent.Children.RemoveAt(index);
+                        parent.Children.Insert(index, CreateDeviceCard(dev));
+                    }
+
+                    Log($"OS override applied: {dev.IP} → {label}");
+                };
+
+                osItems.Add(item);
+            }
+
+            AddOsItem("Windows");
+            AddOsItem("Linux");
+            AddOsItem("macOS");
+            AddOsItem("BSD");
+            AddOsItem("Unix");
+            AddOsItem("Other");
+
+            root.ItemsSource = osItems;
+            menu.ItemsSource = new List<MenuItem> { root };
+
+            return menu;
         }
 
         // ---------------------------------------------------------
         // TARJETA DE SHARE
         // ---------------------------------------------------------
-        private Control CreateShareItem(FakeShare share)
+        private Control CreateShareItem(NetworkShare share)
         {
             var panel = new StackPanel { Spacing = 4 };
 
@@ -171,31 +290,6 @@ namespace SAMBA_Util.Views
             };
         }
 
-        // ---------------------------------------------------------
-        // FAKE DATA
-        // ---------------------------------------------------------
-        private Task<List<FakeDevice>> FakeScanAsync()
-        {
-            return Task.FromResult(new List<FakeDevice>
-            {
-                new FakeDevice("PC-01", "192.168.1.10"),
-                new FakeDevice("NAS-LivingRoom", "192.168.1.20")
-            });
-        }
-
-        private Task<List<FakeShare>> FakeSharesAsync(FakeDevice dev)
-        {
-            return Task.FromResult(new List<FakeShare>
-            {
-                new FakeShare("Public"),
-                new FakeShare("Media"),
-                new FakeShare("Backup")
-            });
-        }
-
-        // ---------------------------------------------------------
-        // INSTRUMENTACIÓN
-        // ---------------------------------------------------------
         private void Log(string msg)
         {
             Console.WriteLine($"[NetworkView] {msg}");
@@ -203,6 +297,5 @@ namespace SAMBA_Util.Views
         }
     }
 
-    public record FakeDevice(string Name, string IP);
-    public record FakeShare(string Name);
+    
 }

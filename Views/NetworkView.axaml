@@ -4,14 +4,24 @@
 
     <Grid RowDefinitions="Auto,*,*,Auto" Margin="10">
 
-        <!-- Botón Scan -->
-        <Button x:Name="ScanButton"
-                Content="Scan Network"
-                
-                Height="32"
-                HorizontalAlignment="Left"
-                Width="150"
-                Margin="0,0,0,10"/>
+        <!-- Fila superior: ComboBox + Botón Scan -->
+        <StackPanel Orientation="Horizontal"
+                    Spacing="10"
+                    Grid.Row="0"
+                    Margin="0,0,0,10">
+
+            <!-- Selector de interfaz -->
+            <ComboBox x:Name="InterfaceSelector"
+                      Width="220"
+                      HorizontalAlignment="Left"/>
+
+            <!-- Botón Scan -->
+            <Button x:Name="ScanButton"
+                    Content="Scan Network"
+                    Height="32"
+                    Width="150"
+                    HorizontalAlignment="Left"/>
+        </StackPanel>
 
         <!-- Lista de dispositivos -->
         <Border Grid.Row="1"
