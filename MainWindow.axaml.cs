@@ -107,7 +107,7 @@ public partial class MainWindow : Window
 
     private void OnStatusTextClicked(object? sender, PointerPressedEventArgs e)
     {
-        UpdateStatus("Cerratonix  |  https://github.com/mijocec");
+        UpdateStatus("Cerratonix  |  https://github.com/mijocecr");
     }
 
     // ---------------------------
