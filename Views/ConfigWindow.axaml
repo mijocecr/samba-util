@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="SAMBA_Util.Views.ConfigWindow"
-        Width="450" Height="250"
+        Width="450" Height="280"
         Title="Samba-util Configuration"
         CanResize="False"
         CanMaximize="False"
@@ -9,41 +9,56 @@
         Background="{StaticResource BackgroundBrush}"
         Foreground="{StaticResource ForegroundBrush}">
 
-    <StackPanel Margin="20" Spacing="15">
+    <Border Margin="20"
+            Padding="20"
+            Background="{StaticResource ControlBackgroundBrush}"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="10"
+            Effect="drop-shadow(0 4 12 #00000040)">
 
-        <!-- Título -->
-        <TextBlock Text="Global Configuration"
-                   FontSize="20"
-                   FontWeight="Bold"
-                   Foreground="{StaticResource ForegroundBrush}"/>
+        <StackPanel Spacing="15">
 
-        <!-- Samba config path -->
-        <StackPanel Spacing="10">
-            <TextBlock Text="Samba config path:"
+            <!-- Título -->
+            <TextBlock Text="Global Configuration"
+                       FontSize="20"
+                       FontWeight="Bold"
                        Foreground="{StaticResource ForegroundBrush}"/>
-            <TextBox x:Name="TxtSmbConf"
-                     Background="{StaticResource ControlBackgroundBrush}"
-                     BorderBrush="{StaticResource BorderBrush}"
-                     Foreground="{StaticResource ForegroundBrush}"/>
+
+            <!-- Samba config path -->
+            <StackPanel Spacing="6">
+                <TextBlock Text="Samba config path:"
+                           Foreground="{StaticResource ForegroundBrush}"/>
+                <TextBox x:Name="TxtSmbConf"
+                         Background="{StaticResource ControlBackgroundBrush}"
+                         BorderBrush="{StaticResource BorderBrush}"
+                         Foreground="{StaticResource ForegroundBrush}"
+                         CornerRadius="6"/>
+            </StackPanel>
+
+            <!-- Default permissions -->
+            <StackPanel Spacing="6">
+                <TextBlock Text="Default permissions:"
+                           Foreground="{StaticResource ForegroundBrush}"/>
+                <TextBox x:Name="TxtDefaultPerms"
+                         Background="{StaticResource ControlBackgroundBrush}"
+                         BorderBrush="{StaticResource BorderBrush}"
+                         Foreground="{StaticResource ForegroundBrush}"
+                         CornerRadius="6"/>
+            </StackPanel>
+
+            <!-- Botones -->
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,5,0,10"
+                        VerticalAlignment="Center">
+                <Button Content="Save"
+                        Classes="AccentButton"
+                        Click="OnSave"/>
+                <Button Content="Close"
+                        Classes="NeutralButton"
+                        Click="OnClose"/>
+            </StackPanel>
+
         </StackPanel>
 
-        <!-- Default permissions -->
-        <StackPanel Spacing="10">
-            <TextBlock Text="Default permissions:"
-                       Foreground="{StaticResource ForegroundBrush}"/>
-            <TextBox x:Name="TxtDefaultPerms"
-                     Background="{StaticResource ControlBackgroundBrush}"
-                     BorderBrush="{StaticResource BorderBrush}"
-                     Foreground="{StaticResource ForegroundBrush}"/>
-        </StackPanel>
-
-        <!-- Botones -->
-        <StackPanel Orientation="Horizontal" Spacing="10">
-            <Button Content="Save"
-                    Click="OnSave"/>
-            <Button Content="Close"
-                    Click="OnClose"/>
-        </StackPanel>
-
-    </StackPanel>
+    </Border>
 </Window>

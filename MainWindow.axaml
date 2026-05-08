@@ -83,6 +83,8 @@
         <!-- CONTENIDO DINÁMICO -->
         <TabControl Background="{StaticResource BackgroundBrush}">
             
+            
+            
             <TabItem>
                 <TabItem.Header>
                     <TextBlock Text="Shares"
@@ -101,15 +103,7 @@
                 <views:UsersView x:Name="UsersViewControl"/>
             </TabItem>
 
-            <TabItem>
-                <TabItem.Header>
-                    <TextBlock Text="Status"
-                               Foreground="{StaticResource ForegroundBrush}"
-                               PointerPressed="OnStatusRefreshClicked"/>
-                </TabItem.Header>
-                <views:StatusView x:Name="StatusViewControl"/>
-            </TabItem>
-
+           
             
             <TabItem>
                 <TabItem.Header>
@@ -122,10 +116,26 @@
             </TabItem>
 
             
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock Text="Status"
+                               Foreground="{StaticResource ForegroundBrush}"
+                               PointerPressed="OnStatusRefreshClicked"/>
+                </TabItem.Header>
+                <views:StatusView x:Name="StatusViewControl"/>
+            </TabItem>
             
-            <TabItem Header="Logs">
+            
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock Text="Logs"
+                               PointerPressed="onLogsTabClick"
+                               Foreground="{StaticResource ForegroundBrush}"/>
+                                 
+                </TabItem.Header>
                 <views:LogsView/>
             </TabItem>
+
             
             
             

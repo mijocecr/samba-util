@@ -26,7 +26,7 @@
                        Foreground="{StaticResource ForegroundBrush}"/>
 
             <TextBox x:Name="PasswordBox"
-                     PasswordChar="*"
+                     PasswordChar="●"
                      PlaceholderText="Leave empty if is not required. (Optional)"
                      Width="300"
                      Height="32"

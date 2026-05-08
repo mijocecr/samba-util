@@ -18,7 +18,7 @@ public partial class MainWindow : Window
 {
     public MainWindow()
     {
-        base.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        WindowStartupLocation = WindowStartupLocation.CenterScreen;
         InitializeComponent();
     }
 
@@ -27,43 +27,42 @@ public partial class MainWindow : Window
         base.OnOpened(e);
 
         StatusText.Text = "Initializing...";
-
-        // Pedir contraseña después de mostrar la ventana
         await Task.Delay(200);
-        await SolicitarPassword();
 
-        if (string.IsNullOrWhiteSpace(Credenciales.AdminPassword))
+        // Bucle de validación de contraseña
+        while (true)
         {
-            StatusText.Text = "Initialization aborted.";
-            return;
-        }
-
-        // Validar contraseña
-        StatusText.Text = "Validating password...";
-        var result = ShellHelper.EjecutarComoRoot("echo OK");
-
-        // 🔥 Manejo de contraseña incorrecta
-        if (result.ExitCode == 1001)
-        {
-            StatusText.Text = "Incorrect admin password.";
-            await MostrarPasswordIncorrecta();
             await SolicitarPassword();
-            return;
-        }
 
-        if (result.ExitCode != 0)
-        {
-            StatusText.Text = "Admin password validation failed.";
-            return;
+            if (string.IsNullOrWhiteSpace(Credenciales.AdminPassword))
+            {
+                StatusText.Text = "Initialization aborted.";
+                return;
+            }
+
+            StatusText.Text = "Validating password...";
+            var result = ShellHelper.EjecutarComoRoot("echo OK");
+
+            if (result.ExitCode == 1001)
+            {
+                StatusText.Text = "Incorrect admin password.";
+                await MostrarPasswordIncorrecta();
+                continue; // vuelve a pedir contraseña
+            }
+
+            if (result.ExitCode != 0)
+            {
+                StatusText.Text = "Admin password validation failed.";
+                return;
+            }
+
+            break; // contraseña correcta
         }
 
         // Cargar shares
         StatusText.Text = "Loading Samba configuration...";
 
-        var shares = await Task.Run(() =>
-        {
-            return SambaConfigReader.LoadShares();
-        });
+        var shares = await Task.Run(() => SambaConfigReader.LoadShares());
 
         SharesViewControl.SetShares(shares);
         StatusText.Text = $"Loaded {shares.Count} shares.";
@@ -77,7 +76,6 @@ public partial class MainWindow : Window
     {
         var win = new ConfigWindow();
 
-        // 🔥 Suscribirse al evento para refrescar vistas
         win.ConfigSaved += () =>
         {
             int count = SharesViewControl.LoadShares();
@@ -113,7 +111,7 @@ public partial class MainWindow : Window
     // ---------------------------
     // UTILIDADES
     // ---------------------------
-    
+
     public async Task<(string user, string pass)?> ShowCredentialsDialog()
     {
         var dialog = new Window
@@ -129,8 +127,8 @@ public partial class MainWindow : Window
         var userBox = new TextBox { Watermark = "Username" };
         var passBox = new TextBox { Watermark = "Password", PasswordChar = '•' };
 
-        var okBtn = new Button { Content = "OK", Width = 80 , HorizontalContentAlignment = HorizontalAlignment.Center};
-        var cancelBtn = new Button { Content = "Cancel", Width = 80 , HorizontalContentAlignment = HorizontalAlignment.Center};
+        var okBtn = new Button { Content = "OK", Width = 80, HorizontalContentAlignment = HorizontalAlignment.Center };
+        var cancelBtn = new Button { Content = "Cancel", Width = 80, HorizontalContentAlignment = HorizontalAlignment.Center };
 
         var panel = new StackPanel
         {
@@ -167,17 +165,15 @@ public partial class MainWindow : Window
             dialog.Close();
         };
 
-        // ⭐ EVENTO ENTER EN USERNAME
         userBox.KeyDown += (s, e) =>
         {
-            if (e.Key == Avalonia.Input.Key.Enter)
+            if (e.Key == Key.Enter)
                 Accept();
         };
 
-        // ⭐ EVENTO ENTER EN PASSWORD
         passBox.KeyDown += (s, e) =>
         {
-            if (e.Key == Avalonia.Input.Key.Enter)
+            if (e.Key == Key.Enter)
                 Accept();
         };
 
@@ -186,8 +182,6 @@ public partial class MainWindow : Window
         return await tcs.Task;
     }
 
-
-    //----------------------------
     public async void ShowErrorDialog(string title, string message)
     {
         var dialog = new Window
@@ -204,7 +198,7 @@ public partial class MainWindow : Window
         {
             Text = message,
             Foreground = Brushes.White,
-            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 10)
         };
 
@@ -212,7 +206,7 @@ public partial class MainWindow : Window
         {
             Content = "OK",
             Width = 80,
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
+            HorizontalAlignment = HorizontalAlignment.Center
         };
 
         okBtn.Click += (_, __) => dialog.Close();
@@ -238,8 +232,6 @@ public partial class MainWindow : Window
         await dialog.ShowDialog(this);
     }
 
-    
-    //----------------------------
     public void ShowToast(string message)
     {
         var toast = new Border
@@ -265,10 +257,6 @@ public partial class MainWindow : Window
             });
         });
     }
-
-    
-    
-    //----------------------------
 
     public void UpdateStatus(string message)
     {
@@ -301,20 +289,15 @@ public partial class MainWindow : Window
             Content = new TextBlock
             {
                 Text = "Incorrect administrator password.",
-                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
             },
             WindowStartupLocation = WindowStartupLocation.CenterOwner
         };
 
         await msg.ShowDialog(this);
     }
-    
-    
-    
-   
 
-    
     public Window ShowLoadingDialog(string message)
     {
         var progress = new ProgressBar
@@ -327,14 +310,14 @@ public partial class MainWindow : Window
 
         var panel = new StackPanel
         {
-            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center,
             Children =
             {
                 new TextBlock
                 {
                     Text = message,
-                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Center,
                     FontSize = 16
                 },
                 progress
@@ -351,13 +334,17 @@ public partial class MainWindow : Window
             Content = panel
         };
 
-        win.Show(this); // No ShowDialog → no bloquea el hilo
+        win.Show(this);
         return win;
     }
-
 
     private void InputElement_OnPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         UpdateStatus("Remote Shares");
+    }
+
+    private void onLogsTabClick(object? sender, PointerPressedEventArgs e)
+    {
+        UpdateStatus("Latest Samba logs");
     }
 }

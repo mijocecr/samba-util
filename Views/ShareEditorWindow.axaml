@@ -16,6 +16,7 @@
             <TextBlock Text="Name"
                        Foreground="{StaticResource ForegroundBrush}"/>
             <TextBox x:Name="TxtName"
+                     CornerRadius="6"
                      Background="{StaticResource ControlBackgroundBrush}"
                      BorderBrush="{StaticResource BorderBrush}"
                      Foreground="{StaticResource ForegroundBrush}"/>
@@ -26,6 +27,7 @@
                 <TextBox x:Name="TxtPath"
                          Width="240"
                          IsReadOnly="True"
+                         CornerRadius="6"
                          Background="{StaticResource ControlBackgroundBrush}"
                          BorderBrush="{StaticResource BorderBrush}"
                          Foreground="{StaticResource ForegroundBrush}"/>
@@ -59,6 +61,7 @@
             <TextBlock Text="Comment"
                        Foreground="{StaticResource ForegroundBrush}"/>
             <TextBox x:Name="TxtComment"
+                     CornerRadius="6"
                      Background="{StaticResource ControlBackgroundBrush}"
                      BorderBrush="{StaticResource BorderBrush}"
                      Foreground="{StaticResource ForegroundBrush}"/>
@@ -76,6 +79,7 @@
                         <TextBlock Text="Valid Users"
                                    Foreground="{StaticResource ForegroundBrush}"/>
                         <TextBox x:Name="TxtValidUsers"
+                                 CornerRadius="6"
                                  Background="{StaticResource ControlBackgroundBrush}"
                                  BorderBrush="{StaticResource BorderBrush}"
                                  Foreground="{StaticResource ForegroundBrush}"/>
@@ -83,6 +87,7 @@
                         <TextBlock Text="Write List"
                                    Foreground="{StaticResource ForegroundBrush}"/>
                         <TextBox x:Name="TxtWriteList"
+                                 CornerRadius="6"
                                  Background="{StaticResource ControlBackgroundBrush}"
                                  BorderBrush="{StaticResource BorderBrush}"
                                  Foreground="{StaticResource ForegroundBrush}"/>
@@ -90,6 +95,7 @@
                         <TextBlock Text="Read List"
                                    Foreground="{StaticResource ForegroundBrush}"/>
                         <TextBox x:Name="TxtReadList"
+                                 CornerRadius="6"
                                  Background="{StaticResource ControlBackgroundBrush}"
                                  BorderBrush="{StaticResource BorderBrush}"
                                  Foreground="{StaticResource ForegroundBrush}"/>
@@ -97,6 +103,7 @@
                         <TextBlock Text="Force User"
                                    Foreground="{StaticResource ForegroundBrush}"/>
                         <TextBox x:Name="TxtForceUser"
+                                 CornerRadius="6"
                                  Background="{StaticResource ControlBackgroundBrush}"
                                  BorderBrush="{StaticResource BorderBrush}"
                                  Foreground="{StaticResource ForegroundBrush}"/>
@@ -104,6 +111,7 @@
                         <TextBlock Text="Force Group"
                                    Foreground="{StaticResource ForegroundBrush}"/>
                         <TextBox x:Name="TxtForceGroup"
+                                 CornerRadius="6"
                                  Background="{StaticResource ControlBackgroundBrush}"
                                  BorderBrush="{StaticResource BorderBrush}"
                                  Foreground="{StaticResource ForegroundBrush}"/>
@@ -111,6 +119,7 @@
                         <TextBlock Text="Create Mask"
                                    Foreground="{StaticResource ForegroundBrush}"/>
                         <TextBox x:Name="TxtCreateMask"
+                                 CornerRadius="6"
                                  Background="{StaticResource ControlBackgroundBrush}"
                                  BorderBrush="{StaticResource BorderBrush}"
                                  Foreground="{StaticResource ForegroundBrush}"/>
@@ -118,6 +127,7 @@
                         <TextBlock Text="Directory Mask"
                                    Foreground="{StaticResource ForegroundBrush}"/>
                         <TextBox x:Name="TxtDirectoryMask"
+                                 CornerRadius="6"
                                  Background="{StaticResource ControlBackgroundBrush}"
                                  BorderBrush="{StaticResource BorderBrush}"
                                  Foreground="{StaticResource ForegroundBrush}"/>
@@ -125,6 +135,7 @@
                     </StackPanel>
                 </Expander>
 
+                <!-- SAVE BUTTON — MISMA POSICIÓN EXACTA -->
                 <Button Grid.Column="1"
                         Content="Save"
                         HorizontalAlignment="Right"

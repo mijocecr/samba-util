@@ -2,7 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="SAMBA_Util.Views.LogsView">
 
-    <StackPanel Margin="20" Spacing="15">
+    <StackPanel Margin="20" Spacing="18">
 
         <!-- Título -->
         <TextBlock Text="Samba Logs"
@@ -13,18 +13,21 @@
         <!-- Botones -->
         <StackPanel Orientation="Horizontal" Spacing="10">
             <Button Content="Refresh"
+                    Classes="NeutralButton"
                     Click="OnRefresh"/>
-            
+
             <Button Content="Open Full Log"
+                    Classes="AccentButton"
                     Click="OnOpenFull"/>
         </StackPanel>
 
-        <!-- Panel de logs -->
+        <!-- Tarjeta elevada para logs -->
         <Border Background="{StaticResource ControlBackgroundBrush}"
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"
-                CornerRadius="6"
-                Padding="10">
+                CornerRadius="10"
+                Padding="14"
+                Effect="drop-shadow(0 4 14 #00000055)">
 
             <ScrollViewer x:Name="Scroll" Height="400">
                 <TextBlock x:Name="TxtLogs"
