@@ -12,7 +12,7 @@ public partial class PasswordDialog : Window
     public PasswordDialog()
     {
         InitializeComponent();
-        WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
         this.Closed += (s, e) =>
         {
