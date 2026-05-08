@@ -55,15 +55,11 @@
                         ToolTip.Tip="Samba global configuration."
                 />
 
-                
                 <StackPanel x:Name="ToastLayer"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Top"
                             Margin="10"
                             Spacing="5"/>
-
-                
-                
             </Grid>
         </Border>
 
@@ -72,7 +68,6 @@
         <TextBlock DockPanel.Dock="Bottom"
                    x:Name="StatusText"
                    Text="Cerratonix  |  https://github.com/mijocecr"
-                   
                    PointerPressed="OnStatusTextClicked"
                    HorizontalAlignment="Center"
                    FontSize="14"
@@ -81,9 +76,20 @@
 
 
         <!-- CONTENIDO DINÁMICO -->
-        <TabControl Background="{StaticResource BackgroundBrush}">
+        <TabControl x:Name="MainTabs"
+                    SelectedIndex="0"
+                    SelectionChanged="OnTabChanged"
+                    Background="{StaticResource BackgroundBrush}">
             
             
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock Text="Status"
+                               Foreground="{StaticResource ForegroundBrush}"
+                               PointerPressed="OnStatusRefreshClicked"/>
+                </TabItem.Header>
+                <views:StatusView x:Name="StatusViewControl"/>
+            </TabItem>
             
             <TabItem>
                 <TabItem.Header>
@@ -103,43 +109,24 @@
                 <views:UsersView x:Name="UsersViewControl"/>
             </TabItem>
 
-           
-            
             <TabItem>
                 <TabItem.Header>
                     <TextBlock Text="Network"
                                PointerPressed="InputElement_OnPointerPressed"
                                Foreground="{StaticResource ForegroundBrush}"/>
-                                 
                 </TabItem.Header>
                 <views:NetworkView/>
             </TabItem>
 
-            
-            <TabItem>
-                <TabItem.Header>
-                    <TextBlock Text="Status"
-                               Foreground="{StaticResource ForegroundBrush}"
-                               PointerPressed="OnStatusRefreshClicked"/>
-                </TabItem.Header>
-                <views:StatusView x:Name="StatusViewControl"/>
-            </TabItem>
-            
-            
             <TabItem>
                 <TabItem.Header>
                     <TextBlock Text="Logs"
                                PointerPressed="onLogsTabClick"
                                Foreground="{StaticResource ForegroundBrush}"/>
-                                 
                 </TabItem.Header>
                 <views:LogsView/>
             </TabItem>
 
-            
-            
-            
-          
         </TabControl>
 
     </DockPanel>

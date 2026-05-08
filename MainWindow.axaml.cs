@@ -16,6 +16,8 @@ namespace SAMBA_Util;
 
 public partial class MainWindow : Window
 {
+    private bool _isLoaded = false;
+
     public MainWindow()
     {
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
@@ -47,7 +49,7 @@ public partial class MainWindow : Window
             {
                 StatusText.Text = "Incorrect admin password.";
                 await MostrarPasswordIncorrecta();
-                continue; // vuelve a pedir contraseña
+                continue;
             }
 
             if (result.ExitCode != 0)
@@ -56,7 +58,7 @@ public partial class MainWindow : Window
                 return;
             }
 
-            break; // contraseña correcta
+            break;
         }
 
         // Cargar shares
@@ -66,11 +68,28 @@ public partial class MainWindow : Window
 
         SharesViewControl.SetShares(shares);
         StatusText.Text = $"Loaded {shares.Count} shares.";
+
+        // ⭐ Forzar Status como pestaña inicial REAL
+        Dispatcher.UIThread.Post(() =>
+        {
+            MainTabs.SelectedIndex = 0;
+            StatusViewControl.RefreshStatus();
+            _isLoaded = true;
+        });
     }
 
     // ---------------------------
     // EVENTOS
     // ---------------------------
+
+    private void OnTabChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (!_isLoaded || StatusViewControl == null)
+            return;
+
+        if (MainTabs.SelectedIndex == 0)
+            StatusViewControl.RefreshStatus();
+    }
 
     private async void OnOpenConfig(object? sender, RoutedEventArgs e)
     {
@@ -303,11 +322,9 @@ public partial class MainWindow : Window
             BorderBrush = (IBrush)Application.Current!.FindResource("BorderBrush")!,
             BorderThickness = new Thickness(1),
 
-            // ⭐ Avalonia 11: DropShadowEffect está en Avalonia.Media
             Effect = new DropShadowEffect
             {
                 BlurRadius = 14,
-                
                 Color = Colors.Black,
                 Opacity = 0.33
             }
