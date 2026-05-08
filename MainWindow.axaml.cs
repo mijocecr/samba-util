@@ -186,8 +186,8 @@ public partial class MainWindow : Window
     {
         var dialog = new Window
         {
-            Width = 400,
-            Height = 220,
+            Width = 360,
+            Height = 200,
             Background = new SolidColorBrush(Color.Parse("#1B2838")),
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Title = title,
@@ -281,22 +281,77 @@ public partial class MainWindow : Window
 
     private async Task MostrarPasswordIncorrecta()
     {
-        var msg = new Window
+        var dialog = new Window
         {
-            Width = 350,
-            Height = 150,
+            Width = 360,
+            Height = 160,
+            CanResize = false,
+            CanMinimize = false,
+            CanMaximize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Title = "Authentication Error",
-            Content = new TextBlock
-            {
-                Text = "Incorrect administrator password.",
-                VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Center
-            },
-            WindowStartupLocation = WindowStartupLocation.CenterOwner
+            Background = (IBrush)Application.Current!.FindResource("BackgroundBrush")!,
+            Foreground = (IBrush)Application.Current!.FindResource("ForegroundBrush")!
         };
 
-        await msg.ShowDialog(this);
+        var border = new Border
+        {
+            Margin = new Thickness(12),
+            Padding = new Thickness(18),
+            CornerRadius = new CornerRadius(10),
+            Background = (IBrush)Application.Current!.FindResource("ControlBackgroundBrush")!,
+            BorderBrush = (IBrush)Application.Current!.FindResource("BorderBrush")!,
+            BorderThickness = new Thickness(1),
+
+            // ⭐ Avalonia 11: DropShadowEffect está en Avalonia.Media
+            Effect = new DropShadowEffect
+            {
+                BlurRadius = 14,
+                
+                Color = Colors.Black,
+                Opacity = 0.33
+            }
+        };
+
+        var stack = new StackPanel { Spacing = 14 };
+
+        var textBlock = new TextBlock
+        {
+            Text = "Incorrect administrator password.",
+            Foreground = (IBrush)Application.Current!.FindResource("ForegroundBrush")!,
+            TextWrapping = TextWrapping.Wrap
+        };
+
+        var okBtn = new Button
+        {
+            Content = "OK",
+            Width = 90,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalAlignment =  VerticalAlignment.Center,
+            HorizontalAlignment =  HorizontalAlignment.Center,
+            Classes = { "AccentButton" }
+        };
+
+        okBtn.Click += (_, __) => dialog.Close();
+
+        var buttonPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Spacing = 10,
+            Children = { okBtn }
+        };
+
+        stack.Children.Add(textBlock);
+        stack.Children.Add(buttonPanel);
+
+        border.Child = stack;
+        dialog.Content = border;
+
+        await dialog.ShowDialog(this);
     }
+
 
     public Window ShowLoadingDialog(string message)
     {

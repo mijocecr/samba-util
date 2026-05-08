@@ -13,6 +13,9 @@ public class PasswordDialogViewModel
 
     public void OnPasswordEntered(string password)
     {
+        // Aquí NO se valida nada.
+        // Aquí NO se cierra el diálogo.
+        // Solo se pasa el password a MainWindow.
         _onPassword(password);
     }
 }
