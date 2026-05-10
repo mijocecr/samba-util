@@ -93,7 +93,8 @@ It focuses on reliability and does not modify any Samba settings outside the use
 
 ---
 
-<img width="1280" height="720" alt="banner" src="https://github.com/user-attachments/assets/e0303aaf-dd37-4b93-b7b8-089845606720" />
+<img width="3840" height="2160" alt="banner_01" src="https://github.com/user-attachments/assets/390f0b06-643b-4986-9d8c-84f1ee5d1c89" />
+
 
 ---
 
