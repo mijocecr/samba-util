@@ -101,7 +101,8 @@ It focuses on reliability and does not modify any Samba settings outside the use
 
 ---
 
-<img width="3840" height="2160" alt="banner_01" src="https://github.com/user-attachments/assets/390f0b06-643b-4986-9d8c-84f1ee5d1c89" />
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/4568afa6-b8fb-4dab-9817-7eb99f1b68fd" />
+
 
 ---
 
