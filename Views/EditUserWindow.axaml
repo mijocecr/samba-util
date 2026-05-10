@@ -4,8 +4,7 @@
         Width="420" Height="460"
         Title="Edit User"
         CanResize="False"
-        CanMinimize="False"
-        CanMaximize="False"
+      
         Background="{StaticResource BackgroundBrush}"
         Foreground="{StaticResource ForegroundBrush}">
 

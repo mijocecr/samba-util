@@ -305,8 +305,7 @@ public partial class MainWindow : Window
             Width = 360,
             Height = 160,
             CanResize = false,
-            CanMinimize = false,
-            CanMaximize = false,
+           
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Title = "Authentication Error",
             Background = (IBrush)Application.Current!.FindResource("BackgroundBrush")!,

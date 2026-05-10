@@ -2,7 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="SAMBA_Util.Views.UsersView">
 
-    <Grid Margin="30" RowDefinitions="Auto,*" RowSpacing="20">
+    <Grid Margin="30" RowDefinitions="Auto,*">
 
         <!-- FORMULARIO + TÍTULO -->
         <StackPanel Spacing="12" Grid.Row="0">
@@ -27,7 +27,7 @@
 
             <TextBox x:Name="PasswordBox"
                      PasswordChar="●"
-                     PlaceholderText="Leave empty if is not required. (Optional)"
+                     Watermark="Leave empty if not required (Optional)"
                      Width="300"
                      Height="32"
                      CornerRadius="6"
@@ -54,6 +54,7 @@
 
         <!-- LISTA CON SCROLL REAL -->
         <ScrollViewer Grid.Row="1"
+                      Margin="0,20,0,0"
                       Height="120"
                       VerticalScrollBarVisibility="Auto">
 
@@ -87,16 +88,14 @@
                                             Height="30"
                                             HorizontalContentAlignment="Center"
                                             VerticalContentAlignment="Center"
-                                            
                                             Click="OnEditUser"/>
 
                                     <Button Content="Delete"
                                             Tag="{Binding}"
                                             Width="70"
                                             Height="30"
-                                            VerticalContentAlignment="Center"
-                                            
                                             HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"
                                             Click="OnDeleteUser"/>
 
                                 </StackPanel>

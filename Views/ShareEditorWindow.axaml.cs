@@ -16,7 +16,7 @@ public partial class ShareEditorWindow : Window
     {
         InitializeComponent();
         _original = new Share();
-        base.WindowStartupLocation= WindowStartupLocation.CenterScreen;
+        WindowStartupLocation = WindowStartupLocation.CenterScreen;
     }
 
     // ⭐ Constructor real (editar o agregar)
@@ -24,6 +24,7 @@ public partial class ShareEditorWindow : Window
     {
         InitializeComponent();
         _original = share;
+        WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
         // BASIC
         TxtName.Text = share.Name;
@@ -42,9 +43,25 @@ public partial class ShareEditorWindow : Window
         TxtForceUser.Text = share.ForceUser;
         TxtForceGroup.Text = share.ForceGroup;
 
-        // MASKS
-        TxtCreateMask.Text = share.CreateMask;
-        TxtDirectoryMask.Text = share.DirectoryMask;
+        // MASKS (seleccionar en ComboBox)
+        SelectComboByTag(CmbCreateMask, share.CreateMask);
+        SelectComboByTag(CmbDirectoryMask, share.DirectoryMask);
+    }
+
+    // ⭐ Helper para seleccionar ComboBoxItem por Tag
+    private void SelectComboByTag(ComboBox combo, string? tag)
+    {
+        if (tag == null)
+            return;
+
+        foreach (var item in combo.Items)
+        {
+            if (item is ComboBoxItem cbi && cbi.Tag?.ToString() == tag)
+            {
+                combo.SelectedItem = cbi;
+                break;
+            }
+        }
     }
 
     // ⭐ Folder Picker moderno (Avalonia 11)
@@ -66,8 +83,8 @@ public partial class ShareEditorWindow : Window
     private void OnSave(object? sender, RoutedEventArgs e)
     {
         // BASIC
-        _original.Name = TxtName.Text;
-        _original.Path = TxtPath.Text;
+        _original.Name = TxtName.Text ?? "";
+        _original.Path = TxtPath.Text ?? "";
         _original.ReadOnly = TgRO.IsChecked ?? false;
         _original.AllowGuests = TgGuests.IsChecked ?? false;
         _original.Browseable = TgBrowseable.IsChecked ?? true;
@@ -82,11 +99,23 @@ public partial class ShareEditorWindow : Window
         _original.ForceUser = TxtForceUser.Text ?? "";
         _original.ForceGroup = TxtForceGroup.Text ?? "";
 
-        // MASKS
-        _original.CreateMask = TxtCreateMask.Text ?? "0744";
-        _original.DirectoryMask = TxtDirectoryMask.Text ?? "0755";
+        // MASKS (desde ComboBox)
+        _original.CreateMask = GetSelectedTag(CmbCreateMask, "755");
+        _original.DirectoryMask = GetSelectedTag(CmbDirectoryMask, "755");
 
         Saved = true;
         Close(_original);   // ⭐ DEVUELVE EL SHARE EDITADO
+    }
+
+    // ⭐ Helper para obtener Tag del ComboBox
+    private string GetSelectedTag(ComboBox combo, string fallback)
+    {
+        if (combo.SelectedItem is ComboBoxItem item &&
+            item.Tag is string tag)
+        {
+            return tag;
+        }
+
+        return fallback;
     }
 }

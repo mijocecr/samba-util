@@ -4,55 +4,44 @@
         <TargetFramework>net9.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ApplicationManifest>app.manifest</ApplicationManifest>
-        <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+
+        <!-- Avalonia 11 funciona mejor con compiled bindings desactivado -->
+        <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Avalonia" Version="12.0.2"/>
-        <PackageReference Include="Avalonia.Desktop" Version="12.0.2"/>
-        <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.2"/>
-        <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.2"/>
-        <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.1">
-            <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
-            <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
-        </PackageReference>
+        <!-- Paquetes principales Avalonia 11 -->
+        <PackageReference Include="Avalonia" Version="11.0.10" />
+        <PackageReference Include="Avalonia.Desktop" Version="11.0.10" />
+        <PackageReference Include="Avalonia.Themes.Fluent" Version="11.0.10" />
+        <PackageReference Include="Avalonia.Fonts.Inter" Version="11.0.10" />
+        <PackageReference Include="Avalonia.Diagnostics" Version="11.0.10" />
     </ItemGroup>
 
+    <!-- Recursos (tus iconos) -->
     <ItemGroup>
-      <None Remove="Assets\Icons\samba-util.png" />
-      <AvaloniaResource Include="Assets\Icons\samba-util.png">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </AvaloniaResource>
-      <None Remove="Assets\Icons\resource-unix.jpeg" />
-      <AvaloniaResource Include="Assets\Icons\resource-unix.jpeg">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </AvaloniaResource>
-      <None Remove="Assets\Icons\resource-router.jpeg" />
-      <AvaloniaResource Include="Assets\Icons\resource-router.jpeg">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </AvaloniaResource>
-    </ItemGroup>
+        <None Remove="Assets\Icons\samba-util.png" />
+        <AvaloniaResource Include="Assets\Icons\samba-util.png" />
 
-    <ItemGroup>
-      <None Remove="Assets\Icons\resource-bsd.jpeg" />
-      <AvaloniaResource Include="Assets\Icons\resource-bsd.jpeg">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </AvaloniaResource>
-      <None Remove="Assets\Icons\resource-linux.jpeg" />
-      <AvaloniaResource Include="Assets\Icons\resource-linux.jpeg">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </AvaloniaResource>
-      <None Remove="Assets\Icons\resource-mac.jpeg" />
-      <AvaloniaResource Include="Assets\Icons\resource-mac.jpeg">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </AvaloniaResource>
-      <None Remove="Assets\Icons\resource-other.jpeg" />
-      <AvaloniaResource Include="Assets\Icons\resource-other.jpeg">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </AvaloniaResource>
-      <None Remove="Assets\Icons\resource-windows.jpeg" />
-      <AvaloniaResource Include="Assets\Icons\resource-windows.jpeg">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </AvaloniaResource>
+        <None Remove="Assets\Icons\resource-unix.jpeg" />
+        <AvaloniaResource Include="Assets\Icons\resource-unix.jpeg" />
+
+        <None Remove="Assets\Icons\resource-router.jpeg" />
+        <AvaloniaResource Include="Assets\Icons\resource-router.jpeg" />
+
+        <None Remove="Assets\Icons\resource-bsd.jpeg" />
+        <AvaloniaResource Include="Assets\Icons\resource-bsd.jpeg" />
+
+        <None Remove="Assets\Icons\resource-linux.jpeg" />
+        <AvaloniaResource Include="Assets\Icons\resource-linux.jpeg" />
+
+        <None Remove="Assets\Icons\resource-mac.jpeg" />
+        <AvaloniaResource Include="Assets\Icons\resource-mac.jpeg" />
+
+        <None Remove="Assets\Icons\resource-other.jpeg" />
+        <AvaloniaResource Include="Assets\Icons\resource-other.jpeg" />
+
+        <None Remove="Assets\Icons\resource-windows.jpeg" />
+        <AvaloniaResource Include="Assets\Icons\resource-windows.jpeg" />
     </ItemGroup>
 </Project>

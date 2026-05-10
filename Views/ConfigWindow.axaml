@@ -1,11 +1,10 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="SAMBA_Util.Views.ConfigWindow"
-        Width="450" Height="280"
+        Width="450" Height="320"
         Title="Samba-util Configuration"
         CanResize="False"
-        CanMaximize="False"
-        CanMinimize="False"
+        
         Background="{StaticResource BackgroundBrush}"
         Foreground="{StaticResource ForegroundBrush}">
 
@@ -14,14 +13,14 @@
             Background="{StaticResource ControlBackgroundBrush}"
             BorderBrush="{StaticResource BorderBrush}"
             BorderThickness="1"
-            CornerRadius="10"
-            Effect="drop-shadow(0 4 12 #00000040)">
+            CornerRadius="10">
 
         <StackPanel Spacing="15">
 
             <!-- Título -->
             <TextBlock Text="Global Configuration"
                        FontSize="20"
+                       
                        FontWeight="Bold"
                        Foreground="{StaticResource ForegroundBrush}"/>
 
@@ -29,22 +28,43 @@
             <StackPanel Spacing="6">
                 <TextBlock Text="Samba config path:"
                            Foreground="{StaticResource ForegroundBrush}"/>
-                <TextBox x:Name="TxtSmbConf"
-                         Background="{StaticResource ControlBackgroundBrush}"
-                         BorderBrush="{StaticResource BorderBrush}"
-                         Foreground="{StaticResource ForegroundBrush}"
-                         CornerRadius="6"/>
+
+                <DockPanel LastChildFill="False">
+
+                    <TextBox x:Name="TxtSmbConf"
+                             Background="{StaticResource ControlBackgroundBrush}"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             Foreground="{StaticResource ForegroundBrush}"
+                             CornerRadius="6"
+                             IsReadOnly="True"
+                             Width="325"/>
+
+                    <Button x:Name="BtnBrowseSmbConf"
+                            Content="..."
+                            Width="40"
+                            Margin="6,0,0,0"
+                            Classes="AccentButton"/>
+                </DockPanel>
             </StackPanel>
 
-            <!-- Default permissions -->
+            <!-- Default permissions (COMBOBOX GitHub style) -->
             <StackPanel Spacing="6">
                 <TextBlock Text="Default permissions:"
                            Foreground="{StaticResource ForegroundBrush}"/>
-                <TextBox x:Name="TxtDefaultPerms"
-                         Background="{StaticResource ControlBackgroundBrush}"
-                         BorderBrush="{StaticResource BorderBrush}"
-                         Foreground="{StaticResource ForegroundBrush}"
-                         CornerRadius="6"/>
+
+                <ComboBox x:Name="PermCombo"
+                          Background="{StaticResource ControlBackgroundBrush}"
+                          BorderBrush="{StaticResource BorderBrush}"
+                          Foreground="{StaticResource ForegroundBrush}"
+                          CornerRadius="6"
+                          Width="365">
+
+                    <ComboBoxItem Content="755 – Owner rwx, Group r-x, Others r-x" Tag="755"/>
+                    <ComboBoxItem Content="775 – Owner rwx, Group rwx, Others r-x" Tag="775"/>
+                    <ComboBoxItem Content="770 – Owner rwx, Group rwx, Others ---" Tag="770"/>
+                    <ComboBoxItem Content="777 – Owner rwx, Group rwx, Others rwx" Tag="777"/>
+
+                </ComboBox>
             </StackPanel>
 
             <!-- Botones -->

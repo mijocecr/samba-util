@@ -3,9 +3,7 @@
         x:Class="SAMBA_Util.Views.ShareEditorWindow"
         Width="380" Height="400"
         Title="Edit Share"
-        CanMaximize="False"
         CanResize="False"
-        CanMinimize="False"
         Background="{StaticResource BackgroundBrush}"
         Foreground="{StaticResource ForegroundBrush}">
 
@@ -116,26 +114,38 @@
                                  BorderBrush="{StaticResource BorderBrush}"
                                  Foreground="{StaticResource ForegroundBrush}"/>
 
+                        <!-- CREATE MASK (COMBOBOX) -->
                         <TextBlock Text="Create Mask"
                                    Foreground="{StaticResource ForegroundBrush}"/>
-                        <TextBox x:Name="TxtCreateMask"
-                                 CornerRadius="6"
-                                 Background="{StaticResource ControlBackgroundBrush}"
-                                 BorderBrush="{StaticResource BorderBrush}"
-                                 Foreground="{StaticResource ForegroundBrush}"/>
+                        <ComboBox x:Name="CmbCreateMask"
+                                  CornerRadius="6"
+                                  Background="{StaticResource ControlBackgroundBrush}"
+                                  BorderBrush="{StaticResource BorderBrush}"
+                                  Foreground="{StaticResource ForegroundBrush}">
+                            <ComboBoxItem Content="755 – rwx r-x r-x" Tag="755"/>
+                            <ComboBoxItem Content="775 – rwx rwx r-x" Tag="775"/>
+                            <ComboBoxItem Content="770 – rwx rwx ---" Tag="770"/>
+                            <ComboBoxItem Content="777 – rwx rwx rwx" Tag="777"/>
+                        </ComboBox>
 
+                        <!-- DIRECTORY MASK (COMBOBOX) -->
                         <TextBlock Text="Directory Mask"
                                    Foreground="{StaticResource ForegroundBrush}"/>
-                        <TextBox x:Name="TxtDirectoryMask"
-                                 CornerRadius="6"
-                                 Background="{StaticResource ControlBackgroundBrush}"
-                                 BorderBrush="{StaticResource BorderBrush}"
-                                 Foreground="{StaticResource ForegroundBrush}"/>
+                        <ComboBox x:Name="CmbDirectoryMask"
+                                  CornerRadius="6"
+                                  Background="{StaticResource ControlBackgroundBrush}"
+                                  BorderBrush="{StaticResource BorderBrush}"
+                                  Foreground="{StaticResource ForegroundBrush}">
+                            <ComboBoxItem Content="755 – rwx r-x r-x" Tag="755"/>
+                            <ComboBoxItem Content="775 – rwx rwx r-x" Tag="775"/>
+                            <ComboBoxItem Content="770 – rwx rwx ---" Tag="770"/>
+                            <ComboBoxItem Content="777 – rwx rwx rwx" Tag="777"/>
+                        </ComboBox>
 
                     </StackPanel>
                 </Expander>
 
-                <!-- SAVE BUTTON — MISMA POSICIÓN EXACTA -->
+                <!-- SAVE BUTTON -->
                 <Button Grid.Column="1"
                         Content="Save"
                         HorizontalAlignment="Right"
