@@ -11,7 +11,8 @@ It is designed for Linux environments and focuses on simplicity, safety, and tra
 ### 🔧 Share Management
 - Create, edit, and delete Samba shares  
 - Configure paths, permissions, masks, and visibility  
-- Automatic validation of share names and paths  
+- Automatic validation of share names and paths
+- Network scanner for Samba shares (Folders)
 - Real‑time reload of Samba configuration
 
 ### 👤 User Management
