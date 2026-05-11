@@ -16,10 +16,11 @@ public static class ShellHelper
 
         Console.WriteLine($"[SHELL] #{callId} → EjecutarComoRoot('{command}')");
 
+        // 🔥 SIEMPRE usar bash -c para soportar redirecciones, sed, systemctl, etc.
         var psi = new ProcessStartInfo
         {
             FileName = "sudo",
-            Arguments = $"-S -p '' {command}",   // -p '' evita prompts interactivos
+            Arguments = $"-S bash -c \"{command.Replace("\"", "\\\"")}\"",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             RedirectStandardInput = true,
@@ -63,7 +64,6 @@ public static class ShellHelper
             Console.WriteLine($"[SHELL] #{callId} ADVERTENCIA: No hay contraseña configurada");
         }
 
-        // Cerrar stdin después de enviar la contraseña
         process.StandardInput.Close();
 
         const int timeoutMs = 15000;
@@ -97,10 +97,9 @@ public static class ShellHelper
 
         return (process.ExitCode, stdout, stderr);
     }
-    
-    
+
     // ---------------------------------------------------------
-    // EJECUCIÓN NORMAL (SIN ROOT) PARA SMBCLIENT, ETC.
+    // EJECUCIÓN NORMAL (SIN ROOT)
     // ---------------------------------------------------------
     public static async Task<string> RunAsync(string command)
     {
@@ -140,7 +139,3 @@ public static class ShellHelper
         return stdoutBuilder.ToString() + stderrBuilder.ToString();
     }
 }
-
-    
-    
-
