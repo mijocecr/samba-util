@@ -9,10 +9,6 @@ namespace SAMBA_Util.Helpers;
 
 public static class SambaConfigWriter
 {
-    private const string SmbConfPath = "/etc/samba/smb.conf";
-    private const string TempPath = "/tmp/smb.conf";
-    private const string BackupPath = "/etc/samba/smb.conf.bak";
-
     private static long _callCountSave = 0;
     private static long _callCountAdd = 0;
     private static long _callCountDelete = 0;
@@ -28,34 +24,55 @@ public static class SambaConfigWriter
 
         Console.WriteLine($"[WRITE] #{callId} → SaveAllShares iniciado. Shares: {shares.Count()}");
 
-        // 1) Leer smb.conf original para preservar [global] y parámetros desconocidos
-        var originalLines = File.Exists(SmbConfPath)
-            ? File.ReadAllLines(SmbConfPath).ToList()
+        var config = ConfigManager.Load();
+        string smbConf = config.SmbConfPath;
+        string backup = smbConf + ".bak";
+        string temp = "/tmp/samba-util-smb.conf";
+
+        // 1) Leer smb.conf original
+        var originalLines = File.Exists(smbConf)
+            ? File.ReadAllLines(smbConf).ToList()
             : new List<string>();
 
         var globalSection = ExtractGlobalSection(originalLines);
+        var includeLines = ExtractIncludeLines(originalLines);
 
         // 2) Generar archivo temporal
         var output = new List<string>();
 
-        // Escribir sección global preservada
+        // Sección global preservada
         output.AddRange(globalSection);
         output.Add("");
 
-        // Escribir shares
+        // Includes preservados
+        foreach (var inc in includeLines)
+            output.Add(inc);
+
+        output.Add("");
+
+        // Shares
         foreach (var s in shares)
         {
             output.AddRange(ShareToLines(s));
             output.Add("");
         }
 
-        File.WriteAllLines(TempPath, output);
+        File.WriteAllLines(temp, output);
 
         // 3) Backup
-        ShellHelper.EjecutarComoRoot($"cp \"{SmbConfPath}\" \"{BackupPath}\"");
+        ShellHelper.EjecutarComoRoot($"cp \"{smbConf}\" \"{backup}\"");
 
-        // 4) Copiar archivo temporal
-        var copyResult = ShellHelper.EjecutarComoRoot($"cp \"{TempPath}\" \"{SmbConfPath}\"");
+        // 4) Validar con testparm ANTES de copiar
+        var test = ShellHelper.EjecutarComoRoot($"testparm -s \"{temp}\"");
+        if (test.ExitCode != 0)
+        {
+            Console.WriteLine($"[WRITE] #{callId} ERROR: testparm falló. smb.conf inválido.");
+            Console.WriteLine(test.Stderr);
+            return;
+        }
+
+        // 5) Copiar archivo temporal
+        var copyResult = ShellHelper.EjecutarComoRoot($"cp \"{temp}\" \"{smbConf}\"");
 
         if (copyResult.ExitCode != 0)
         {
@@ -63,8 +80,8 @@ public static class SambaConfigWriter
             return;
         }
 
-        // 5) Reiniciar Samba
-        ShellHelper.EjecutarComoRoot("systemctl restart smbd");
+        // 6) Reiniciar Samba (autodetección)
+        RestartSambaService();
 
         sw.Stop();
         Console.WriteLine($"[WRITE] #{callId} ← SaveAllShares completado en {sw.ElapsedMilliseconds} ms");
@@ -165,6 +182,16 @@ public static class SambaConfigWriter
     }
 
     // ---------------------------------------------------------
+    //  PRESERVAR includes
+    // ---------------------------------------------------------
+    private static List<string> ExtractIncludeLines(List<string> lines)
+    {
+        return lines
+            .Where(l => l.Trim().StartsWith("include =", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    // ---------------------------------------------------------
     //  SHARE → LÍNEAS DE smb.conf
     // ---------------------------------------------------------
     private static IEnumerable<string> ShareToLines(Share s)
@@ -206,5 +233,32 @@ public static class SambaConfigWriter
     private static string EscapePath(string path)
     {
         return path.Contains(' ') ? $"\"{path}\"" : path;
+    }
+
+    // ---------------------------------------------------------
+    //  REINICIAR SAMBA (AUTODETECCIÓN)
+    // ---------------------------------------------------------
+    private static void RestartSambaService()
+    {
+        if (File.Exists("/bin/systemctl"))
+        {
+            ShellHelper.EjecutarComoRoot("systemctl restart smbd || systemctl restart smb");
+            return;
+        }
+
+        if (File.Exists("/sbin/service"))
+        {
+            ShellHelper.EjecutarComoRoot("service smbd restart || service smb restart");
+            return;
+        }
+
+        // OpenRC
+        if (File.Exists("/sbin/rc-service"))
+        {
+            ShellHelper.EjecutarComoRoot("rc-service samba restart");
+            return;
+        }
+
+        Console.WriteLine("[WRITE] ADVERTENCIA: No se pudo detectar el gestor de servicios.");
     }
 }

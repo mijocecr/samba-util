@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 
 namespace SAMBA_Util.Helpers;
 
@@ -16,10 +17,13 @@ public static class SambaConfigReader
         v.Equals("1") ||
         v.Equals("y", StringComparison.OrdinalIgnoreCase);
 
-    public static List<Share> LoadShares(string filePath = "/etc/samba/smb.conf")
+    public static List<Share> LoadShares(string filePath = null)
     {
         var sw = Stopwatch.StartNew();
         var callId = ++_callCount;
+
+        var config = ConfigManager.Load();
+        filePath ??= config.SmbConfPath;
 
         Console.WriteLine($"[CONF] #{callId} → LoadShares('{filePath}') iniciado");
 
@@ -38,14 +42,39 @@ public static class SambaConfigReader
         string? rawLine;
         while ((rawLine = reader.ReadLine()) != null)
         {
-            var line = rawLine.Trim();
+            // Normalizar tabs
+            rawLine = rawLine.Replace("\t", " ");
 
-            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#") || line.StartsWith(";"))
+            // Quitar comentarios al final de línea
+            var clean = rawLine.Split('#')[0].Split(';')[0].Trim();
+
+            if (string.IsNullOrWhiteSpace(clean))
                 continue;
 
-            if (line.StartsWith("[") && line.EndsWith("]"))
+            // Soporte para includes
+            if (clean.StartsWith("include =", StringComparison.OrdinalIgnoreCase))
             {
-                var name = line.Trim('[', ']');
+                var includePath = clean.Split('=', 2)[1].Trim().Trim('"');
+                if (File.Exists(includePath))
+                {
+                    Console.WriteLine($"[CONF] #{callId} → Procesando include: {includePath}");
+                    shares.AddRange(LoadShares(includePath));
+                }
+                continue;
+            }
+
+            // Soporte para parámetros multilinea con \
+            while (clean.EndsWith("\\"))
+            {
+                clean = clean.TrimEnd('\\').Trim();
+                var next = reader.ReadLine()?.Trim() ?? "";
+                clean += " " + next;
+            }
+
+            // Detectar nueva sección
+            if (clean.StartsWith("[") && clean.EndsWith("]"))
+            {
+                var name = clean.Substring(1, clean.Length - 2);
 
                 if (name.Equals("global", StringComparison.OrdinalIgnoreCase))
                 {
@@ -63,7 +92,8 @@ public static class SambaConfigReader
                     AllowGuests = false,
                     Browseable = true,
                     CreateMask = "0744",
-                    DirectoryMask = "0755"
+                    DirectoryMask = "0755",
+                    UnknownParameters = new List<string>()
                 };
 
                 continue;
@@ -72,9 +102,13 @@ public static class SambaConfigReader
             if (current == null)
                 continue;
 
-            var parts = line.Split('=', 2);
+            // Parseo de clave=valor
+            var parts = clean.Split('=', 2, StringSplitOptions.TrimEntries);
             if (parts.Length != 2)
+            {
+                current.UnknownParameters.Add(clean);
                 continue;
+            }
 
             var key = parts[0].Trim().ToLower();
             var value = parts[1].Trim().Trim('"');
@@ -137,6 +171,11 @@ public static class SambaConfigReader
                 case "directory mask":
                 case "directory mode":
                     current.DirectoryMask = value;
+                    break;
+
+                default:
+                    // Parámetro desconocido → preservarlo
+                    current.UnknownParameters.Add(clean);
                     break;
             }
         }

@@ -18,50 +18,55 @@ public static class FileSystemHelper
 
         try
         {
-            // Detectar inexistencia ANTES de llamar a stat
+            // Verificar existencia antes de ejecutar stat
             if (!File.Exists(path) && !Directory.Exists(path))
             {
                 Console.WriteLine($"[PERM] #{callId} NO EXISTE");
-                return ("", "", ""); // ← diferencia clara respecto a error
+                return ("", "", "");
             }
 
-            var result = ShellHelper.EjecutarComoRoot($"stat -c \"%U %G %a\" \"{path}\"");
+            // Comando universal:
+            // 1. GNU stat (Linux)
+            // 2. BSD stat (FreeBSD/macOS)
+            // 3. BusyBox stat (Alpine)
+            string cmd =
+                $"stat -c \"%U %G %a\" \"{path}\" 2>/dev/null || " +
+                $"stat -f \"%Su %Sg %Op\" \"{path}\" 2>/dev/null";
 
+            var result = ShellHelper.Ejecutar(cmd);
             var output = result.Stdout?.Trim() ?? "";
 
             sw.Stop();
             Console.WriteLine($"[PERM] #{callId} ← stat completado en {sw.ElapsedMilliseconds} ms");
 
-            if (string.IsNullOrWhiteSpace(output) ||
-                output.Contains("No such file", StringComparison.OrdinalIgnoreCase) ||
-                output.Contains("cannot stat", StringComparison.OrdinalIgnoreCase) ||
-                output.Contains("error", StringComparison.OrdinalIgnoreCase))
+            if (string.IsNullOrWhiteSpace(output))
             {
-                Console.WriteLine($"[PERM] #{callId} ERROR o salida vacía");
+                Console.WriteLine($"[PERM] #{callId} ERROR: salida vacía");
                 return ("?", "?", "?");
             }
 
+            // SELinux, ACLs y atributos extendidos pueden añadir más campos
             var parts = output.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-            if (parts.Length == 3)
-            {
-                string owner = parts[0];
-                string group = parts[1];
-                string mode = parts[2];
-
-                // Normalizar modo a 3 dígitos
-                mode = new string(mode.Where(char.IsDigit).ToArray());
-
-                if (mode.Length > 3)
-                    mode = mode[^3..]; // últimos 3 dígitos
-
-                Console.WriteLine($"[PERM] #{callId} OK → Owner={owner}, Group={group}, Mode={mode}");
-                return (owner, group, mode);
-            }
-            else
+            if (parts.Length < 3)
             {
                 Console.WriteLine($"[PERM] #{callId} SALIDA INVALIDA: '{output}'");
+                return ("?", "?", "?");
             }
+
+            string owner = parts[0];
+            string group = parts[1];
+            string mode = parts[2];
+
+            // Normalizar permisos (solo dígitos)
+            mode = new string(mode.Where(char.IsDigit).ToArray());
+
+            // Mantener solo los últimos 3 dígitos
+            if (mode.Length > 3)
+                mode = mode[^3..];
+
+            Console.WriteLine($"[PERM] #{callId} OK → Owner={owner}, Group={group}, Mode={mode}");
+            return (owner, group, mode);
         }
         catch (Exception ex)
         {

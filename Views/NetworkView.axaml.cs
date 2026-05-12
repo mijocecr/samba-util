@@ -10,7 +10,6 @@ using Avalonia;
 using Avalonia.Layout;
 using Avalonia.Platform;
 using SAMBA_Util.Helpers;
-
 using Avalonia.Controls.Primitives;
 
 namespace SAMBA_Util.Views
@@ -271,23 +270,25 @@ namespace SAMBA_Util.Views
 
             void UpdateMountButton()
             {
-                mountBtn.Content = NetworkScanner.IsMounted(mountPoint) ? "Unmount" : "Mount";
+                mountBtn.Content = MountHelper.IsMounted(mountPoint) ? "Unmount" : "Mount";
             }
 
             UpdateMountButton();
 
+            // ---------------------------------------------------------
+            // MOUNT / UNMOUNT (MountHelper PRO)
+            // ---------------------------------------------------------
             mountBtn.Click += async (_, __) =>
             {
                 try
                 {
-                    if (NetworkScanner.IsMounted(mountPoint))
+                    if (MountHelper.IsMounted(mountPoint))
                     {
-                        string cmd = $"sudo umount \"{mountPoint}\"";
-                        string result = await ShellHelper.RunAsync(cmd);
+                        var res = MountHelper.Unmount(mountPoint);
 
-                        if (result.Contains("error") || result.Contains("failed"))
+                        if (!res.Success)
                         {
-                            main.ShowErrorDialog("Unmount failed", result);
+                            main.ShowErrorDialog("Unmount failed", res.Stderr);
                             return;
                         }
 
@@ -296,7 +297,9 @@ namespace SAMBA_Util.Views
                         return;
                     }
 
-                    if (share.Access.Contains("Requires"))
+                    bool isGuest = share.Access.Contains("Anonymous");
+
+                    if (!isGuest && share.Access.Contains("Requires"))
                     {
                         var cred = await main.ShowCredentialsDialog();
                         if (cred == null)
@@ -309,16 +312,18 @@ namespace SAMBA_Util.Views
                         CredStore.Password = cred.Value.pass;
                     }
 
-                    string options = share.Access.Contains("Anonymous")
-                        ? "-o guest"
-                        : $"-o username={CredStore.User},password={CredStore.Password}";
+                    var mountRes = await MountHelper.MountAsync(
+                        share.IP,
+                        share.Name,
+                        mountPoint,
+                        isGuest,
+                        isGuest ? null : CredStore.User,
+                        isGuest ? null : CredStore.Password
+                    );
 
-                    string cmdMount = $"sudo mount.cifs //{share.IP}/{share.Name} \"{mountPoint}\" {options}";
-                    string resultMount = await ShellHelper.RunAsync(cmdMount);
-
-                    if (resultMount.Contains("mount error") || resultMount.Contains("NT_STATUS"))
+                    if (!mountRes.Success)
                     {
-                        main.ShowErrorDialog("Mount failed", resultMount);
+                        main.ShowErrorDialog("Mount failed", mountRes.Stderr);
                         return;
                     }
 
@@ -331,6 +336,9 @@ namespace SAMBA_Util.Views
                 }
             };
 
+            // ---------------------------------------------------------
+            // OPEN (MountHelper PRO)
+            // ---------------------------------------------------------
             var openBtn = new Button
             {
                 Content = "Open",
@@ -343,9 +351,11 @@ namespace SAMBA_Util.Views
             {
                 try
                 {
-                    if (!NetworkScanner.IsMounted(mountPoint))
+                    if (!MountHelper.IsMounted(mountPoint))
                     {
-                        if (share.Access.Contains("Requires"))
+                        bool isGuest = share.Access.Contains("Anonymous");
+
+                        if (!isGuest && share.Access.Contains("Requires"))
                         {
                             var cred = await main.ShowCredentialsDialog();
                             if (cred == null)
@@ -358,16 +368,18 @@ namespace SAMBA_Util.Views
                             CredStore.Password = cred.Value.pass;
                         }
 
-                        string options = share.Access.Contains("Anonymous")
-                            ? "-o guest"
-                            : $"-o username={CredStore.User},password={CredStore.Password}";
+                        var mountRes = await MountHelper.MountAsync(
+                            share.IP,
+                            share.Name,
+                            mountPoint,
+                            isGuest,
+                            isGuest ? null : CredStore.User,
+                            isGuest ? null : CredStore.Password
+                        );
 
-                        string cmd = $"sudo mount.cifs //{share.IP}/{share.Name} \"{mountPoint}\" {options}";
-                        string result = await ShellHelper.RunAsync(cmd);
-
-                        if (result.Contains("mount error") || result.Contains("NT_STATUS"))
+                        if (!mountRes.Success)
                         {
-                            main.ShowErrorDialog("Open failed", result);
+                            main.ShowErrorDialog("Open failed", mountRes.Stderr);
                             return;
                         }
 
@@ -375,7 +387,7 @@ namespace SAMBA_Util.Views
                     }
 
                     await ShellHelper.RunAsync($"xdg-open \"{mountPoint}\"");
-                    main.ShowToast($"Abriendo {share.Name}");
+                    main.ShowToast($"Opening {share.Name}");
                 }
                 catch (Exception ex)
                 {

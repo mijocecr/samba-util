@@ -9,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace SAMBA_Util.Helpers
 {
@@ -94,12 +95,15 @@ namespace SAMBA_Util.Helpers
     }
 
     // ---------------------------------------------------------
-    // NETWORK SCANNER
+    // NETWORK SCANNER (UNIVERSAL)
     // ---------------------------------------------------------
     public static class NetworkScanner
     {
+        // Cache interna para OS
+        private static readonly Dictionary<string, string> OsCache = new();
+
         // ---------------------------------------------------------
-        // DISCOVER DEVICES
+        // DISCOVER DEVICES (con OS detection paralela)
         // ---------------------------------------------------------
         public static async Task<List<NetworkDevice>> DiscoverAsync(string ifaceName)
         {
@@ -113,6 +117,7 @@ namespace SAMBA_Util.Helpers
 
             var uniqueHosts = new HashSet<string>();
 
+            // Crear lista de dispositivos sin OS
             foreach (var ip in alive)
             {
                 string? mac = await GetMacAsync(ip);
@@ -136,20 +141,30 @@ namespace SAMBA_Util.Helpers
                     Name = hostname,
                     Hostname = hostname,
                     IP = ip,
-                    OS = "Unknown",
+                    OS = "Detecting...",
                     Source = ifaceName
                 });
             }
+
+            // ---------------------------------------------------------
+            // Detectar OS en paralelo (rápido y eficiente)
+            // ---------------------------------------------------------
+            var tasks = devices.Select(async dev =>
+            {
+                dev.OS = await DetectOSAsync(dev.IP, dev.Name);
+            });
+
+            await Task.WhenAll(tasks);
 
             return devices;
         }
 
         // ---------------------------------------------------------
-        // GET MAC ADDRESS
+        // GET MAC ADDRESS (MODERNO: ip neigh)
         // ---------------------------------------------------------
         private static async Task<string?> GetMacAsync(string ip)
         {
-            string output = await ShellHelper.RunAsync($"arp -n {ip}");
+            string output = await ShellHelper.RunAsync($"ip neigh show {ip}");
 
             var match = Regex.Match(output, @"([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}");
 
@@ -160,250 +175,29 @@ namespace SAMBA_Util.Helpers
         }
 
         // ---------------------------------------------------------
-        // OS DETECTION
+        // OS DETECTION (OsDetector rápido + Cache + Overrides)
         // ---------------------------------------------------------
         public static async Task<string> DetectOSAsync(string ip, string name)
         {
+            // 1) Override manual del usuario
             if (OsOverrideManager.TryGetOverride(ip, out var forcedOs))
                 return forcedOs;
 
-            if (IsRouter(ip, name))
-                return "Router";
+            // 2) Cache interna
+            if (OsCache.TryGetValue(ip, out var cached))
+                return cached;
 
-            if (await IsPortOpen(ip, 445))
-            {
-                string smb = await DetectFromSMB(ip);
-                if (smb != null)
-                    return smb;
-            }
+            // 3) Detección real (rápida)
+            string detected = await OsDetector.DetectOsAsync(ip);
 
-            if (await IsPortOpen(ip, 22))
-            {
-                string ssh = await DetectFromSSH(ip);
-                if (ssh != null)
-                    return ssh;
-            }
+            // 4) Guardar en caché
+            OsCache[ip] = detected;
 
-            if (await IsPortOpen(ip, 80) || await IsPortOpen(ip, 443))
-            {
-                string http = await DetectFromHTTP(ip);
-                if (http != null)
-                    return http;
-            }
-
-            string ttl = await DetectFromTTL(ip);
-            if (ttl != null)
-                return ttl;
-
-            return "Other";
-        }
-
-        private static bool IsRouter(string ip, string hostname)
-        {
-            if (hostname == "_gateway")
-                return true;
-
-            if (ip.EndsWith(".1") || ip.EndsWith(".254"))
-                return true;
-
-            try
-            {
-                var ping = new Ping();
-                var reply = ping.Send(ip, 200);
-
-                if (reply.Status == IPStatus.Success)
-                {
-                    int ttl = reply.Options.Ttl;
-                    if (ttl == 255 || ttl == 254 || ttl == 253)
-                        return true;
-                }
-            }
-            catch { }
-
-            return false;
-        }
-
-        private static async Task<string> DetectFromSMB(string ip)
-        {
-            string output = "";
-            string lower = output.ToLowerInvariant();
-
-            if (lower.Contains("windows"))
-                return "Windows";
-
-            if (lower.Contains("samba"))
-            {
-                if (lower.Contains("freebsd") || lower.Contains("openbsd") || lower.Contains("netbsd"))
-                    return "BSD";
-
-                if (lower.Contains("darwin"))
-                    return "macOS";
-
-                return "Linux";
-            }
-
-            return null;
-        }
-
-        private static async Task<string> DetectFromSSH(string ip)
-        {
-            try
-            {
-                using var client = new TcpClient();
-                var result = client.ConnectAsync(ip, 22);
-                if (await Task.WhenAny(result, Task.Delay(300)) != result)
-                    return null;
-
-                using var stream = client.GetStream();
-                byte[] buffer = new byte[256];
-                int read = await stream.ReadAsync(buffer, 0, buffer.Length);
-                if (read <= 0) return null;
-
-                string banner = Encoding.ASCII.GetString(buffer, 0, read).ToLowerInvariant();
-
-                if (banner.Contains("windows"))
-                    return "Windows";
-
-                if (banner.Contains("darwin"))
-                    return "macOS";
-
-                if (banner.Contains("freebsd") || banner.Contains("openbsd") || banner.Contains("netbsd"))
-                    return "BSD";
-
-                if (banner.Contains("linux"))
-                    return "Linux";
-
-                if (banner.Contains("openssh"))
-                    return "Unix";
-
-                return null;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        private static async Task<string> DetectFromHTTP(string ip)
-        {
-            try
-            {
-                using var client = new HttpClient();
-                client.Timeout = TimeSpan.FromMilliseconds(600);
-
-                var response = await client.GetAsync($"http://{ip}");
-                var headers = response.Headers;
-
-                if (headers.Contains("Server"))
-                {
-                    string server = string.Join(" ", headers.GetValues("Server")).ToLowerInvariant();
-
-                    if (server.Contains("microsoft"))
-                        return "Windows";
-
-                    if (server.Contains("darwin"))
-                        return "macOS";
-
-                    if (server.Contains("freebsd"))
-                        return "BSD";
-
-                    if (server.Contains("nginx") || server.Contains("apache"))
-                        return "Linux";
-
-                    return "Unix";
-                }
-
-                return null;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        private static async Task<string> DetectFromTTL(string ip)
-        {
-            try
-            {
-                var ping = new Ping();
-                var reply = await ping.SendPingAsync(ip, 300);
-
-                if (reply.Status != IPStatus.Success)
-                    return null;
-
-                int ttl = reply.Options.Ttl;
-
-                if (ttl >= 120 && ttl <= 135)
-                    return "Windows";
-
-                if (ttl >= 60 && ttl <= 70)
-                    return "Unix";
-
-                return "Other";
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        private static async Task<bool> IsPortOpen(string ip, int port)
-        {
-            try
-            {
-                using var client = new TcpClient();
-                var connectTask = client.ConnectAsync(ip, port);
-                var timeoutTask = Task.Delay(250);
-
-                var completed = await Task.WhenAny(connectTask, timeoutTask);
-                if (completed == timeoutTask)
-                    return false;
-
-                return client.Connected;
-            }
-            catch
-            {
-                return false;
-            }
+            return detected;
         }
 
         // ---------------------------------------------------------
-        // SHARE ACCESS DETECTION
-        // ---------------------------------------------------------
-        private static async Task<string> DetectShareAccess(string ip, string share)
-        {
-            // 1. Probar lectura
-            string readTest = await ShellHelper.RunAsync(
-                $"smbclient //{ip}/{share} -N -c \"ls\""
-            );
-
-            if (readTest.Contains("NT_STATUS_ACCESS_DENIED"))
-                return "Requires credentials";
-
-            if (!readTest.Contains("NT_STATUS") && readTest.Contains("blocks"))
-            {
-                // 2. Probar escritura
-                string writeTest = await ShellHelper.RunAsync(
-                    $"smbclient //{ip}/{share} -N -c \"put /dev/null __test\""
-                );
-
-                if (!writeTest.Contains("NT_STATUS"))
-                {
-                    await ShellHelper.RunAsync(
-                        $"smbclient //{ip}/{share} -N -c \"del __test\""
-                    );
-
-                    return "Read/Write (Anonymous)";
-                }
-
-                return "Read Only (Anonymous)";
-            }
-
-            return "No Access";
-        }
-
-        // ---------------------------------------------------------
-        // GET SHARES (REMOTE)
+        // GET SHARES (UNIVERSAL SMB2/SMB3)
         // ---------------------------------------------------------
         public static async Task<List<NetworkShare>> GetSharesAsync(string ip)
         {
@@ -411,7 +205,7 @@ namespace SAMBA_Util.Helpers
 
             try
             {
-                string cmd = $"smbclient -L //{ip} -N";
+                string cmd = $"smbclient -L //{ip} -N --option='client min protocol=SMB2'";
                 string output = await ShellHelper.RunAsync(cmd);
 
                 var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -422,25 +216,23 @@ namespace SAMBA_Util.Helpers
                 {
                     string line = raw.Trim();
 
-                    if (line.StartsWith("Sharename", StringComparison.OrdinalIgnoreCase) ||
-                        line.StartsWith("Server", StringComparison.OrdinalIgnoreCase))
+                    if (line.StartsWith("Sharename", StringComparison.OrdinalIgnoreCase))
                     {
                         inShareSection = true;
                         continue;
                     }
 
-                    if (line.StartsWith("----") ||
-                        line.StartsWith("Anonymous") ||
-                        line.StartsWith("Reconnecting", StringComparison.OrdinalIgnoreCase) ||
-                        line.StartsWith("SMB1 disabled", StringComparison.OrdinalIgnoreCase) ||
-                        line.StartsWith("Domain", StringComparison.OrdinalIgnoreCase))
+                    if (line.StartsWith("SMB1 disabled", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    if (line.StartsWith("----"))
                         continue;
 
                     if (!inShareSection)
                         continue;
 
                     var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length < 2)
+                    if (parts.Length < 1)
                         continue;
 
                     string name = parts[0];
@@ -475,14 +267,53 @@ namespace SAMBA_Util.Helpers
         }
 
         // ---------------------------------------------------------
-        // IS MOUNTED
+        // SHARE ACCESS DETECTION (MEJORADO)
+        // ---------------------------------------------------------
+        private static async Task<string> DetectShareAccess(string ip, string share)
+        {
+            string readTest = await ShellHelper.RunAsync(
+                $"smbclient //{ip}/{share} -N --option='client min protocol=SMB2' -c \"ls\""
+            );
+
+            if (readTest.Contains("NT_STATUS_ACCESS_DENIED"))
+                return "Requires credentials";
+
+            if (readTest.Contains("NT_STATUS_LOGON_FAILURE"))
+                return "Requires credentials";
+
+            if (readTest.Contains("NT_STATUS_BAD_NETWORK_NAME"))
+                return "No Access";
+
+            if (readTest.Contains("blocks"))
+            {
+                string writeTest = await ShellHelper.RunAsync(
+                    $"smbclient //{ip}/{share} -N --option='client min protocol=SMB2' -c \"put /dev/null __test\""
+                );
+
+                if (!writeTest.Contains("NT_STATUS"))
+                {
+                    await ShellHelper.RunAsync(
+                        $"smbclient //{ip}/{share} -N --option='client min protocol=SMB2' -c \"del __test\""
+                    );
+
+                    return "Read/Write (Anonymous)";
+                }
+
+                return "Read Only (Anonymous)";
+            }
+
+            return "Read Only";
+        }
+
+        // ---------------------------------------------------------
+        // IS MOUNTED (ROBUSTO)
         // ---------------------------------------------------------
         public static bool IsMounted(string mountPoint)
         {
             try
             {
                 string mounts = File.ReadAllText("/proc/mounts");
-                return mounts.Contains(mountPoint);
+                return mounts.Split('\n').Any(l => l.Contains($" {mountPoint} "));
             }
             catch
             {
@@ -491,12 +322,14 @@ namespace SAMBA_Util.Helpers
         }
 
         // ---------------------------------------------------------
-        // PING SWEEP
+        // PING SWEEP (OPTIMIZADO)
         // ---------------------------------------------------------
         private static async Task<List<string>> PingSweepAsync(string subnet)
         {
             var list = new List<string>();
             var tasks = new List<Task>();
+
+            SemaphoreSlim limiter = new SemaphoreSlim(64);
 
             for (int i = 1; i <= 254; i++)
             {
@@ -504,6 +337,7 @@ namespace SAMBA_Util.Helpers
 
                 tasks.Add(Task.Run(async () =>
                 {
+                    await limiter.WaitAsync();
                     try
                     {
                         var ping = new Ping();
@@ -512,7 +346,10 @@ namespace SAMBA_Util.Helpers
                         if (reply.Status == IPStatus.Success)
                             lock (list) list.Add(ip);
                     }
-                    catch { }
+                    finally
+                    {
+                        limiter.Release();
+                    }
                 }));
             }
 
@@ -521,13 +358,13 @@ namespace SAMBA_Util.Helpers
         }
 
         // ---------------------------------------------------------
-        // SUBNET FROM INTERFACE
+        // SUBNET FROM INTERFACE (ROBUSTO)
         // ---------------------------------------------------------
         private static string? GetSubnetFromInterface(string ifaceName)
         {
             foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
             {
-                if (ni.Name != ifaceName)
+                if (!ni.Name.Equals(ifaceName, StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 var props = ni.GetIPProperties();

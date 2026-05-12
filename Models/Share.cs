@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace SAMBA_Util.Models;
 
 public class Share
@@ -9,6 +11,8 @@ public class Share
     public bool AllowGuests { get; set; } = false;   // guest ok
     public bool Browseable { get; set; } = true;     // default Samba
     public string Comment { get; set; } = "";
+    public List<string> UnknownParameters { get; set; }
+
 
     // Usuarios y permisos
     public string ValidUsers { get; set; } = "";     // "miguel juan"

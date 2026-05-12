@@ -77,6 +77,7 @@
                             <TextBlock Text="{Binding Warning}"
                                        Foreground="{StaticResource AccentBrush}"
                                        FontSize="12"
+                                       TextWrapping="Wrap"
                                        FontWeight="Bold"
                                        IsVisible="{Binding Warning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 

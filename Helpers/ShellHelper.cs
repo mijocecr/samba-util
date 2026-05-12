@@ -97,6 +97,46 @@ public static class ShellHelper
 
         return (process.ExitCode, stdout, stderr);
     }
+    
+    public static (int ExitCode, string Stdout, string Stderr) Ejecutar(string command)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = "/bin/bash",
+            Arguments = $"-c \"{command.Replace("\"", "\\\"")}\"",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var process = new Process { StartInfo = psi };
+
+        var stdoutBuilder = new StringBuilder();
+        var stderrBuilder = new StringBuilder();
+
+        process.OutputDataReceived += (s, e) =>
+        {
+            if (e.Data != null)
+                stdoutBuilder.AppendLine(e.Data);
+        };
+
+        process.ErrorDataReceived += (s, e) =>
+        {
+            if (e.Data != null)
+                stderrBuilder.AppendLine(e.Data);
+        };
+
+        process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+
+        process.WaitForExit();
+
+        return (process.ExitCode, stdoutBuilder.ToString(), stderrBuilder.ToString());
+    }
+
+    
 
     // ---------------------------------------------------------
     // EJECUCIÓN NORMAL (SIN ROOT)
