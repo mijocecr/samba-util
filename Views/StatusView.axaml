@@ -2,85 +2,91 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="SAMBA_Util.Views.StatusView">
 
-    <StackPanel Margin="20" Spacing="14">
+    <!-- SCROLL GLOBAL -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
 
-        <!-- Título -->
-        <TextBlock Text="Samba Service Status"
-                   FontSize="20"
-                   HorizontalAlignment="Center"
-                   FontWeight="Bold"
-                   Foreground="{StaticResource ForegroundBrush}"/>
+        <StackPanel Margin="20" Spacing="14">
 
-        <!-- Estado de servicios -->
-        <StackPanel Spacing="6">
+            <!-- Título -->
+            <TextBlock Text="Samba's Summary"
+                       FontSize="20"
+                       HorizontalAlignment="Center"
+                       FontWeight="Bold"
+                       Foreground="{StaticResource ForegroundBrush}"/>
 
-            <!-- smbd -->
-            <Grid ColumnDefinitions="120,Auto,*">
-                <TextBlock Text="smbd:"
-                           Grid.Column="0"
-                           VerticalAlignment="Center"
-                           Foreground="{StaticResource ForegroundBrush}"/>
+            <!-- Estado de servicios -->
+            <TextBlock Text="Service Status"
+                       FontWeight="Bold"
+                       Foreground="{StaticResource ForegroundBrush}"/>
 
-                <Ellipse x:Name="IconSmbd"
-                         Grid.Column="1"
-                         Width="12" Height="12"
-                         VerticalAlignment="Center"
-                         Fill="{StaticResource BorderBrush}"/>
+            <StackPanel Spacing="6">
 
-                <TextBlock x:Name="TxtSmbd"
-                           Grid.Column="2"
-                           Margin="8,0,0,0"
-                           VerticalAlignment="Center"
-                           Foreground="{StaticResource ForegroundBrush}"/>
-            </Grid>
+                <!-- smbd -->
+                <Grid ColumnDefinitions="120 Auto *">
+                    <TextBlock Text="smbd:"
+                               Grid.Column="0"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource ForegroundBrush}"/>
 
-            <!-- nmbd -->
-            <Grid ColumnDefinitions="120,Auto,*">
-                <TextBlock Text="nmbd:"
-                           Grid.Column="0"
-                           VerticalAlignment="Center"
-                           Foreground="{StaticResource ForegroundBrush}"/>
+                    <Ellipse x:Name="IconSmbd"
+                             Grid.Column="1"
+                             Width="12" Height="12"
+                             VerticalAlignment="Center"
+                             Fill="{StaticResource BorderBrush}"/>
 
-                <Ellipse x:Name="IconNmbd"
-                         Grid.Column="1"
-                         Width="12" Height="12"
-                         VerticalAlignment="Center"
-                         Fill="{StaticResource BorderBrush}"/>
+                    <TextBlock x:Name="TxtSmbd"
+                               Grid.Column="2"
+                               Margin="8,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource ForegroundBrush}"/>
+                </Grid>
 
-                <TextBlock x:Name="TxtNmbd"
-                           Grid.Column="2"
-                           Margin="8,0,0,0"
-                           VerticalAlignment="Center"
-                           Foreground="{StaticResource ForegroundBrush}"/>
-            </Grid>
+                <!-- nmbd -->
+                <Grid ColumnDefinitions="120 Auto *">
+                    <TextBlock Text="nmbd:"
+                               Grid.Column="0"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource ForegroundBrush}"/>
 
-            <!-- winbind -->
-            <Grid ColumnDefinitions="120,Auto,*">
-                <TextBlock Text="winbind:"
-                           Grid.Column="0"
-                           VerticalAlignment="Center"
-                           Foreground="{StaticResource ForegroundBrush}"/>
+                    <Ellipse x:Name="IconNmbd"
+                             Grid.Column="1"
+                             Width="12" Height="12"
+                             VerticalAlignment="Center"
+                             Fill="{StaticResource BorderBrush}"/>
 
-                <Ellipse x:Name="IconWinbind"
-                         Grid.Column="1"
-                         Width="12" Height="12"
-                         VerticalAlignment="Center"
-                         Fill="{StaticResource BorderBrush}"/>
+                    <TextBlock x:Name="TxtNmbd"
+                               Grid.Column="2"
+                               Margin="8,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource ForegroundBrush}"/>
+                </Grid>
 
-                <TextBlock x:Name="TxtWinbind"
-                           Grid.Column="2"
-                           Margin="8,0,0,0"
-                           VerticalAlignment="Center"
-                           Foreground="{StaticResource ForegroundBrush}"/>
-            </Grid>
+                <!-- winbind -->
+                <Grid ColumnDefinitions="120 Auto *">
+                    <TextBlock Text="winbind:"
+                               Grid.Column="0"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource ForegroundBrush}"/>
 
-        </StackPanel>
+                    <Ellipse x:Name="IconWinbind"
+                             Grid.Column="1"
+                             Width="12" Height="12"
+                             VerticalAlignment="Center"
+                             Fill="{StaticResource BorderBrush}"/>
 
-        <!-- Validación de configuración -->
-        <StackPanel Spacing="6">
+                    <TextBlock x:Name="TxtWinbind"
+                               Grid.Column="2"
+                               Margin="8,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource ForegroundBrush}"/>
+                </Grid>
+
+            </StackPanel>
+
+            <!-- testparm -->
             <TextBlock Text="Configuration Check (testparm)"
                        FontWeight="Bold"
-                       TextAlignment="Center"
+                       Margin="0,10,0,0"
                        Foreground="{StaticResource ForegroundBrush}"/>
 
             <Border x:Name="TestparmBorder"
@@ -94,29 +100,111 @@
                            TextWrapping="Wrap"
                            Foreground="{StaticResource ForegroundBrush}"/>
             </Border>
+
+            <!-- Puertos -->
+            <TextBlock Text="Port Check"
+                       FontWeight="Bold"
+                       Margin="0,10,0,0"
+                       Foreground="{StaticResource ForegroundBrush}"/>
+
+            <StackPanel Spacing="6">
+
+                <Grid ColumnDefinitions="120 Auto *">
+                    <TextBlock Text="Port 445:"
+                               Grid.Column="0"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource ForegroundBrush}"/>
+
+                    <Ellipse x:Name="IconPort445"
+                             Grid.Column="1"
+                             Width="12" Height="12"
+                             VerticalAlignment="Center"
+                             Fill="{StaticResource BorderBrush}"/>
+
+                    <TextBlock x:Name="TxtPort445"
+                               Grid.Column="2"
+                               Margin="8,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource ForegroundBrush}"/>
+                </Grid>
+
+                <Grid ColumnDefinitions="120 Auto *">
+                    <TextBlock Text="Port 139:"
+                               Grid.Column="0"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource ForegroundBrush}"/>
+
+                    <Ellipse x:Name="IconPort139"
+                             Grid.Column="1"
+                             Width="12" Height="12"
+                             VerticalAlignment="Center"
+                             Fill="{StaticResource BorderBrush}"/>
+
+                    <TextBlock x:Name="TxtPort139"
+                               Grid.Column="2"
+                               Margin="8,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource ForegroundBrush}"/>
+                </Grid>
+
+            </StackPanel>
+
+            <!-- Shares -->
+            <TextBlock Text="Shares Check"
+                       FontWeight="Bold"
+                       Margin="0,10,0,0"
+                       Foreground="{StaticResource ForegroundBrush}"/>
+
+            <Border Padding="10"
+                    CornerRadius="8"
+                    Background="{StaticResource ControlBackgroundBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1">
+                <TextBlock x:Name="TxtShares"
+                           TextWrapping="Wrap"
+                           Foreground="{StaticResource ForegroundBrush}"/>
+            </Border>
+
+            <!-- User Consistency -->
+            <TextBlock Text="User Consistency"
+                       FontWeight="Bold"
+                       Margin="0,10,0,0"
+                       Foreground="{StaticResource ForegroundBrush}"/>
+
+            <Border Padding="10"
+                    CornerRadius="8"
+                    Background="{StaticResource ControlBackgroundBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1">
+                <TextBlock x:Name="TxtUserCheck"
+                           TextWrapping="Wrap"
+                           Foreground="{StaticResource ForegroundBrush}"/>
+            </Border>
+
+            <!-- Botones -->
+            <StackPanel Orientation="Horizontal" Spacing="10"
+                        HorizontalAlignment="Center"
+                        Margin="0,10,0,0">
+                <Button Content="Reload Samba" Click="OnReload"/>
+                <Button Content="Restart Samba" Click="OnRestart"/>
+                <Button Content="Refresh" Click="OnRefresh"/>
+            </StackPanel>
+
+            <!-- Última actualización -->
+            <TextBlock x:Name="TxtLastUpdate"
+                       FontStyle="Italic"
+                       Foreground="{StaticResource ForegroundBrush}"/>
+
+            <!-- Interfaces -->
+            <TextBlock Text="Active Network Interfaces"
+                       FontWeight="Bold"
+                       Margin="0,10,0,0"
+                       Foreground="{StaticResource ForegroundBrush}"/>
+
+            <StackPanel x:Name="IpListPanel" Spacing="5"/>
+
         </StackPanel>
 
-        <!-- Botones -->
-        <StackPanel Orientation="Horizontal" Spacing="10"
-                    HorizontalAlignment="Center">
-            <Button Content="Reload Samba" Click="OnReload"/>
-            <Button Content="Restart Samba" Click="OnRestart"/>
-            <Button Content="Refresh" Click="OnRefresh"/>
-            
-        </StackPanel>
+    </ScrollViewer>
 
-        <!-- Última actualización -->
-        <TextBlock x:Name="TxtLastUpdate"
-                   FontStyle="Italic"
-                   Foreground="{StaticResource ForegroundBrush}"/>
-
-        <!-- Interfaces -->
-        <TextBlock Text="Active Network Interfaces"
-                   FontWeight="Bold"
-                   Margin="0,10,0,0"
-                   Foreground="{StaticResource ForegroundBrush}"/>
-
-        <StackPanel x:Name="IpListPanel" Spacing="5"/>
-
-    </StackPanel>
 </UserControl>

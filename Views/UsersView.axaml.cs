@@ -12,9 +12,11 @@ public partial class UsersView : UserControl
     {
         InitializeComponent();
         LoadUsers();
-        
     }
 
+    // ---------------------------------------------------------
+    // CARGAR USUARIOS SAMBA
+    // ---------------------------------------------------------
     public int LoadUsers()
     {
         if (string.IsNullOrEmpty(Credenciales.AdminPassword))
@@ -40,6 +42,9 @@ public partial class UsersView : UserControl
         return users.Count;
     }
 
+    // ---------------------------------------------------------
+    // AÑADIR USUARIO SAMBA (VERSIÓN PROFESIONAL)
+    // ---------------------------------------------------------
     private void OnAddUser(object? sender, RoutedEventArgs e)
     {
         var username = UsernameBox.Text?.Trim();
@@ -51,23 +56,24 @@ public partial class UsersView : UserControl
         if (string.IsNullOrEmpty(Credenciales.AdminPassword))
             return;
 
-        // 🔥 NECESARIO: Samba NO puede crear usuario si no existe en UNIX
+        // 1) Crear usuario UNIX si no existe
         ShellHelper.EjecutarComoRoot(
-            $"bash -c \"id -u {username} >/dev/null 2>&1 || useradd {username}\""
+            $"bash -c \"id -u '{username}' >/dev/null 2>&1 || useradd -M -s /usr/sbin/nologin '{username}'\""
         );
 
+        // 2) Crear usuario Samba con contraseña segura (heredoc)
         if (!string.IsNullOrWhiteSpace(password))
         {
-            // 🔥 ESTA ES LA CLAVE: usar bash -c + printf para que sudo NO toque stdin
-            var cmd =
-                $"bash -c \"printf \\\"{password}\\n{password}\\n\\\" | smbpasswd -a {username}\"";
+            string cmd =
+                $"bash -c \"smbpasswd -a '{username}' <<EOF\n{password}\n{password}\nEOF\"";
 
             ShellHelper.EjecutarComoRoot(cmd);
         }
         else
         {
+            // Usuario Samba sin contraseña
             ShellHelper.EjecutarComoRoot(
-                $"bash -c \"smbpasswd -a -n {username}\""
+                $"bash -c \"smbpasswd -a -n '{username}'\""
             );
         }
 
@@ -76,7 +82,10 @@ public partial class UsersView : UserControl
 
         LoadUsers();
     }
-/*
+
+    // ---------------------------------------------------------
+    // ELIMINAR USUARIO SAMBA + UNIX (SEGURO)
+    // ---------------------------------------------------------
     private void OnDeleteUser(object? sender, RoutedEventArgs e)
     {
         if (sender is Button btn && btn.Tag is string username)
@@ -84,30 +93,14 @@ public partial class UsersView : UserControl
             if (string.IsNullOrEmpty(Credenciales.AdminPassword))
                 return;
 
+            // 1) Eliminar usuario Samba
             ShellHelper.EjecutarComoRoot(
-                $"bash -c \"smbpasswd -x {username}\""
+                $"bash -c \"smbpasswd -x '{username}' 2>/dev/null || true\""
             );
 
-            LoadUsers();
-        }
-    }*/
-
-
-    private void OnDeleteUser(object? sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && btn.Tag is string username)
-        {
-            if (string.IsNullOrEmpty(Credenciales.AdminPassword))
-                return;
-
-            // 1) Eliminar usuario Samba (si existe)
-            ShellHelper.EjecutarComoRoot(
-                $"bash -c \"smbpasswd -x {username} 2>/dev/null || true\""
-            );
-
-            // 2) Comprobar si es usuario UNIX con UID >= 1000
+            // 2) Comprobar si es usuario UNIX válido
             var (exitUid, uidOutput, _) = ShellHelper.EjecutarComoRoot(
-                $"bash -c \"id -u {username} 2>/dev/null\""
+                $"bash -c \"id -u '{username}' 2>/dev/null\""
             );
 
             if (exitUid == 0)
@@ -116,7 +109,7 @@ public partial class UsersView : UserControl
                 {
                     // 3) Eliminar usuario UNIX y su home
                     ShellHelper.EjecutarComoRoot(
-                        $"bash -c \"userdel -r {username} 2>/dev/null || true\""
+                        $"bash -c \"userdel -r '{username}' 2>/dev/null || true\""
                     );
                 }
             }
@@ -125,7 +118,9 @@ public partial class UsersView : UserControl
         }
     }
 
-
+    // ---------------------------------------------------------
+    // EDITAR USUARIO (SIN CAMBIOS)
+    // ---------------------------------------------------------
     private void OnEditUser(object? sender, RoutedEventArgs e)
     {
         if (sender is Button btn && btn.Tag is string username)
@@ -139,7 +134,4 @@ public partial class UsersView : UserControl
             }
         }
     }
-
-  
-
 }

@@ -16,7 +16,7 @@
                     Classes="NeutralButton"
                     Click="OnRefresh"/>
 
-            <Button Content="Open Full Log"
+            <Button Content="Open File"
                     Classes="AccentButton"
                     Click="OnOpenFull"/>
         </StackPanel>
