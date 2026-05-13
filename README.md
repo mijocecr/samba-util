@@ -72,7 +72,10 @@ paru -S samba-util
 
 ## 📦 Requirements
 
-- Linux distribution with Samba installed  
+- Linux distribution with `systemd`
+-  `samba` 
+- `linux-headers` needed for kernel controller 
+- `cifs-utils`    needed to operate the filesystem
 - .NET 9.0 runtime (or self‑contained build)  
 - `sudo` privileges for administrative actions  
 - Access to `/etc/samba/smb.conf`
