@@ -68,6 +68,16 @@ Install with `paru`:
 paru -S samba-util
 ```
 
+Manual AUR clone:
+
+```bash
+git clone https://aur.archlinux.org/samba-util.git
+cd samba-util
+makepkg -si
+```
+
+
+
 ---
 
 ## 📦 Requirements
