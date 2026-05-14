@@ -80,7 +80,7 @@ makepkg -si
 
 ---
 
-## 📦 Requirements
+## Requirements
 
 - Linux distribution with `systemd`
 -  `samba` 
@@ -93,7 +93,7 @@ makepkg -si
 ---
 
 
-## 🚀 Running SAMBA‑Util
+## Running SAMBA‑Util
 
 ### From source:
 ```bash
