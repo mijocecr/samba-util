@@ -44,6 +44,8 @@
         <AvaloniaResource Include="Assets\Icons\resource-windows.jpeg" />
     </ItemGroup>
     <ItemGroup>
-      <Content Include="Assets\Icons\samba-util.png" />
+      <AvaloniaResource Include="Assets\Icons\samba-util.png">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </AvaloniaResource>
     </ItemGroup>
 </Project>
