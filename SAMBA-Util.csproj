@@ -21,7 +21,6 @@
     <!-- Recursos (tus iconos) -->
     <ItemGroup>
         <None Remove="Assets\Icons\samba-util.png" />
-        <AvaloniaResource Include="Assets\Icons\samba-util.png" />
 
         <None Remove="Assets\Icons\resource-unix.jpeg" />
         <AvaloniaResource Include="Assets\Icons\resource-unix.jpeg" />
@@ -43,5 +42,8 @@
 
         <None Remove="Assets\Icons\resource-windows.jpeg" />
         <AvaloniaResource Include="Assets\Icons\resource-windows.jpeg" />
+    </ItemGroup>
+    <ItemGroup>
+      <Content Include="Assets\Icons\samba-util.png" />
     </ItemGroup>
 </Project>
