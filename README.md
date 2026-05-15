@@ -68,11 +68,24 @@ Install with `paru`:
 paru -S samba-util
 ```
 
+Manual AUR clone:
+
+```bash
+git clone https://aur.archlinux.org/samba-util.git
+cd samba-util
+makepkg -si
+```
+
+
+
 ---
 
-## 📦 Requirements
+## Requirements
 
-- Linux distribution with Samba installed  
+- Linux distribution with `systemd`
+-  `samba` 
+- `linux-headers` needed for kernel controller 
+- `cifs-utils`    needed to operate the filesystem
 - .NET 9.0 runtime (or self‑contained build)  
 - `sudo` privileges for administrative actions  
 - Access to `/etc/samba/smb.conf`
@@ -80,7 +93,7 @@ paru -S samba-util
 ---
 
 
-## 🚀 Running SAMBA‑Util
+## Running SAMBA‑Util
 
 ### From source:
 ```bash
