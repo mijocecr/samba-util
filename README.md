@@ -59,20 +59,20 @@ SAMBA‑Util is available in the Arch User Repository.
 Install with `yay`:
 
 ```bash
-yay -S samba-util
+yay -S samba-util-bin
 ```
 Install with `paru`:
 
 
 ```bash
-paru -S samba-util
+paru -S samba-util-bin
 ```
 
 Manual AUR clone:
 
 ```bash
-git clone https://aur.archlinux.org/samba-util.git
-cd samba-util
+git clone https://aur.archlinux.org/samba-util-bin.git
+cd samba-util-bin
 makepkg -si
 ```
 
