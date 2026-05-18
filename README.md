@@ -76,10 +76,17 @@ cd samba-util-bin
 makepkg -si
 ```
 
-
-
 ---
 
+## Running SAMBA‑Util
+
+### From source:
+```bash
+git clone https://github.com/mijocecr/samba-util.git
+cd samba-util
+dotnet run
+```
+---
 ## Requirements
 
 - Linux distribution with `systemd`
@@ -92,16 +99,6 @@ makepkg -si
 
 ---
 
-
-## Running SAMBA‑Util
-
-### From source:
-```bash
-git clone https://github.com/mijocecr/samba-util.git
-cd samba-util
-dotnet run
-```
----
 ## License
 
 SAMBA‑Util is distributed under the **MIT License**, allowing free use, modification, and distribution.
