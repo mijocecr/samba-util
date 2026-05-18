@@ -59,27 +59,34 @@ SAMBA‑Util is available in the Arch User Repository.
 Install with `yay`:
 
 ```bash
-yay -S samba-util
+yay -S samba-util-bin
 ```
 Install with `paru`:
 
 
 ```bash
-paru -S samba-util
+paru -S samba-util-bin
 ```
 
 Manual AUR clone:
 
 ```bash
-git clone https://aur.archlinux.org/samba-util.git
-cd samba-util
+git clone https://aur.archlinux.org/samba-util-bin.git
+cd samba-util-bin
 makepkg -si
 ```
 
-
-
 ---
 
+## Running SAMBA‑Util
+
+### From source:
+```bash
+git clone https://github.com/mijocecr/samba-util.git
+cd samba-util
+dotnet run
+```
+---
 ## Requirements
 
 - Linux distribution with `systemd`
@@ -92,16 +99,6 @@ makepkg -si
 
 ---
 
-
-## Running SAMBA‑Util
-
-### From source:
-```bash
-git clone https://github.com/mijocecr/samba-util.git
-cd samba-util
-dotnet run
-```
----
 ## License
 
 SAMBA‑Util is distributed under the **MIT License**, allowing free use, modification, and distribution.
