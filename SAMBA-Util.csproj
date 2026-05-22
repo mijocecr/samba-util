@@ -48,4 +48,10 @@
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </AvaloniaResource>
     </ItemGroup>
+    <ItemGroup>
+      <None Remove="LICENSE.txt" />
+      <Resource Include="LICENSE.txt">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </Resource>
+    </ItemGroup>
 </Project>
