@@ -1,5 +1,6 @@
 ﻿using Avalonia;
 using System;
+using SAMBA_Util.Helpers;
 
 namespace SAMBA_Util;
 
@@ -9,8 +10,21 @@ class Program
     // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
     // yet and stuff might break.
     [STAThread]
-    public static void Main(string[] args) => BuildAvaloniaApp()
-        .StartWithClassicDesktopLifetime(args);
+   
+    public static void Main(string[] args)
+    {
+        bool hasDisplay = Environment.GetEnvironmentVariable("DISPLAY") != null;
+        bool isTerminal = !Console.IsInputRedirected && !Console.IsOutputRedirected;
+
+        if (!hasDisplay && isTerminal)
+        {
+            CliApp.Run();
+            return;
+        }
+
+        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    }
+
 
     // Avalonia configuration, don't remove; also used by visual designer.
     public static AppBuilder BuildAvaloniaApp()

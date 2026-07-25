@@ -13,7 +13,7 @@ public static class ConfigManager
     public class AppConfig
     {
         public string SmbConfPath { get; set; } = "/etc/samba/smb.conf";
-        public string DefaultPermissions { get; set; } = "0755";
+        public string DefaultPermissions { get; set; } = "0777";
     }
 
     public static AppConfig Load()
