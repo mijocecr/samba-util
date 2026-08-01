@@ -13,7 +13,7 @@ using System.Threading;
 namespace SAMBA_Util.Helpers
 {
     // ---------------------------------------------------------
-    // CREDENCIALES
+    // CREDENTIALS
     // ---------------------------------------------------------
     public static class CredStore
     {
@@ -146,7 +146,7 @@ namespace SAMBA_Util.Helpers
         }
 
         // ---------------------------------------------------------
-        // OS DETECTION
+        // OS DETECTION (cached + override)
         // ---------------------------------------------------------
         public static async Task<string> DetectOSAsync(string ip, string name)
         {
@@ -165,25 +165,19 @@ namespace SAMBA_Util.Helpers
         // ---------------------------------------------------------
         // UNIVERSAL USER SPEC (Windows / macOS / Linux)
         // ---------------------------------------------------------
-        private static string BuildUserSpec(string ip)
+        public static string BuildUserSpec(string ip, string os)
         {
             string user = CredStore.User;
             string pass = CredStore.Password;
 
-            if (user == "guest")
+            if (string.IsNullOrWhiteSpace(user))
                 return "guest%";
-
-            if (OsCache.TryGetValue(ip, out var os) &&
-                os.Contains("Windows", StringComparison.OrdinalIgnoreCase))
-            {
-                return $"WORKGROUP\\{user}%{pass}";
-            }
 
             return $"{user}%{pass}";
         }
 
         // ---------------------------------------------------------
-        // SHARE ENUMERATION (CON FALLBACK WINDOWS)
+        // SHARE ENUMERATION (RPC for Windows, SMBCLIENT for others)
         // ---------------------------------------------------------
         public static async Task<List<NetworkShare>> GetSharesAsync(string ip)
         {
@@ -192,8 +186,42 @@ namespace SAMBA_Util.Helpers
 
             var shares = new List<NetworkShare>();
 
+            string os = await DetectOSAsync(ip, ip);
+
             // ---------------------------------------------------------
-            // 1) Intentar guest
+            // WINDOWS → RPC netshareenumall
+            // ---------------------------------------------------------
+            if (os == "Windows")
+            {
+                string userSpec = BuildUserSpec(ip, os);
+
+                string rpcOut = await ShellHelper.RunAsync(
+                    $"rpcclient -U {userSpec} {ip} -c \"netshareenumall\""
+                );
+
+                Console.WriteLine("[Scanner] RPC output:");
+                Console.WriteLine(rpcOut);
+
+                foreach (var line in rpcOut.Split('\n'))
+                {
+                    if (!line.Contains("netname:")) continue;
+
+                    string name = line.Replace("netname:", "").Trim();
+                    if (string.IsNullOrWhiteSpace(name)) continue;
+
+                    shares.Add(new NetworkShare(name)
+                    {
+                        IP = ip,
+                        Access = "Authenticated",
+                        Comment = "Windows RPC"
+                    });
+                }
+
+                return shares;
+            }
+
+            // ---------------------------------------------------------
+            // NON-WINDOWS → SMBCLIENT
             // ---------------------------------------------------------
             string outGuest = await ShellHelper.RunAsync(
                 $"smbclient -gL //{ip} -U guest% --option='client min protocol=SMB2'"
@@ -207,24 +235,21 @@ namespace SAMBA_Util.Helpers
                 var parsed = ParseShares(ip, outGuest);
 
                 foreach (var share in parsed)
-                    share.Access = await DetectShareAccess(ip, share.Name);
+                    share.Access = await DetectShareAccess(ip, share.Name, os);
 
                 return parsed;
             }
 
-            // ---------------------------------------------------------
-            // 2) Intentar credenciales reales
-            // ---------------------------------------------------------
             if (!string.IsNullOrWhiteSpace(CredStore.User) &&
                 CredStore.User != "guest")
             {
-                string userSpec = BuildUserSpec(ip);
+                string userSpec = BuildUserSpec(ip, os);
 
                 string outCred = await ShellHelper.RunAsync(
                     $"smbclient -gL //{ip} -U {userSpec} --option='client min protocol=SMB2'"
                 );
 
-                Console.WriteLine("[Scanner] CredStore output:");
+                Console.WriteLine("[Scanner] Credential output:");
                 Console.WriteLine(outCred);
 
                 if (!outCred.Contains("NT_STATUS"))
@@ -238,54 +263,13 @@ namespace SAMBA_Util.Helpers
                 }
             }
 
-            // ---------------------------------------------------------
-            // 3) FALLBACK WINDOWS
-            // ---------------------------------------------------------
-            Console.WriteLine("[Scanner] Enumeration failed → Windows fallback");
-
-            string[] commonShares =
-            {
-                "Users",
-                "Public",
-                "Documents",
-                "Downloads",
-                "Desktop",
-                "Shared",
-                "Share",
-                "Data",
-                "Miguel",
-                "MacOs",
-                "Carpeta pública de “Miguel Cerrato”"
-            };
-
-            string winUserSpec = BuildUserSpec(ip);
-
-            foreach (var shareName in commonShares)
-            {
-                string cmd =
-                    $"smbclient //{ip}/{shareName} -U {winUserSpec} --option='client min protocol=SMB2' -c \"ls\"";
-
-                Console.WriteLine($"[Scanner] Testing fallback share: {shareName}");
-                string output = await ShellHelper.RunAsync(cmd);
-
-                if (!output.Contains("NT_STATUS"))
-                {
-                    shares.Add(new NetworkShare(shareName)
-                    {
-                        IP = ip,
-                        Access = "Authenticated",
-                        Comment = "Detected via Windows fallback"
-                    });
-                }
-            }
-
-            if (shares.Count > 0)
-                return shares;
-
-            Console.WriteLine("[Scanner] Unable to enumerate shares (guest + credstore + fallback failed).");
+            Console.WriteLine("[Scanner] Enumeration failed.");
             return shares;
         }
 
+        // ---------------------------------------------------------
+        // SHARE PARSING (SMBCLIENT)
+        // ---------------------------------------------------------
         private static List<NetworkShare> ParseShares(string ip, string output)
         {
             var shares = new List<NetworkShare>();
@@ -294,29 +278,31 @@ namespace SAMBA_Util.Helpers
             {
                 if (!line.StartsWith("Disk|")) continue;
 
-                var parts = line.Split('|');
+                var parts = line.Split('|', StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length < 2) continue;
 
-                string name = parts[1];
+                string name = parts[1].Trim();
                 if (string.IsNullOrWhiteSpace(name)) continue;
 
                 shares.Add(new NetworkShare(name)
                 {
                     IP = ip,
-                    Comment = parts.Length > 2 ? parts[2] : ""
+                    Comment = parts.Length > 2 ? parts[2].Trim() : ""
                 });
             }
 
             return shares;
         }
+
         // ---------------------------------------------------------
-        // ACCESS DETECTION
+        // ACCESS DETECTION (SMBCLIENT)
         // ---------------------------------------------------------
-        private static async Task<string> DetectShareAccess(string ip, string share)
+        private static async Task<string> DetectShareAccess(string ip, string share, string os)
         {
             Console.WriteLine($"[Scanner] Testing access for share '{share}'...");
 
-            // 1) Guest
+            string userSpec = BuildUserSpec(ip, os);
+
             string guestCmd =
                 $"smbclient //{ip}/{share} -U guest% --option='client min protocol=SMB2' -c \"ls\"";
 
@@ -325,7 +311,6 @@ namespace SAMBA_Util.Helpers
             if (guestOut.Contains("blocks") || guestOut.Contains("NT_STATUS_OK"))
                 return "Anonymous";
 
-            // 2) Anonymous (sin usuario)
             string anonCmd =
                 $"smbclient //{ip}/{share} -N --option='client min protocol=SMB2' -c \"ls\"";
 
@@ -334,9 +319,8 @@ namespace SAMBA_Util.Helpers
             if (anonOut.Contains("blocks") || anonOut.Contains("NT_STATUS_OK"))
                 return "Anonymous";
 
-            // 3) Credenciales reales
             string credCmd =
-                $"smbclient //{ip}/{share} -U {BuildUserSpec(ip)} --option='client min protocol=SMB2' -c \"ls\"";
+                $"smbclient //{ip}/{share} -U {userSpec} --option='client min protocol=SMB2' -c \"ls\"";
 
             string credOut = await ShellHelper.RunAsync(credCmd);
 
@@ -347,12 +331,12 @@ namespace SAMBA_Util.Helpers
                 credOut.Contains("NT_STATUS_LOGON_FAILURE"))
                 return "Requires credentials";
 
-            if (credOut.Contains("NT_STATUS_BAD_NETWORK_NAME"))
+            if (credOut.Contains("NT_STATUS_BAD_NETWORK_NAME") ||
+                credOut.Contains("NT_STATUS_BAD_NETWORK_PATH"))
                 return "No Access";
 
             return "Requires credentials";
         }
-
 
         // ---------------------------------------------------------
         // PING SWEEP
