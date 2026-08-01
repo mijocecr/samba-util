@@ -1,5 +1,4 @@
 using System;
-using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
@@ -11,7 +10,7 @@ namespace SAMBA_Util.Helpers
     {
         public static async Task<string> DetectOsAsync(string ip)
         {
-            // 1) SMB (Windows / Samba / NAS / macOS)
+            // 1) SMB (Windows / macOS / Linux / NAS)
             if (await IsPortOpen(ip, 445))
             {
                 string smb = await DetectFromSmbAsync(ip);
@@ -27,7 +26,7 @@ namespace SAMBA_Util.Helpers
                     return ssh;
             }
 
-            // 3) TTL heuristics (rápido)
+            // 3) TTL fallback
             string ttl = await DetectFromTtlAsync(ip);
             if (ttl != null)
                 return ttl;
@@ -36,12 +35,15 @@ namespace SAMBA_Util.Helpers
         }
 
         // ---------------------------------------------------------
-        // SMB DETECTION (rápido)
+        // SMB DETECTION (limpio y funcional)
         // ---------------------------------------------------------
-        private static async Task<string> DetectFromSmbAsync(string ip)
+        private static async Task<string?> DetectFromSmbAsync(string ip)
         {
+            string user = CredStore.User ?? "guest";
+            string pass = CredStore.Password ?? "";
+
             var result = ShellHelper.Ejecutar(
-                $"smbclient -L //{ip} -N --option='client min protocol=SMB2' 2>/dev/null"
+                $"smbclient -L //{ip} -U {user}%{pass} --option='client min protocol=SMB2' 2>/dev/null"
             );
 
             string output = (result.Stdout + result.Stderr).ToLowerInvariant();
@@ -49,16 +51,27 @@ namespace SAMBA_Util.Helpers
             if (string.IsNullOrWhiteSpace(output))
                 return null;
 
-            if (output.Contains("windows") || output.Contains("microsoft"))
+            // Windows
+            if (output.Contains("microsoft") ||
+                output.Contains("windows"))
                 return "Windows";
 
-            if (output.Contains("darwin") || output.Contains("macos"))
+            // macOS
+            if (output.Contains("mac os") ||
+                output.Contains("darwin") ||
+                output.Contains("smbx") ||
+                output.Contains("aapl"))
                 return "macOS";
 
-            if (output.Contains("synology") || output.Contains("qnap") ||
-                output.Contains("freenas") || output.Contains("truenas"))
+            // NAS
+            if (output.Contains("synology") ||
+                output.Contains("qnap") ||
+                output.Contains("freenas") ||
+                output.Contains("truenas") ||
+                output.Contains("wd"))
                 return "NAS";
 
+            // Linux Samba
             if (output.Contains("samba"))
                 return "Linux";
 
@@ -66,21 +79,24 @@ namespace SAMBA_Util.Helpers
         }
 
         // ---------------------------------------------------------
-        // SSH BANNER (rápido)
+        // SSH BANNER (limpio)
         // ---------------------------------------------------------
-        private static async Task<string> DetectFromSshAsync(string ip)
+        private static async Task<string?> DetectFromSshAsync(string ip)
         {
             try
             {
                 using var client = new TcpClient();
                 var connectTask = client.ConnectAsync(ip, 22);
+
                 if (await Task.WhenAny(connectTask, Task.Delay(250)) != connectTask)
                     return null;
 
                 using var stream = client.GetStream();
                 byte[] buffer = new byte[200];
                 int read = await stream.ReadAsync(buffer, 0, buffer.Length);
-                if (read <= 0) return null;
+
+                if (read <= 0)
+                    return null;
 
                 string banner = Encoding.ASCII.GetString(buffer, 0, read).ToLowerInvariant();
 
@@ -90,12 +106,17 @@ namespace SAMBA_Util.Helpers
                 if (banner.Contains("darwin"))
                     return "macOS";
 
-                if (banner.Contains("freebsd") || banner.Contains("openbsd") || banner.Contains("netbsd"))
+                if (banner.Contains("freebsd") ||
+                    banner.Contains("openbsd") ||
+                    banner.Contains("netbsd"))
                     return "BSD";
 
-                if (banner.Contains("ubuntu") || banner.Contains("debian") ||
-                    banner.Contains("fedora") || banner.Contains("arch") ||
-                    banner.Contains("manjaro") || banner.Contains("opensuse"))
+                if (banner.Contains("ubuntu") ||
+                    banner.Contains("debian") ||
+                    banner.Contains("fedora") ||
+                    banner.Contains("arch") ||
+                    banner.Contains("manjaro") ||
+                    banner.Contains("opensuse"))
                     return "Linux";
 
                 if (banner.Contains("linux"))
@@ -110,9 +131,9 @@ namespace SAMBA_Util.Helpers
         }
 
         // ---------------------------------------------------------
-        // TTL HEURISTICS (rápido)
+        // TTL HEURISTICS (simple)
         // ---------------------------------------------------------
-        private static async Task<string> DetectFromTtlAsync(string ip)
+        private static async Task<string?> DetectFromTtlAsync(string ip)
         {
             try
             {
@@ -142,7 +163,7 @@ namespace SAMBA_Util.Helpers
         }
 
         // ---------------------------------------------------------
-        // PORT CHECK (rápido)
+        // PORT CHECK
         // ---------------------------------------------------------
         private static async Task<bool> IsPortOpen(string ip, int port)
         {
@@ -150,10 +171,8 @@ namespace SAMBA_Util.Helpers
             {
                 using var client = new TcpClient();
                 var connectTask = client.ConnectAsync(ip, port);
-                var timeoutTask = Task.Delay(150);
 
-                var completed = await Task.WhenAny(connectTask, timeoutTask);
-                if (completed == timeoutTask)
+                if (await Task.WhenAny(connectTask, Task.Delay(150)) != connectTask)
                     return false;
 
                 return client.Connected;

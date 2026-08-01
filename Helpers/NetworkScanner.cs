@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Threading.Tasks;
-using System.Net.Http;
 using System.Text;
 using System.IO;
 using System.Linq;
@@ -14,7 +13,7 @@ using System.Threading;
 namespace SAMBA_Util.Helpers
 {
     // ---------------------------------------------------------
-    // CREDENCIALES (para Mount/Open)
+    // CREDENCIALES
     // ---------------------------------------------------------
     public static class CredStore
     {
@@ -95,15 +94,14 @@ namespace SAMBA_Util.Helpers
     }
 
     // ---------------------------------------------------------
-    // NETWORK SCANNER (UNIVERSAL)
+    // NETWORK SCANNER
     // ---------------------------------------------------------
     public static class NetworkScanner
     {
-        // Cache interna para OS
         private static readonly Dictionary<string, string> OsCache = new();
 
         // ---------------------------------------------------------
-        // DISCOVER DEVICES (con OS detection paralela)
+        // DISCOVER DEVICES
         // ---------------------------------------------------------
         public static async Task<List<NetworkDevice>> DiscoverAsync(string ifaceName)
         {
@@ -115,14 +113,10 @@ namespace SAMBA_Util.Helpers
 
             var alive = await PingSweepAsync(subnet);
 
-            var uniqueHosts = new HashSet<string>();
-
-            // Crear lista de dispositivos sin OS
             foreach (var ip in alive)
             {
-                string? mac = await GetMacAsync(ip);
-
                 string hostname = ip;
+
                 try
                 {
                     var entry = await System.Net.Dns.GetHostEntryAsync(ip);
@@ -130,11 +124,6 @@ namespace SAMBA_Util.Helpers
                         hostname = entry.HostName;
                 }
                 catch { }
-
-                string key = mac ?? hostname ?? ip;
-
-                if (!uniqueHosts.Add(key))
-                    continue;
 
                 devices.Add(new NetworkDevice
                 {
@@ -146,9 +135,6 @@ namespace SAMBA_Util.Helpers
                 });
             }
 
-            // ---------------------------------------------------------
-            // Detectar OS en paralelo (rápido y eficiente)
-            // ---------------------------------------------------------
             var tasks = devices.Select(async dev =>
             {
                 dev.OS = await DetectOSAsync(dev.IP, dev.Name);
@@ -160,176 +146,212 @@ namespace SAMBA_Util.Helpers
         }
 
         // ---------------------------------------------------------
-        // GET MAC ADDRESS (MODERNO: ip neigh)
-        // ---------------------------------------------------------
-        private static async Task<string?> GetMacAsync(string ip)
-        {
-            string output = await ShellHelper.RunAsync($"ip neigh show {ip}");
-
-            var match = Regex.Match(output, @"([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}");
-
-            if (match.Success)
-                return match.Value.ToLowerInvariant();
-
-            return null;
-        }
-
-        // ---------------------------------------------------------
-        // OS DETECTION (OsDetector rápido + Cache + Overrides)
+        // OS DETECTION
         // ---------------------------------------------------------
         public static async Task<string> DetectOSAsync(string ip, string name)
         {
-            // 1) Override manual del usuario
             if (OsOverrideManager.TryGetOverride(ip, out var forcedOs))
                 return forcedOs;
 
-            // 2) Cache interna
             if (OsCache.TryGetValue(ip, out var cached))
                 return cached;
 
-            // 3) Detección real (rápida)
             string detected = await OsDetector.DetectOsAsync(ip);
-
-            // 4) Guardar en caché
             OsCache[ip] = detected;
 
             return detected;
         }
 
         // ---------------------------------------------------------
-        // GET SHARES (UNIVERSAL SMB2/SMB3)
+        // UNIVERSAL USER SPEC (Windows / macOS / Linux)
+        // ---------------------------------------------------------
+        private static string BuildUserSpec(string ip)
+        {
+            string user = CredStore.User;
+            string pass = CredStore.Password;
+
+            if (user == "guest")
+                return "guest%";
+
+            if (OsCache.TryGetValue(ip, out var os) &&
+                os.Contains("Windows", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"WORKGROUP\\{user}%{pass}";
+            }
+
+            return $"{user}%{pass}";
+        }
+
+        // ---------------------------------------------------------
+        // SHARE ENUMERATION (CON FALLBACK WINDOWS)
         // ---------------------------------------------------------
         public static async Task<List<NetworkShare>> GetSharesAsync(string ip)
         {
+            Console.Clear();
+            Console.WriteLine($"[Scanner] === GET SHARES FOR {ip} ===");
+
             var shares = new List<NetworkShare>();
 
-            try
+            // ---------------------------------------------------------
+            // 1) Intentar guest
+            // ---------------------------------------------------------
+            string outGuest = await ShellHelper.RunAsync(
+                $"smbclient -gL //{ip} -U guest% --option='client min protocol=SMB2'"
+            );
+
+            Console.WriteLine("[Scanner] Guest output:");
+            Console.WriteLine(outGuest);
+
+            if (!outGuest.Contains("NT_STATUS"))
             {
-                string cmd = $"smbclient -L //{ip} -N --option='client min protocol=SMB2'";
-                string output = await ShellHelper.RunAsync(cmd);
+                var parsed = ParseShares(ip, outGuest);
 
-                var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var share in parsed)
+                    share.Access = await DetectShareAccess(ip, share.Name);
 
-                bool inShareSection = false;
+                return parsed;
+            }
 
-                foreach (var raw in lines)
+            // ---------------------------------------------------------
+            // 2) Intentar credenciales reales
+            // ---------------------------------------------------------
+            if (!string.IsNullOrWhiteSpace(CredStore.User) &&
+                CredStore.User != "guest")
+            {
+                string userSpec = BuildUserSpec(ip);
+
+                string outCred = await ShellHelper.RunAsync(
+                    $"smbclient -gL //{ip} -U {userSpec} --option='client min protocol=SMB2'"
+                );
+
+                Console.WriteLine("[Scanner] CredStore output:");
+                Console.WriteLine(outCred);
+
+                if (!outCred.Contains("NT_STATUS"))
                 {
-                    string line = raw.Trim();
+                    var parsed = ParseShares(ip, outCred);
 
-                    if (line.StartsWith("Sharename", StringComparison.OrdinalIgnoreCase))
-                    {
-                        inShareSection = true;
-                        continue;
-                    }
+                    foreach (var share in parsed)
+                        share.Access = "Authenticated";
 
-                    if (line.StartsWith("SMB1 disabled", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    if (line.StartsWith("----"))
-                        continue;
-
-                    if (!inShareSection)
-                        continue;
-
-                    var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length < 1)
-                        continue;
-
-                    string name = parts[0];
-
-                    if (name is "IPC$" or "print$" or "ADMIN$")
-                        continue;
-
-                    var share = new NetworkShare(name)
-                    {
-                        IP = ip
-                    };
-
-                    if (parts.Length > 2)
-                    {
-                        string comment = string.Join(" ", parts.Skip(2));
-                        if (!string.IsNullOrWhiteSpace(comment))
-                            share.Comment = comment;
-                    }
-
-                    share.Access = await DetectShareAccess(ip, name);
-
-                    if (!shares.Any(s => s.Name == share.Name))
-                        shares.Add(share);
+                    return parsed;
                 }
             }
-            catch (Exception ex)
+
+            // ---------------------------------------------------------
+            // 3) FALLBACK WINDOWS
+            // ---------------------------------------------------------
+            Console.WriteLine("[Scanner] Enumeration failed → Windows fallback");
+
+            string[] commonShares =
             {
-                Console.WriteLine($"[SMB] Error leyendo shares de {ip}: {ex.Message}");
+                "Users",
+                "Public",
+                "Documents",
+                "Downloads",
+                "Desktop",
+                "Shared",
+                "Share",
+                "Data",
+                "Miguel",
+                "MacOs",
+                "Carpeta pública de “Miguel Cerrato”"
+            };
+
+            string winUserSpec = BuildUserSpec(ip);
+
+            foreach (var shareName in commonShares)
+            {
+                string cmd =
+                    $"smbclient //{ip}/{shareName} -U {winUserSpec} --option='client min protocol=SMB2' -c \"ls\"";
+
+                Console.WriteLine($"[Scanner] Testing fallback share: {shareName}");
+                string output = await ShellHelper.RunAsync(cmd);
+
+                if (!output.Contains("NT_STATUS"))
+                {
+                    shares.Add(new NetworkShare(shareName)
+                    {
+                        IP = ip,
+                        Access = "Authenticated",
+                        Comment = "Detected via Windows fallback"
+                    });
+                }
+            }
+
+            if (shares.Count > 0)
+                return shares;
+
+            Console.WriteLine("[Scanner] Unable to enumerate shares (guest + credstore + fallback failed).");
+            return shares;
+        }
+
+        private static List<NetworkShare> ParseShares(string ip, string output)
+        {
+            var shares = new List<NetworkShare>();
+
+            foreach (var line in output.Split('\n'))
+            {
+                if (!line.StartsWith("Disk|")) continue;
+
+                var parts = line.Split('|');
+                if (parts.Length < 2) continue;
+
+                string name = parts[1];
+                if (string.IsNullOrWhiteSpace(name)) continue;
+
+                shares.Add(new NetworkShare(name)
+                {
+                    IP = ip,
+                    Comment = parts.Length > 2 ? parts[2] : ""
+                });
             }
 
             return shares;
         }
 
         // ---------------------------------------------------------
-        // SHARE ACCESS DETECTION (MEJORADO)
+        // ACCESS DETECTION
         // ---------------------------------------------------------
         private static async Task<string> DetectShareAccess(string ip, string share)
         {
-            string readTest = await ShellHelper.RunAsync(
-                $"smbclient //{ip}/{share} -N --option='client min protocol=SMB2' -c \"ls\""
-            );
+            Console.WriteLine($"[Scanner] Testing access for share '{share}'...");
 
-            if (readTest.Contains("NT_STATUS_ACCESS_DENIED"))
+            string cmd =
+                $"smbclient //{ip}/{share} -U {BuildUserSpec(ip)} --option='client min protocol=SMB2' -c \"ls\"";
+
+            Console.WriteLine($"[Scanner] CMD: {cmd}");
+
+            string output = await ShellHelper.RunAsync(cmd);
+            Console.WriteLine("[Scanner] OUTPUT:");
+            Console.WriteLine(output);
+
+            if (output.Contains("blocks") || output.Contains("NT_STATUS_OK"))
+            {
+                if (CredStore.User == "guest")
+                    return "Anonymous";
+                else
+                    return "Authenticated";
+            }
+
+            if (output.Contains("NT_STATUS_ACCESS_DENIED") ||
+                output.Contains("NT_STATUS_LOGON_FAILURE"))
                 return "Requires credentials";
 
-            if (readTest.Contains("NT_STATUS_LOGON_FAILURE"))
-                return "Requires credentials";
-
-            if (readTest.Contains("NT_STATUS_BAD_NETWORK_NAME"))
+            if (output.Contains("NT_STATUS_BAD_NETWORK_NAME"))
                 return "No Access";
 
-            if (readTest.Contains("blocks"))
-            {
-                string writeTest = await ShellHelper.RunAsync(
-                    $"smbclient //{ip}/{share} -N --option='client min protocol=SMB2' -c \"put /dev/null __test\""
-                );
-
-                if (!writeTest.Contains("NT_STATUS"))
-                {
-                    await ShellHelper.RunAsync(
-                        $"smbclient //{ip}/{share} -N --option='client min protocol=SMB2' -c \"del __test\""
-                    );
-
-                    return "Read/Write (Anonymous)";
-                }
-
-                return "Read Only (Anonymous)";
-            }
-
-            return "Read Only";
+            return "Requires credentials";
         }
 
         // ---------------------------------------------------------
-        // IS MOUNTED (ROBUSTO)
-        // ---------------------------------------------------------
-        public static bool IsMounted(string mountPoint)
-        {
-            try
-            {
-                string mounts = File.ReadAllText("/proc/mounts");
-                return mounts.Split('\n').Any(l => l.Contains($" {mountPoint} "));
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        // ---------------------------------------------------------
-        // PING SWEEP (OPTIMIZADO)
+        // PING SWEEP
         // ---------------------------------------------------------
         private static async Task<List<string>> PingSweepAsync(string subnet)
         {
             var list = new List<string>();
             var tasks = new List<Task>();
-
-            SemaphoreSlim limiter = new SemaphoreSlim(64);
+            var limiter = new SemaphoreSlim(64);
 
             for (int i = 1; i <= 254; i++)
             {
@@ -358,7 +380,7 @@ namespace SAMBA_Util.Helpers
         }
 
         // ---------------------------------------------------------
-        // SUBNET FROM INTERFACE (ROBUSTO)
+        // SUBNET FROM INTERFACE
         // ---------------------------------------------------------
         private static string? GetSubnetFromInterface(string ifaceName)
         {

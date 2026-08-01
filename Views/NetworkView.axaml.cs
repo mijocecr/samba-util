@@ -44,7 +44,14 @@ namespace SAMBA_Util.Views
 
         private async void OnScanClicked(object? sender, RoutedEventArgs e)
         {
-            var main = (MainWindow)TopLevel.GetTopLevel(this);
+            Console.Clear();
+
+            var main = TopLevel.GetTopLevel(this) as MainWindow;
+            if (main == null)
+            {
+                Log("Main window not found.");
+                return;
+            }
 
             var loading = main.ShowLoadingDialog("Scanning network...");
 
@@ -65,9 +72,6 @@ namespace SAMBA_Util.Views
 
             var devices = await NetworkScanner.DiscoverAsync(iface);
 
-            foreach (var dev in devices)
-                dev.OS = await NetworkScanner.DetectOSAsync(dev.IP, dev.Name);
-
             loading.Close();
 
             Log($"Scan finished. Devices found: {devices.Count}");
@@ -84,13 +88,15 @@ namespace SAMBA_Util.Views
 
             string iconPath = dev.OS switch
             {
-                "Windows" => "avares://SAMBA-Util/Assets/Icons/resource-windows.jpeg",
-                "Linux"   => "avares://SAMBA-Util/Assets/Icons/resource-linux.jpeg",
-                "macOS"   => "avares://SAMBA-Util/Assets/Icons/resource-mac.jpeg",
-                "BSD"     => "avares://SAMBA-Util/Assets/Icons/resource-bsd.jpeg",
-                "Unix"    => "avares://SAMBA-Util/Assets/Icons/resource-unix.jpeg",
-                "Router"  => "avares://SAMBA-Util/Assets/Icons/resource-router.jpeg",
-                _         => "avares://SAMBA-Util/Assets/Icons/resource-other.jpeg"
+                "Windows"    => "avares://SAMBA-Util/Assets/Icons/resource-windows.jpeg",
+                "Linux"      => "avares://SAMBA-Util/Assets/Icons/resource-linux.jpeg",
+                "macOS"      => "avares://SAMBA-Util/Assets/Icons/resource-mac.jpeg",
+                "BSD"        => "avares://SAMBA-Util/Assets/Icons/resource-bsd.jpeg",
+                "Unix"       => "avares://SAMBA-Util/Assets/Icons/resource-unix.jpeg",
+                "Router"     => "avares://SAMBA-Util/Assets/Icons/resource-router.jpeg",
+                "NAS"        => "avares://SAMBA-Util/Assets/Icons/resource-nas.jpeg",
+                "SMB Device" => "avares://SAMBA-Util/Assets/Icons/resource-smb.jpeg",
+                _            => "avares://SAMBA-Util/Assets/Icons/resource-other.jpeg"
             };
 
             Image icon;
@@ -156,6 +162,16 @@ namespace SAMBA_Util.Views
 
             btn.Click += async (_, __) =>
             {
+                Console.Clear();
+                Console.WriteLine($"[NetworkView] SHOW SHARES FOR {dev.IP}");
+
+                var main = TopLevel.GetTopLevel(this) as MainWindow;
+                if (main == null)
+                {
+                    Log("Main window not found.");
+                    return;
+                }
+
                 Log($"Loading shares for device: {dev.Name}");
                 StatusText.Text = "Loading shares...";
 
@@ -165,18 +181,35 @@ namespace SAMBA_Util.Views
 
                 if (shares.Count == 0)
                 {
+                    var cred = await main.ShowCredentialsDialog();
+                    if (cred == null)
+                    {
+                        main.ShowToast("Canceled");
+                        StatusText.Text = "Shares loading canceled";
+                        return;
+                    }
+
+                    CredStore.User = cred.Value.user;
+                    CredStore.Password = cred.Value.pass;
+
+                    shares = await NetworkScanner.GetSharesAsync(dev.IP);
+                }
+
+                if (shares.Count == 0)
+                {
                     SharesPanel.Children.Add(new TextBlock
                     {
-                        Text = "No SMB shares found.",
+                        Text = "Unable to enumerate SMB shares (credentials required or access denied).",
                         Foreground = new SolidColorBrush(fg.Color, 0.7),
                         FontSize = 14
                     });
+
+                    StatusText.Text = $"No shares visible for {dev.Name}";
+                    return;
                 }
-                else
-                {
-                    foreach (var share in shares)
-                        SharesPanel.Children.Add(CreateShareItem(share));
-                }
+
+                foreach (var share in shares)
+                    SharesPanel.Children.Add(CreateShareItem(share));
 
                 StatusText.Text = $"Shares loaded for {dev.Name}";
             };
@@ -241,6 +274,8 @@ namespace SAMBA_Util.Views
             AddOsItem("macOS");
             AddOsItem("BSD");
             AddOsItem("Unix");
+            AddOsItem("NAS");
+            AddOsItem("SMB Device");
             AddOsItem("Other");
 
             root.ItemsSource = osItems;
@@ -251,94 +286,15 @@ namespace SAMBA_Util.Views
 
         private Control CreateShareItem(NetworkShare share)
         {
-            var main = (MainWindow)TopLevel.GetTopLevel(this);
-
-            string baseDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "samba-util", "mounts"
-            );
-
-            string mountPoint = Path.Combine(baseDir, share.IP, share.Name);
-            Directory.CreateDirectory(mountPoint);
-
-            var mountBtn = new Button
+            var main = TopLevel.GetTopLevel(this) as MainWindow;
+            if (main == null)
             {
-                Width = 80,
-                HorizontalContentAlignment = HorizontalAlignment.Center,
-                VerticalContentAlignment = VerticalAlignment.Center
-            };
-
-            void UpdateMountButton()
-            {
-                mountBtn.Content = MountHelper.IsMounted(mountPoint) ? "Unmount" : "Mount";
+                Log("Main window not found.");
+                return new TextBlock { Text = "Main window not found." };
             }
 
-            UpdateMountButton();
+            var fg = (SolidColorBrush)this.FindResource("ForegroundBrush");
 
-            // ---------------------------------------------------------
-            // MOUNT / UNMOUNT (MountHelper PRO)
-            // ---------------------------------------------------------
-            mountBtn.Click += async (_, __) =>
-            {
-                try
-                {
-                    if (MountHelper.IsMounted(mountPoint))
-                    {
-                        var res = MountHelper.Unmount(mountPoint);
-
-                        if (!res.Success)
-                        {
-                            main.ShowErrorDialog("Unmount failed", res.Stderr);
-                            return;
-                        }
-
-                        main.ShowToast($"{share.Name} unmounted");
-                        UpdateMountButton();
-                        return;
-                    }
-
-                    bool isGuest = share.Access.Contains("Anonymous");
-
-                    if (!isGuest && share.Access.Contains("Requires"))
-                    {
-                        var cred = await main.ShowCredentialsDialog();
-                        if (cred == null)
-                        {
-                            main.ShowToast("Mount canceled");
-                            return;
-                        }
-
-                        CredStore.User = cred.Value.user;
-                        CredStore.Password = cred.Value.pass;
-                    }
-
-                    var mountRes = await MountHelper.MountAsync(
-                        share.IP,
-                        share.Name,
-                        mountPoint,
-                        isGuest,
-                        isGuest ? null : CredStore.User,
-                        isGuest ? null : CredStore.Password
-                    );
-
-                    if (!mountRes.Success)
-                    {
-                        main.ShowErrorDialog("Mount failed", mountRes.Stderr);
-                        return;
-                    }
-
-                    main.ShowToast($"{share.Name} mounted successfully");
-                    UpdateMountButton();
-                }
-                catch (Exception ex)
-                {
-                    main.ShowErrorDialog("Mount/Unmount failed", ex.Message);
-                }
-            };
-
-            // ---------------------------------------------------------
-            // OPEN (MountHelper PRO)
-            // ---------------------------------------------------------
             var openBtn = new Button
             {
                 Content = "Open",
@@ -351,42 +307,28 @@ namespace SAMBA_Util.Views
             {
                 try
                 {
-                    if (!MountHelper.IsMounted(mountPoint))
+                    bool isAnonymous = share.Access == "Anonymous";
+
+                    if (!isAnonymous)
                     {
-                        bool isGuest = share.Access.Contains("Anonymous");
-
-                        if (!isGuest && share.Access.Contains("Requires"))
+                        var cred = await main.ShowCredentialsDialog();
+                        if (cred == null)
                         {
-                            var cred = await main.ShowCredentialsDialog();
-                            if (cred == null)
-                            {
-                                main.ShowToast("Opening canceled");
-                                return;
-                            }
-
-                            CredStore.User = cred.Value.user;
-                            CredStore.Password = cred.Value.pass;
-                        }
-
-                        var mountRes = await MountHelper.MountAsync(
-                            share.IP,
-                            share.Name,
-                            mountPoint,
-                            isGuest,
-                            isGuest ? null : CredStore.User,
-                            isGuest ? null : CredStore.Password
-                        );
-
-                        if (!mountRes.Success)
-                        {
-                            main.ShowErrorDialog("Open failed", mountRes.Stderr);
+                            main.ShowToast("Opening canceled");
                             return;
                         }
 
-                        UpdateMountButton();
+                        CredStore.User = cred.Value.user;
+                        CredStore.Password = cred.Value.pass;
                     }
 
-                    await ShellHelper.RunAsync($"xdg-open \"{mountPoint}\"");
+                    SmbHelper.OpenShare(
+                        share.IP,
+                        share.Name,
+                        isAnonymous ? null : CredStore.User,
+                        isAnonymous ? null : CredStore.Password
+                    );
+
                     main.ShowToast($"Opening {share.Name}");
                 }
                 catch (Exception ex)
@@ -395,8 +337,6 @@ namespace SAMBA_Util.Views
                 }
             };
 
-            var fg = (SolidColorBrush)this.FindResource("ForegroundBrush");
-
             var row = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -404,7 +344,6 @@ namespace SAMBA_Util.Views
                 VerticalAlignment = VerticalAlignment.Center
             };
 
-            row.Children.Add(mountBtn);
             row.Children.Add(openBtn);
 
             row.Children.Add(new TextBlock
