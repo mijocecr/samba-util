@@ -309,7 +309,6 @@ namespace SAMBA_Util.Helpers
 
             return shares;
         }
-
         // ---------------------------------------------------------
         // ACCESS DETECTION
         // ---------------------------------------------------------
@@ -317,32 +316,43 @@ namespace SAMBA_Util.Helpers
         {
             Console.WriteLine($"[Scanner] Testing access for share '{share}'...");
 
-            string cmd =
+            // 1) Guest
+            string guestCmd =
+                $"smbclient //{ip}/{share} -U guest% --option='client min protocol=SMB2' -c \"ls\"";
+
+            string guestOut = await ShellHelper.RunAsync(guestCmd);
+
+            if (guestOut.Contains("blocks") || guestOut.Contains("NT_STATUS_OK"))
+                return "Anonymous";
+
+            // 2) Anonymous (sin usuario)
+            string anonCmd =
+                $"smbclient //{ip}/{share} -N --option='client min protocol=SMB2' -c \"ls\"";
+
+            string anonOut = await ShellHelper.RunAsync(anonCmd);
+
+            if (anonOut.Contains("blocks") || anonOut.Contains("NT_STATUS_OK"))
+                return "Anonymous";
+
+            // 3) Credenciales reales
+            string credCmd =
                 $"smbclient //{ip}/{share} -U {BuildUserSpec(ip)} --option='client min protocol=SMB2' -c \"ls\"";
 
-            Console.WriteLine($"[Scanner] CMD: {cmd}");
+            string credOut = await ShellHelper.RunAsync(credCmd);
 
-            string output = await ShellHelper.RunAsync(cmd);
-            Console.WriteLine("[Scanner] OUTPUT:");
-            Console.WriteLine(output);
+            if (credOut.Contains("blocks") || credOut.Contains("NT_STATUS_OK"))
+                return "Authenticated";
 
-            if (output.Contains("blocks") || output.Contains("NT_STATUS_OK"))
-            {
-                if (CredStore.User == "guest")
-                    return "Anonymous";
-                else
-                    return "Authenticated";
-            }
-
-            if (output.Contains("NT_STATUS_ACCESS_DENIED") ||
-                output.Contains("NT_STATUS_LOGON_FAILURE"))
+            if (credOut.Contains("NT_STATUS_ACCESS_DENIED") ||
+                credOut.Contains("NT_STATUS_LOGON_FAILURE"))
                 return "Requires credentials";
 
-            if (output.Contains("NT_STATUS_BAD_NETWORK_NAME"))
+            if (credOut.Contains("NT_STATUS_BAD_NETWORK_NAME"))
                 return "No Access";
 
             return "Requires credentials";
         }
+
 
         // ---------------------------------------------------------
         // PING SWEEP
