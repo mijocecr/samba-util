@@ -158,10 +158,10 @@ public partial class SharesView : UserControl
                 // 🔥 Volver a leer permisos reales desde el sistema
                 var (owner, group, mode) = FileSystemHelper.GetPermissions(share.Path);
 
-                // 🔥 Revalidar usando los permisos recién leídos
+                //  Revalidar usando los permisos recién leídos
                 share.Warning = ShareValidator.ValidateShare(share);
 
-                // 🔥 Forzar refresco visual del ListBox
+                //  Forzar refresco visual del ListBox
                 ListShares.ItemsSource = null;
                 ListShares.ItemsSource = Shares;
 

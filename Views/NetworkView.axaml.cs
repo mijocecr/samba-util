@@ -165,6 +165,10 @@ namespace SAMBA_Util.Views
                 Console.Clear();
                 Console.WriteLine($"[NetworkView] SHOW SHARES FOR {dev.IP}");
 
+                // Reset credentials when switching host
+                CredStore.User = null;
+                CredStore.Password = null;
+
                 var main = TopLevel.GetTopLevel(this) as MainWindow;
                 if (main == null)
                 {

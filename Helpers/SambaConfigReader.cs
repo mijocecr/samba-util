@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace SAMBA_Util.Helpers;
 
@@ -17,6 +18,17 @@ public static class SambaConfigReader
         v.Equals("1") ||
         v.Equals("y", StringComparison.OrdinalIgnoreCase);
 
+    private static void ValidateShareName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new InvalidOperationException("Share name cannot be empty.");
+
+        if (!Regex.IsMatch(name, @"^[A-Za-z0-9._-]+$"))
+            throw new InvalidOperationException(
+                $"Invalid share name '{name}'. Allowed characters: letters, numbers, dot, underscore, dash."
+            );
+    }
+
     public static List<Share> LoadShares(string filePath = null)
     {
         var sw = Stopwatch.StartNew();
@@ -25,13 +37,13 @@ public static class SambaConfigReader
         var config = ConfigManager.Load();
         filePath ??= config.SmbConfPath;
 
-        Console.WriteLine($"[CONF] #{callId} → LoadShares('{filePath}') iniciado");
+        Console.WriteLine($"[CONF] #{callId} → LoadShares('{filePath}') started");
 
         var shares = new List<Share>();
 
         if (!File.Exists(filePath))
         {
-            Console.WriteLine($"[CONF] #{callId} Archivo no existe. Tiempo: {sw.ElapsedMilliseconds} ms");
+            Console.WriteLine($"[CONF] #{callId} File does not exist. Time: {sw.ElapsedMilliseconds} ms");
             return shares;
         }
 
@@ -42,28 +54,35 @@ public static class SambaConfigReader
         string? rawLine;
         while ((rawLine = reader.ReadLine()) != null)
         {
-            // Normalizar tabs
             rawLine = rawLine.Replace("\t", " ");
 
-            // Quitar comentarios al final de línea
+            // Preserve full-line comments inside sections
+            if (rawLine.Trim().StartsWith("#") || rawLine.Trim().StartsWith(";"))
+            {
+                if (current != null)
+                    current.UnknownParameters.Add(rawLine.Trim());
+                continue;
+            }
+
+            // Remove trailing comments
             var clean = rawLine.Split('#')[0].Split(';')[0].Trim();
 
             if (string.IsNullOrWhiteSpace(clean))
                 continue;
 
-            // Soporte para includes
+            // Includes
             if (clean.StartsWith("include =", StringComparison.OrdinalIgnoreCase))
             {
                 var includePath = clean.Split('=', 2)[1].Trim().Trim('"');
                 if (File.Exists(includePath))
                 {
-                    Console.WriteLine($"[CONF] #{callId} → Procesando include: {includePath}");
+                    Console.WriteLine($"[CONF] #{callId} → Processing include: {includePath}");
                     shares.AddRange(LoadShares(includePath));
                 }
                 continue;
             }
 
-            // Soporte para parámetros multilinea con \
+            // Multiline continuation
             while (clean.EndsWith("\\"))
             {
                 clean = clean.TrimEnd('\\').Trim();
@@ -71,7 +90,7 @@ public static class SambaConfigReader
                 clean += " " + next;
             }
 
-            // Detectar nueva sección
+            // Section detection
             if (clean.StartsWith("[") && clean.EndsWith("]"))
             {
                 var name = clean.Substring(1, clean.Length - 2);
@@ -81,6 +100,8 @@ public static class SambaConfigReader
                     current = null;
                     continue;
                 }
+
+                ValidateShareName(name);
 
                 if (current != null)
                     shares.Add(current);
@@ -102,7 +123,7 @@ public static class SambaConfigReader
             if (current == null)
                 continue;
 
-            // Parseo de clave=valor
+            // Key/value parsing
             var parts = clean.Split('=', 2, StringSplitOptions.TrimEntries);
             if (parts.Length != 2)
             {
@@ -174,7 +195,6 @@ public static class SambaConfigReader
                     break;
 
                 default:
-                    // Parámetro desconocido → preservarlo
                     current.UnknownParameters.Add(clean);
                     break;
             }
@@ -184,7 +204,7 @@ public static class SambaConfigReader
             shares.Add(current);
 
         sw.Stop();
-        Console.WriteLine($"[CONF] #{callId} ← LoadShares completado en {sw.ElapsedMilliseconds} ms. Shares: {shares.Count}");
+        Console.WriteLine($"[CONF] #{callId} ← LoadShares completed in {sw.ElapsedMilliseconds} ms. Shares: {shares.Count}");
 
         return shares;
     }
