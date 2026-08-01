@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.NetworkInformation;
+using System.Text.RegularExpressions;
 using SAMBA_Util.Models;
 using SAMBA_Util.Helpers;
 
@@ -121,7 +122,13 @@ public class CliApp
 
         if (string.IsNullOrWhiteSpace(name))
         {
-            Console.WriteLine("Operation cancelled.");
+            Console.WriteLine("Operation canceled.");
+            return;
+        }
+
+        if (!Regex.IsMatch(name, @"^[A-Za-z0-9._-]+$"))
+        {
+            Console.WriteLine("Invalid share name. Allowed characters: letters, numbers, dot, underscore, dash.");
             return;
         }
 
@@ -130,7 +137,7 @@ public class CliApp
 
         if (string.IsNullOrWhiteSpace(path))
         {
-            Console.WriteLine("Operation cancelled.");
+            Console.WriteLine("Operation canceled.");
             return;
         }
 
@@ -160,7 +167,13 @@ public class CliApp
 
         if (string.IsNullOrWhiteSpace(name))
         {
-            Console.WriteLine("Operation cancelled.");
+            Console.WriteLine("Operation canceled.");
+            return;
+        }
+
+        if (!Regex.IsMatch(name, @"^[A-Za-z0-9._-]+$"))
+        {
+            Console.WriteLine("Invalid share name.");
             return;
         }
 
@@ -178,7 +191,13 @@ public class CliApp
 
         if (string.IsNullOrWhiteSpace(name))
         {
-            Console.WriteLine("Operation cancelled.");
+            Console.WriteLine("Operation canceled.");
+            return;
+        }
+
+        if (!Regex.IsMatch(name, @"^[A-Za-z0-9._-]+$"))
+        {
+            Console.WriteLine("Invalid share name.");
             return;
         }
 
@@ -294,6 +313,8 @@ public class CliApp
                 break;
         }
 
+        share.UnknownParameters ??= new List<string>();
+
         SambaConfigWriter.UpdateShare(share);
         Console.WriteLine("Share updated.");
     }
@@ -303,6 +324,10 @@ public class CliApp
     // ---------------------------------------------------------
     static async System.Threading.Tasks.Task NetworkScannerMenu()
     {
+        // Reset credentials when switching host
+        CredStore.User = null;
+        CredStore.Password = null;
+
         Console.Clear();
         Console.WriteLine("=== Network Scanner ===");
 
@@ -372,6 +397,11 @@ public class CliApp
         var device = devices[devNum - 1];
 
         Console.WriteLine($"Getting shares from {device.IP}...");
+
+        // Reset credentials before scanning a new host
+        CredStore.User = null;
+        CredStore.Password = null;
+
         var shares = await NetworkScanner.GetSharesAsync(device.IP);
 
         Console.WriteLine();
@@ -420,6 +450,10 @@ public class CliApp
     // ---------------------------------------------------------
     static async System.Threading.Tasks.Task OpenShareFromScanner(string ip, List<NetworkShare> shares)
     {
+        // Reset credentials before opening a share
+        CredStore.User = null;
+        CredStore.Password = null;
+
         Console.Write("Select share number to open: ");
         var sel = Console.ReadLine();
 
