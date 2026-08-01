@@ -53,5 +53,7 @@
       <Resource Include="LICENSE.txt">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </Resource>
+      <None Remove="Assets\Icons\resource-nas.jpeg" />
+      <AvaloniaResource Include="Assets\Icons\resource-nas.jpeg" />
     </ItemGroup>
 </Project>

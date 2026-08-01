@@ -95,7 +95,7 @@ namespace SAMBA_Util.Views
                 "Unix"       => "avares://SAMBA-Util/Assets/Icons/resource-unix.jpeg",
                 "Router"     => "avares://SAMBA-Util/Assets/Icons/resource-router.jpeg",
                 "NAS"        => "avares://SAMBA-Util/Assets/Icons/resource-nas.jpeg",
-                "SMB Device" => "avares://SAMBA-Util/Assets/Icons/resource-smb.jpeg",
+                "SMB Device" => "avares://SAMBA-Util/Assets/Icons/resource-other.jpeg",
                 _            => "avares://SAMBA-Util/Assets/Icons/resource-other.jpeg"
             };
 
@@ -309,17 +309,25 @@ namespace SAMBA_Util.Views
                 {
                     bool isAnonymous = share.Access == "Anonymous";
 
+                    // Reuse stored credentials if available; only prompt if we don't have any
                     if (!isAnonymous)
                     {
-                        var cred = await main.ShowCredentialsDialog();
-                        if (cred == null)
-                        {
-                            main.ShowToast("Opening canceled");
-                            return;
-                        }
+                        bool haveStoredCreds =
+                            !string.IsNullOrWhiteSpace(CredStore.User) &&
+                            CredStore.User != "guest";
 
-                        CredStore.User = cred.Value.user;
-                        CredStore.Password = cred.Value.pass;
+                        if (!haveStoredCreds)
+                        {
+                            var cred = await main.ShowCredentialsDialog();
+                            if (cred == null)
+                            {
+                                main.ShowToast("Opening canceled");
+                                return;
+                            }
+
+                            CredStore.User = cred.Value.user;
+                            CredStore.Password = cred.Value.pass;
+                        }
                     }
 
                     SmbHelper.OpenShare(
