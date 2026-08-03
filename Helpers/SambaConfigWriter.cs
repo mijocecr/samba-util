@@ -30,11 +30,12 @@ public static class SambaConfigWriter
                 $"Invalid share name '{name}'. Allowed characters: letters, numbers, dot, underscore, dash, dollar."
             );
 
-        // Reserved names
-        var reserved = new[] { "global", "homes", "printers" };
+        // Reserved names (only truly restricted ones)
+        var reserved = new[] { "global", "homes" };
         if (reserved.Any(r => r.Equals(name, StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException($"Share name '{name}' is reserved by Samba.");
     }
+
 
 
     // ---------------------------------------------------------
