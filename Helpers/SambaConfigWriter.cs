@@ -16,44 +16,50 @@ public static class SambaConfigWriter
     private static long _callCountUpdate = 0;
 
     // ---------------------------------------------------------
-    //  VALIDATE SHARE NAME (user-facing: English)
+    // SPECIAL SHARES (must always be preserved)
     // ---------------------------------------------------------
-    
+    private static bool IsSpecialShare(string name)
+    {
+        return name.Equals("printers", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("print$", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("IPC$", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("homes", StringComparison.OrdinalIgnoreCase);
+    }
+
+    // ---------------------------------------------------------
+    // VALIDATE SHARE NAME
+    // ---------------------------------------------------------
     private static void ValidateShareName(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new InvalidOperationException("Share name cannot be empty.");
 
-        // Samba-friendly: letters, numbers, dot, underscore, dash, dollar
         if (!Regex.IsMatch(name, @"^[A-Za-z0-9._\-$]+$"))
             throw new InvalidOperationException(
                 $"Invalid share name '{name}'. Allowed characters: letters, numbers, dot, underscore, dash, dollar."
             );
 
-        // Reserved names (only truly restricted ones)
         var reserved = new[] { "global", "homes" };
         if (reserved.Any(r => r.Equals(name, StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException($"Share name '{name}' is reserved by Samba.");
     }
 
-
-
     // ---------------------------------------------------------
-    //  SAVE ALL SHARES
+    // SAVE ALL SHARES (non-destructive)
     // ---------------------------------------------------------
-    public static void SaveAllShares(IEnumerable<Share> shares)
+    public static void SaveAllShares(IEnumerable<Share> uiShares)
     {
         var callId = ++_callCountSave;
         var sw = Stopwatch.StartNew();
 
-        Console.WriteLine($"[WRITE] #{callId} → SaveAllShares started. Shares: {shares.Count()}");
+        Console.WriteLine($"[WRITE] #{callId} → SaveAllShares started. UI Shares: {uiShares.Count()}");
 
         var config = ConfigManager.Load();
         string smbConf = config.SmbConfPath;
         string backup = smbConf + ".bak";
         string temp = "/tmp/samba-util-smb.conf";
 
-        // 1) Read original smb.conf
+        // Read original file
         var originalLines = File.Exists(smbConf)
             ? File.ReadAllLines(smbConf).ToList()
             : new List<string>();
@@ -61,21 +67,50 @@ public static class SambaConfigWriter
         var globalSection = ExtractGlobalSectionWithComments(originalLines);
         var includeLines = ExtractIncludeLines(originalLines);
 
-        // 2) Generate temporary file
+        // Load shares from includes
+        var includeShares = new List<Share>();
+        foreach (var inc in includeLines)
+        {
+            var includePath = inc.Split('=', 2)[1].Trim().Trim('"');
+            if (File.Exists(includePath))
+                includeShares.AddRange(SambaConfigReader.LoadShares(includePath));
+        }
+
+        // Load original shares
+        var originalShares = SambaConfigReader.LoadShares();
+
+        // Build output
         var output = new List<string>();
 
-        // Global section preserved (with comments)
+        // Global section
         output.AddRange(globalSection);
         output.Add("");
 
-        // Includes preserved
+        // Includes
         foreach (var inc in includeLines)
             output.Add(inc);
 
         output.Add("");
 
-        // Shares
-        foreach (var s in shares)
+        // 1) Write special shares from original file
+        foreach (var s in originalShares)
+        {
+            if (IsSpecialShare(s.Name))
+            {
+                output.AddRange(ShareToLines(s));
+                output.Add("");
+            }
+        }
+
+        // 2) Write shares from includes
+        foreach (var s in includeShares)
+        {
+            output.AddRange(ShareToLines(s));
+            output.Add("");
+        }
+
+        // 3) Write UI-managed shares
+        foreach (var s in uiShares)
         {
             ValidateShareName(s.Name);
             output.AddRange(ShareToLines(s));
@@ -84,28 +119,26 @@ public static class SambaConfigWriter
 
         File.WriteAllLines(temp, output);
 
-        // 3) Backup
+        // Backup
         ShellHelper.EjecutarComoRoot($"cp \"{smbConf}\" \"{backup}\"");
 
-        // 4) Validate with testparm BEFORE copying
+        // Validate
         var test = ShellHelper.EjecutarComoRoot($"testparm -s \"{temp}\"");
         if (test.ExitCode != 0)
         {
-            Console.WriteLine($"[WRITE] #{callId} ERROR: testparm failed. smb.conf is invalid.");
+            Console.WriteLine($"[WRITE] #{callId} ERROR: testparm failed.");
             Console.WriteLine(test.Stderr);
             return;
         }
 
-        // 5) Copy temporary file
+        // Copy
         var copyResult = ShellHelper.EjecutarComoRoot($"cp \"{temp}\" \"{smbConf}\"");
-
         if (copyResult.ExitCode != 0)
         {
             Console.WriteLine($"[WRITE] #{callId} ERROR: failed to copy smb.conf");
             return;
         }
 
-        // 6) Restart Samba (auto-detection)
         RestartSambaService();
 
         sw.Stop();
@@ -113,24 +146,19 @@ public static class SambaConfigWriter
     }
 
     // ---------------------------------------------------------
-    //  ADD SHARE
+    // ADD SHARE
     // ---------------------------------------------------------
     public static void AddShare(Share newShare)
     {
         var callId = ++_callCountAdd;
         var sw = Stopwatch.StartNew();
 
-        Console.WriteLine($"[WRITE] #{callId} → AddShare('{newShare.Name}')");
-
         ValidateShareName(newShare.Name);
 
         var shares = SambaConfigReader.LoadShares();
 
         if (shares.Any(s => s.Name.Equals(newShare.Name, StringComparison.OrdinalIgnoreCase)))
-        {
-            Console.WriteLine($"[WRITE] #{callId} ERROR: duplicate share name.");
             throw new InvalidOperationException($"A share named '{newShare.Name}' already exists.");
-        }
 
         shares.Add(newShare);
 
@@ -141,14 +169,12 @@ public static class SambaConfigWriter
     }
 
     // ---------------------------------------------------------
-    //  DELETE SHARE
+    // DELETE SHARE
     // ---------------------------------------------------------
     public static void DeleteShare(string name)
     {
         var callId = ++_callCountDelete;
         var sw = Stopwatch.StartNew();
-
-        Console.WriteLine($"[WRITE] #{callId} → DeleteShare('{name}')");
 
         var shares = SambaConfigReader.LoadShares();
         var filtered = shares.Where(s => s.Name != name).ToList();
@@ -160,14 +186,12 @@ public static class SambaConfigWriter
     }
 
     // ---------------------------------------------------------
-    //  UPDATE SHARE
+    // UPDATE SHARE
     // ---------------------------------------------------------
     public static void UpdateShare(Share updated)
     {
         var callId = ++_callCountUpdate;
         var sw = Stopwatch.StartNew();
-
-        Console.WriteLine($"[WRITE] #{callId} → UpdateShare('{updated.Name}')");
 
         ValidateShareName(updated.Name);
 
@@ -182,7 +206,7 @@ public static class SambaConfigWriter
     }
 
     // ---------------------------------------------------------
-    //  PRESERVE [global] WITH COMMENTS
+    // PRESERVE [global]
     // ---------------------------------------------------------
     private static List<string> ExtractGlobalSectionWithComments(List<string> lines)
     {
@@ -194,7 +218,6 @@ public static class SambaConfigWriter
         {
             var trimmed = line.Trim();
 
-            // Preserve comments before [global]
             if (!globalFound && trimmed.StartsWith("#"))
             {
                 result.Add(line);
@@ -225,7 +248,7 @@ public static class SambaConfigWriter
     }
 
     // ---------------------------------------------------------
-    //  PRESERVE includes
+    // PRESERVE includes
     // ---------------------------------------------------------
     private static List<string> ExtractIncludeLines(List<string> lines)
     {
@@ -235,7 +258,7 @@ public static class SambaConfigWriter
     }
 
     // ---------------------------------------------------------
-    //  SHARE → smb.conf LINES
+    // SHARE → smb.conf LINES
     // ---------------------------------------------------------
     private static IEnumerable<string> ShareToLines(Share s)
     {
@@ -271,7 +294,7 @@ public static class SambaConfigWriter
     }
 
     // ---------------------------------------------------------
-    //  ESCAPE PATHS WITH SPACES
+    // ESCAPE PATHS
     // ---------------------------------------------------------
     private static string EscapePath(string path)
     {
@@ -279,7 +302,7 @@ public static class SambaConfigWriter
     }
 
     // ---------------------------------------------------------
-    //  RESTART SAMBA (AUTO-DETECTION)
+    // RESTART SAMBA
     // ---------------------------------------------------------
     private static void RestartSambaService()
     {
@@ -295,13 +318,12 @@ public static class SambaConfigWriter
             return;
         }
 
-        // OpenRC
         if (File.Exists("/sbin/rc-service"))
         {
             ShellHelper.EjecutarComoRoot("rc-service samba restart");
             return;
         }
 
-        Console.WriteLine("[WRITE] WARNING: Could not detect service manager. Samba was not restarted automatically.");
+        Console.WriteLine("[WRITE] WARNING: Could not detect service manager.");
     }
 }

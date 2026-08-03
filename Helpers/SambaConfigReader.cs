@@ -18,20 +18,24 @@ public static class SambaConfigReader
         v.Equals("1") ||
         v.Equals("y", StringComparison.OrdinalIgnoreCase);
 
+    // ---------------------------------------------------------
+    // VALIDATE SHARE NAME (same rules as Writer)
+    // ---------------------------------------------------------
     private static void ValidateShareName(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new InvalidOperationException("Share name cannot be empty.");
 
-        // Samba permite letras, números, punto, guion, guion bajo y dólar
-        if (!Regex.IsMatch(name, @"^[A-Za-z0-9._\-$]+$"))
+        // Samba-friendly: letters, numbers, dot, underscore, dash, dollar
+        if (!Regex.IsMatch(name, @"^[A-Za-z0-9._\\-$]+$"))
             throw new InvalidOperationException(
                 $"Invalid share name '{name}'. Allowed characters: letters, numbers, dot, underscore, dash, dollar."
             );
     }
 
-
-
+    // ---------------------------------------------------------
+    // LOAD SHARES (supports includes + avoids duplicates)
+    // ---------------------------------------------------------
     public static List<Share> LoadShares(string filePath = null)
     {
         var sw = Stopwatch.StartNew();
@@ -77,10 +81,19 @@ public static class SambaConfigReader
             if (clean.StartsWith("include =", StringComparison.OrdinalIgnoreCase))
             {
                 var includePath = clean.Split('=', 2)[1].Trim().Trim('"');
+
                 if (File.Exists(includePath))
                 {
                     Console.WriteLine($"[CONF] #{callId} → Processing include: {includePath}");
-                    shares.AddRange(LoadShares(includePath));
+
+                    var includedShares = LoadShares(includePath);
+
+                    // Avoid duplicates
+                    foreach (var s in includedShares)
+                    {
+                        if (!shares.Any(x => x.Name.Equals(s.Name, StringComparison.OrdinalIgnoreCase)))
+                            shares.Add(s);
+                    }
                 }
                 continue;
             }
