@@ -18,20 +18,24 @@ public static class SambaConfigWriter
     // ---------------------------------------------------------
     //  VALIDATE SHARE NAME (user-facing: English)
     // ---------------------------------------------------------
+    
     private static void ValidateShareName(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new InvalidOperationException("Share name cannot be empty.");
 
-        // Samba-friendly: letters, numbers, dot, underscore, dash
-        if (!Regex.IsMatch(name, @"^[A-Za-z0-9._-]+$"))
-            throw new InvalidOperationException("Invalid share name. Allowed characters: letters, numbers, dot, underscore, dash.");
+        // Samba-friendly: letters, numbers, dot, underscore, dash, dollar
+        if (!Regex.IsMatch(name, @"^[A-Za-z0-9._\-$]+$"))
+            throw new InvalidOperationException(
+                $"Invalid share name '{name}'. Allowed characters: letters, numbers, dot, underscore, dash, dollar."
+            );
 
         // Reserved names
         var reserved = new[] { "global", "homes", "printers" };
         if (reserved.Any(r => r.Equals(name, StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException($"Share name '{name}' is reserved by Samba.");
     }
+
 
     // ---------------------------------------------------------
     //  SAVE ALL SHARES

@@ -23,11 +23,13 @@ public static class SambaConfigReader
         if (string.IsNullOrWhiteSpace(name))
             throw new InvalidOperationException("Share name cannot be empty.");
 
-        if (!Regex.IsMatch(name, @"^[A-Za-z0-9._-]+$"))
+        // Samba permite letras, números, punto, guion, guion bajo y dólar
+        if (!Regex.IsMatch(name, @"^[A-Za-z0-9._\-$]+$"))
             throw new InvalidOperationException(
-                $"Invalid share name '{name}'. Allowed characters: letters, numbers, dot, underscore, dash."
+                $"Invalid share name '{name}'. Allowed characters: letters, numbers, dot, underscore, dash, dollar."
             );
     }
+
 
     public static List<Share> LoadShares(string filePath = null)
     {
