@@ -11,9 +11,6 @@ namespace SAMBA_Util.Helpers;
 public static class SambaConfigWriter
 {
     private static long _callCountSave = 0;
-    private static long _callCountAdd = 0;
-    private static long _callCountDelete = 0;
-    private static long _callCountUpdate = 0;
 
     // ---------------------------------------------------------
     // SPECIAL SHARES (preserve if present)
@@ -34,9 +31,9 @@ public static class SambaConfigWriter
         if (string.IsNullOrWhiteSpace(name))
             throw new InvalidOperationException("Share name cannot be empty.");
 
-        if (!Regex.IsMatch(name, @"^[A-Za-z0-9._\-$]+$"))
+        if (!Regex.IsMatch(name, @"^[A-Za-z0-9._\-$ ]+$"))
             throw new InvalidOperationException(
-                $"Invalid share name '{name}'. Allowed characters: letters, numbers, dot, underscore, dash, dollar."
+                $"Invalid share name '{name}'. Allowed characters: letters, numbers, space, dot, underscore, dash, dollar."
             );
 
         if (name.Equals("global", StringComparison.OrdinalIgnoreCase))
@@ -44,7 +41,7 @@ public static class SambaConfigWriter
     }
 
     // ---------------------------------------------------------
-    // SAVE ALL SHARES (non-destructive, original behavior)
+    // SAVE ALL SHARES
     // ---------------------------------------------------------
     public static void SaveAllShares(IEnumerable<Share> uiShares)
     {
@@ -66,7 +63,7 @@ public static class SambaConfigWriter
         var globalSection = ExtractGlobalSection(originalLines);
         var includeLines = ExtractIncludeLines(originalLines);
 
-        // cargar original para detectar especiales
+        // Cargar originales para preservar especiales no incluidos en la UI
         var originalShares = SambaConfigReader.LoadShares();
 
         // 2) Generar archivo temporal
@@ -82,10 +79,13 @@ public static class SambaConfigWriter
 
         output.Add("");
 
-        // Shares especiales preservados
+        // Identificar qué shares vienen de la UI para evitar duplicar especiales
+        var uiShareNames = uiShares.Select(x => x.Name).ToList();
+
+        // Preservar shares especiales SOLAMENTE si no están ya en uiShares
         foreach (var s in originalShares)
         {
-            if (IsSpecialShare(s.Name))
+            if (IsSpecialShare(s.Name) && !uiShareNames.Any(u => u.Equals(s.Name, StringComparison.OrdinalIgnoreCase)))
             {
                 output.AddRange(ShareToLines(s));
                 output.Add("");
@@ -102,28 +102,31 @@ public static class SambaConfigWriter
 
         File.WriteAllLines(temp, output);
 
-        // 3) Backup
-        ShellHelper.EjecutarComoRoot($"cp \"{smbConf}\" \"{backup}\"");
+        // 3) Backup del archivo original
+        if (File.Exists(smbConf))
+        {
+            ShellHelper.EjecutarComoRoot($"cp \"{smbConf}\" \"{backup}\"");
+        }
 
-        // 4) Validar con testparm ANTES de copiar
+        // 4) Validar con testparm ANTES de aplicar cambios
         var test = ShellHelper.EjecutarComoRoot($"testparm -s \"{temp}\"");
         if (test.ExitCode != 0)
         {
             Console.WriteLine($"[WRITE] #{callId} ERROR: testparm falló. smb.conf inválido.");
             Console.WriteLine(test.Stderr);
-            return;
+            throw new InvalidOperationException($"La configuración de Samba generada no es válida: {test.Stderr}");
         }
 
-        // 5) Copiar archivo temporal
+        // 5) Aplicar el archivo temporal al archivo de configuración real
         var copyResult = ShellHelper.EjecutarComoRoot($"cp \"{temp}\" \"{smbConf}\"");
 
         if (copyResult.ExitCode != 0)
         {
             Console.WriteLine($"[WRITE] #{callId} ERROR al copiar smb.conf");
-            return;
+            throw new InvalidOperationException("No se pudo escribir el archivo /etc/samba/smb.conf. Verifica permisos de root.");
         }
 
-        // 6) Reiniciar Samba (autodetección)
+        // 6) Reiniciar Samba
         RestartSambaService();
 
         sw.Stop();
@@ -140,10 +143,9 @@ public static class SambaConfigWriter
         var shares = SambaConfigReader.LoadShares();
 
         if (shares.Any(s => s.Name.Equals(newShare.Name, StringComparison.OrdinalIgnoreCase)))
-            throw new InvalidOperationException($"A share named '{newShare.Name}' already exists.");
+            throw new InvalidOperationException($"Ya existe un recurso compartido llamado '{newShare.Name}'.");
 
         shares.Add(newShare);
-
         SaveAllShares(shares);
     }
 
@@ -153,7 +155,7 @@ public static class SambaConfigWriter
     public static void DeleteShare(string name)
     {
         var shares = SambaConfigReader.LoadShares();
-        var filtered = shares.Where(s => s.Name != name).ToList();
+        var filtered = shares.Where(s => !s.Name.Equals(name, StringComparison.OrdinalIgnoreCase)).ToList();
 
         SaveAllShares(filtered);
     }
@@ -166,14 +168,14 @@ public static class SambaConfigWriter
         ValidateShareName(updated.Name);
 
         var shares = SambaConfigReader.LoadShares();
-        var list = shares.Where(s => s.Name != updated.Name).ToList();
+        var list = shares.Where(s => !s.Name.Equals(updated.Name, StringComparison.OrdinalIgnoreCase)).ToList();
         list.Add(updated);
 
         SaveAllShares(list);
     }
 
     // ---------------------------------------------------------
-    // PRESERVAR [global]
+    // HELPER: PRESERVAR [global]
     // ---------------------------------------------------------
     private static List<string> ExtractGlobalSection(List<string> lines)
     {
@@ -182,7 +184,9 @@ public static class SambaConfigWriter
 
         foreach (var line in lines)
         {
-            if (line.Trim().StartsWith("[global]", StringComparison.OrdinalIgnoreCase))
+            string trimmed = line.Trim();
+
+            if (trimmed.StartsWith("[global]", StringComparison.OrdinalIgnoreCase))
             {
                 insideGlobal = true;
                 result.Add(line);
@@ -191,7 +195,7 @@ public static class SambaConfigWriter
 
             if (insideGlobal)
             {
-                if (line.Trim().StartsWith("[") && !line.Trim().StartsWith("[global]"))
+                if (trimmed.StartsWith("[") && !trimmed.StartsWith("[global]", StringComparison.OrdinalIgnoreCase))
                     break;
 
                 result.Add(line);
@@ -202,7 +206,7 @@ public static class SambaConfigWriter
     }
 
     // ---------------------------------------------------------
-    // PRESERVAR includes
+    // HELPER: PRESERVAR INCLUDES
     // ---------------------------------------------------------
     private static List<string> ExtractIncludeLines(List<string> lines)
     {
@@ -217,7 +221,7 @@ public static class SambaConfigWriter
     private static IEnumerable<string> ShareToLines(Share s)
     {
         yield return $"[{s.Name}]";
-        yield return $"   path = {EscapePath(s.Path)}";
+        yield return $"   path = {CleanPath(s.Path)}";
         yield return $"   read only = {(s.ReadOnly ? "yes" : "no")}";
         yield return $"   guest ok = {(s.AllowGuests ? "yes" : "no")}";
         yield return $"   browseable = {(s.Browseable ? "yes" : "no")}";
@@ -245,24 +249,46 @@ public static class SambaConfigWriter
 
         if (!string.IsNullOrWhiteSpace(s.DirectoryMask))
             yield return $"   directory mask = {s.DirectoryMask}";
+
+        // Preservar cualquier parámetro avanzado no mapeado explícitamente en la UI
+        if (s.UnknownParameters != null)
+        {
+            foreach (var param in s.UnknownParameters)
+            {
+                if (!string.IsNullOrWhiteSpace(param))
+                    yield return $"   {param}";
+            }
+        }
     }
 
-    private static string EscapePath(string path)
+    /// <summary>
+    /// Limpia las rutas asegurando que NUNCA lleven comillas en Samba.
+    /// </summary>
+    private static string CleanPath(string path)
     {
-        return path.Contains(' ') ? $"\"{path}\"" : path;
+        if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+        return path.Trim().Trim('"');
     }
 
     private static void RestartSambaService()
     {
-        if (File.Exists("/bin/systemctl"))
+        if (File.Exists("/bin/systemctl") || File.Exists("/usr/bin/systemctl"))
         {
-            ShellHelper.EjecutarComoRoot("systemctl restart smbd || systemctl restart smb");
+            var res = ShellHelper.EjecutarComoRoot("systemctl restart smbd");
+            if (res.ExitCode != 0)
+            {
+                ShellHelper.EjecutarComoRoot("systemctl restart smb");
+            }
             return;
         }
 
-        if (File.Exists("/sbin/service"))
+        if (File.Exists("/sbin/service") || File.Exists("/usr/sbin/service"))
         {
-            ShellHelper.EjecutarComoRoot("service smbd restart || service smb restart");
+            var res = ShellHelper.EjecutarComoRoot("service smbd restart");
+            if (res.ExitCode != 0)
+            {
+                ShellHelper.EjecutarComoRoot("service smb restart");
+            }
             return;
         }
 
@@ -272,6 +298,6 @@ public static class SambaConfigWriter
             return;
         }
 
-        Console.WriteLine("[WRITE] ADVERTENCIA: No se pudo detectar el gestor de servicios.");
+        Console.WriteLine("[WRITE] ADVERTENCIA: No se pudo detectar el gestor de servicios para reiniciar Samba.");
     }
 }

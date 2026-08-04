@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net.NetworkInformation;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using SAMBA_Util.Models;
 using SAMBA_Util.Helpers;
 
@@ -11,9 +12,11 @@ namespace SAMBA_Util.Helpers;
 
 public class CliApp
 {
-    public static void Run()
+    private static readonly string ShareNameRegex = @"^[A-Za-z0-9._\-$ ]+$";
+
+    public static async Task RunAsync()
     {
-        AskPasswordOnce();   // Initialize Credenciales.AdminPassword
+        AskPasswordOnce();   // Inicializa Credenciales.AdminPassword
 
         while (true)
         {
@@ -42,7 +45,7 @@ public class CliApp
                 case "2": CreateShare(); break;
                 case "3": DeleteShare(); break;
                 case "4": EditShare(); break;
-                case "5": NetworkScannerMenu().GetAwaiter().GetResult(); break;
+                case "5": await NetworkScannerMenu(); break;
                 case "6": CheckSambaStatus(); break;
                 case "7": RunTestparm(); break;
                 case "8": RestartSamba(); break;
@@ -108,6 +111,8 @@ public class CliApp
             Console.WriteLine($"  Guests: {s.AllowGuests}");
             Console.WriteLine($"  Browseable: {s.Browseable}");
             Console.WriteLine($"  ValidUsers: {s.ValidUsers}");
+            if (!string.IsNullOrWhiteSpace(s.Comment))
+                Console.WriteLine($"  Comment: {s.Comment}");
             Console.WriteLine();
         }
     }
@@ -126,9 +131,9 @@ public class CliApp
             return;
         }
 
-        if (!Regex.IsMatch(name, @"^[A-Za-z0-9._-]+$"))
+        if (!Regex.IsMatch(name, ShareNameRegex))
         {
-            Console.WriteLine("Invalid share name. Allowed characters: letters, numbers, dot, underscore, dash.");
+            Console.WriteLine("Invalid share name. Allowed characters: letters, numbers, spaces, dot, underscore, dash, dollar.");
             return;
         }
 
@@ -144,7 +149,7 @@ public class CliApp
         var share = new Share
         {
             Name = name,
-            Path = path,
+            Path = path.Trim().Trim('"'),
             ReadOnly = true,
             AllowGuests = false,
             Browseable = true,
@@ -153,8 +158,15 @@ public class CliApp
             UnknownParameters = new List<string>()
         };
 
-        SambaConfigWriter.AddShare(share);
-        Console.WriteLine("Share created successfully.");
+        try
+        {
+            SambaConfigWriter.AddShare(share);
+            Console.WriteLine("Share created successfully.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error creating share: {ex.Message}");
+        }
     }
 
     // ---------------------------------------------------------
@@ -171,14 +183,15 @@ public class CliApp
             return;
         }
 
-        if (!Regex.IsMatch(name, @"^[A-Za-z0-9._-]+$"))
+        try
         {
-            Console.WriteLine("Invalid share name.");
-            return;
+            SambaConfigWriter.DeleteShare(name);
+            Console.WriteLine("Share deleted.");
         }
-
-        SambaConfigWriter.DeleteShare(name);
-        Console.WriteLine("Share deleted.");
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deleting share: {ex.Message}");
+        }
     }
 
     // ---------------------------------------------------------
@@ -195,14 +208,8 @@ public class CliApp
             return;
         }
 
-        if (!Regex.IsMatch(name, @"^[A-Za-z0-9._-]+$"))
-        {
-            Console.WriteLine("Invalid share name.");
-            return;
-        }
-
         var shares = SambaConfigReader.LoadShares();
-        var share = shares.FirstOrDefault(s => s.Name == name);
+        var share = shares.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
 
         if (share == null)
         {
@@ -217,7 +224,7 @@ public class CliApp
         Console.Write("New path (ENTER to keep): ");
         var newPath = Console.ReadLine();
         if (!string.IsNullOrWhiteSpace(newPath))
-            share.Path = newPath;
+            share.Path = newPath.Trim().Trim('"');
 
         Console.WriteLine($"ReadOnly (current: {(share.ReadOnly ? "yes" : "no")})");
         Console.WriteLine("1) yes");
@@ -277,7 +284,8 @@ public class CliApp
         Console.WriteLine("1) 0644");
         Console.WriteLine("2) 0660");
         Console.WriteLine("3) 0744");
-        Console.WriteLine("4) custom");
+        Console.WriteLine("4) 0775");
+        Console.WriteLine("5) custom");
         Console.Write("Select (ENTER to keep): ");
         var cmSel = Console.ReadLine();
         switch (cmSel)
@@ -285,7 +293,8 @@ public class CliApp
             case "1": share.CreateMask = "0644"; break;
             case "2": share.CreateMask = "0660"; break;
             case "3": share.CreateMask = "0744"; break;
-            case "4":
+            case "4": share.CreateMask = "0775"; break;
+            case "5":
                 Console.Write("Enter custom mask: ");
                 var custom = Console.ReadLine();
                 if (!string.IsNullOrWhiteSpace(custom))
@@ -315,16 +324,22 @@ public class CliApp
 
         share.UnknownParameters ??= new List<string>();
 
-        SambaConfigWriter.UpdateShare(share);
-        Console.WriteLine("Share updated.");
+        try
+        {
+            SambaConfigWriter.UpdateShare(share);
+            Console.WriteLine("Share updated.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating share: {ex.Message}");
+        }
     }
 
     // ---------------------------------------------------------
-    //  NETWORK SCANNER MENU (SYNC VIA TASK)
+    //  NETWORK SCANNER MENU
     // ---------------------------------------------------------
-    static async System.Threading.Tasks.Task NetworkScannerMenu()
+    static async Task NetworkScannerMenu()
     {
-        // Reset credentials when switching host
         CredStore.User = null;
         CredStore.Password = null;
 
@@ -366,7 +381,7 @@ public class CliApp
         string ifaceName = interfaces[ifaceNum - 1].Name;
 
         Console.WriteLine();
-        Console.WriteLine($"Scanning network on interface: {ifaceName}");
+        Console.WriteLine($"Scanning network on interface: {ifaceName}...");
         Console.WriteLine();
 
         var devices = await NetworkScanner.DiscoverAsync(ifaceName);
@@ -398,7 +413,6 @@ public class CliApp
 
         Console.WriteLine($"Getting shares from {device.IP}...");
 
-        // Reset credentials before scanning a new host
         CredStore.User = null;
         CredStore.Password = null;
 
@@ -426,7 +440,7 @@ public class CliApp
         switch (opt)
         {
             case "1":
-                await OpenShareFromScanner(device.IP, shares);
+                OpenShareFromScanner(device.IP, shares);
                 break;
 
             case "2":
@@ -448,9 +462,8 @@ public class CliApp
     // ---------------------------------------------------------
     //  OPEN SHARE (NO CIFS, NO ROOT)
     // ---------------------------------------------------------
-    static async System.Threading.Tasks.Task OpenShareFromScanner(string ip, List<NetworkShare> shares)
+    static void OpenShareFromScanner(string ip, List<NetworkShare> shares)
     {
-        // Reset credentials before opening a share
         CredStore.User = null;
         CredStore.Password = null;
 
@@ -465,7 +478,10 @@ public class CliApp
 
         var share = shares[num - 1];
 
-        Console.WriteLine($"Selected: {share.Name}");
+        // Limpiar posible formato "NombreShare|Comentario" retornado por el escáner
+        string cleanShareName = share.Name.Split('|')[0].Trim();
+
+        Console.WriteLine($"Selected: {cleanShareName}");
 
         bool isAnonymous = share.Access == "Anonymous";
 
@@ -481,28 +497,19 @@ public class CliApp
             pass = ReadPassword();
         }
 
-        SmbHelper.OpenShare(ip, share.Name, user, pass);
-
         Console.WriteLine("Opening share...");
+        SmbHelper.OpenShare(ip, cleanShareName, user, pass);
     }
 
     // ---------------------------------------------------------
-    //  SAMBA STATUS
+    //  SAMBA STATUS & MANAGEMENT
     // ---------------------------------------------------------
     static void CheckSambaStatus()
     {
         Console.Clear();
         Console.WriteLine("=== Samba Status ===\n");
 
-        string[] units =
-        {
-            "smb",
-            "smbd",
-            "nmbd",
-            "samba",
-            "samba4"
-        };
-
+        string[] units = { "smb", "smbd", "nmbd", "samba", "samba4" };
         bool any = false;
 
         foreach (var unit in units)
@@ -546,20 +553,20 @@ public class CliApp
 
         if (!string.IsNullOrWhiteSpace(stderr))
         {
-            Console.WriteLine("Configuration errors detected:\n");
+            Console.WriteLine("Configuration notes / warnings:\n");
             Console.WriteLine(stderr);
             Console.WriteLine();
-            return;
         }
 
         if (stdout.Contains("Loaded services file OK", StringComparison.OrdinalIgnoreCase))
         {
             Console.WriteLine("Configuration is valid.");
-            Console.WriteLine();
-            return;
+        }
+        else
+        {
+            Console.WriteLine(stdout);
         }
 
-        Console.WriteLine(stdout);
         Console.WriteLine();
     }
 
@@ -569,21 +576,30 @@ public class CliApp
         Console.WriteLine("=== Reload Samba ===\n");
 
         string[] units = { "smb", "smbd", "samba", "samba4" };
+        bool reloadedAny = false;
 
         foreach (var unit in units)
         {
             var check = ShellHelper.Ejecutar($"systemctl is-active {unit}");
-            if (check.Stdout.Trim() == "unknown")
+            if (check.Stdout.Trim() == "unknown" || string.IsNullOrWhiteSpace(check.Stdout))
                 continue;
 
             Console.WriteLine($"Reloading {unit}...");
             var res = ShellHelper.EjecutarComoRoot($"systemctl reload {unit}");
 
             if (res.ExitCode == 0)
+            {
                 Console.WriteLine($"{unit} reloaded.");
+                reloadedAny = true;
+            }
             else
+            {
                 Console.WriteLine($"{unit} failed to reload.");
+            }
         }
+
+        if (!reloadedAny)
+            Console.WriteLine("No active Samba services found to reload.");
 
         Console.WriteLine();
     }
@@ -594,21 +610,30 @@ public class CliApp
         Console.WriteLine("=== Restart Samba ===\n");
 
         string[] units = { "smb", "smbd", "nmbd", "samba", "samba4" };
+        bool restartedAny = false;
 
         foreach (var unit in units)
         {
             var check = ShellHelper.Ejecutar($"systemctl is-active {unit}");
-            if (check.Stdout.Trim() == "unknown")
+            if (check.Stdout.Trim() == "unknown" || string.IsNullOrWhiteSpace(check.Stdout))
                 continue;
 
             Console.WriteLine($"Restarting {unit}...");
             var res = ShellHelper.EjecutarComoRoot($"systemctl restart {unit}");
 
             if (res.ExitCode == 0)
+            {
                 Console.WriteLine($"{unit} restarted.");
+                restartedAny = true;
+            }
             else
+            {
                 Console.WriteLine($"{unit} failed to restart.");
+            }
         }
+
+        if (!restartedAny)
+            Console.WriteLine("No active Samba services found to restart.");
 
         Console.WriteLine();
     }
@@ -622,7 +647,7 @@ public class CliApp
 
         if (string.IsNullOrWhiteSpace(result.Stdout))
         {
-            Console.WriteLine("No active connections.");
+            Console.WriteLine("No active connections or smbstatus unavailable.");
         }
         else
         {

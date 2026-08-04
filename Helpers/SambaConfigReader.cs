@@ -17,7 +17,7 @@ public static class SambaConfigReader
         v.Equals("1") ||
         v.Equals("y", StringComparison.OrdinalIgnoreCase);
 
-    public static List<Share> LoadShares(string filePath = null)
+    public static List<Share> LoadShares(string? filePath = null)
     {
         var sw = Stopwatch.StartNew();
         var callId = ++_callCount;
@@ -29,9 +29,9 @@ public static class SambaConfigReader
 
         var shares = new List<Share>();
 
-        if (!File.Exists(filePath))
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
         {
-            Console.WriteLine($"[CONF] #{callId} Archivo no existe. Tiempo: {sw.ElapsedMilliseconds} ms");
+            Console.WriteLine($"[CONF] #{callId} Archivo no existe o ruta inválida. Tiempo: {sw.ElapsedMilliseconds} ms");
             return shares;
         }
 
@@ -42,15 +42,30 @@ public static class SambaConfigReader
         string? rawLine;
         while ((rawLine = reader.ReadLine()) != null)
         {
-            rawLine = rawLine.Replace("\t", " ");
+            // Normalizar tabulaciones
+            var clean = rawLine.Replace("\t", " ").Trim();
 
-            // Quitar comentarios al final de línea
-            var clean = rawLine.Split('#')[0].Split(';')[0].Trim();
+            // Ignorar líneas vacías o comentarios puros (que empiezan por # o ;)
+            if (string.IsNullOrWhiteSpace(clean) || clean.StartsWith("#") || clean.StartsWith(";"))
+                continue;
 
+            // Quitar comentarios al final de la línea si no son parte de comillas
+            clean = StripInlineComment(clean);
             if (string.IsNullOrWhiteSpace(clean))
                 continue;
 
-            // Includes
+            // Multilínea: procesar la barra invertida al final
+            while (clean.EndsWith("\\"))
+            {
+                clean = clean.TrimEnd('\\').Trim();
+                var nextLine = reader.ReadLine()?.Replace("\t", " ").Trim();
+                if (!string.IsNullOrEmpty(nextLine))
+                {
+                    clean += " " + StripInlineComment(nextLine);
+                }
+            }
+
+            // Manejo de la directiva 'include ='
             if (clean.StartsWith("include =", StringComparison.OrdinalIgnoreCase))
             {
                 var includePath = clean.Split('=', 2)[1].Trim().Trim('"');
@@ -59,39 +74,43 @@ public static class SambaConfigReader
                 {
                     Console.WriteLine($"[CONF] #{callId} → Procesando include: {includePath}");
 
-                    var included = LoadShares(includePath);
+                    // Guardar el share actual si teníamos uno en progreso antes del include
+                    if (current != null && !shares.Contains(current))
+                    {
+                        shares.Add(current);
+                        current = null;
+                    }
 
-                    // evitar duplicados
-                    foreach (var s in included)
+                    var includedShares = LoadShares(includePath);
+
+                    foreach (var s in includedShares)
                     {
                         if (!shares.Any(x => x.Name.Equals(s.Name, StringComparison.OrdinalIgnoreCase)))
+                        {
                             shares.Add(s);
+                        }
                     }
                 }
                 continue;
             }
 
-            // Multiline
-            while (clean.EndsWith("\\"))
-            {
-                clean = clean.TrimEnd('\\').Trim();
-                var next = reader.ReadLine()?.Trim() ?? "";
-                clean += " " + next;
-            }
-
-            // Nueva sección
+            // Detección de nueva sección [NombreSeccion]
             if (clean.StartsWith("[") && clean.EndsWith("]"))
             {
-                var name = clean.Substring(1, clean.Length - 2);
+                var name = clean.Substring(1, clean.Length - 2).Trim();
 
+                // Guardar la sección anterior si existía
+                if (current != null)
+                {
+                    shares.Add(current);
+                }
+
+                // Si es la sección global, la ignoramos para la lista de recursos compartidos
                 if (name.Equals("global", StringComparison.OrdinalIgnoreCase))
                 {
                     current = null;
                     continue;
                 }
-
-                if (current != null)
-                    shares.Add(current);
 
                 current = new Share
                 {
@@ -107,10 +126,11 @@ public static class SambaConfigReader
                 continue;
             }
 
+            // Si estamos fuera de una sección válida (ej: antes de la primera sección o en [global]), ignorar
             if (current == null)
                 continue;
 
-            // clave=valor
+            // Parsear Clave = Valor
             var parts = clean.Split('=', 2, StringSplitOptions.TrimEntries);
             if (parts.Length != 2)
             {
@@ -118,7 +138,7 @@ public static class SambaConfigReader
                 continue;
             }
 
-            var key = parts[0].Trim().ToLower();
+            var key = parts[0].Trim().ToLowerInvariant();
             var value = parts[1].Trim().Trim('"');
 
             switch (key)
@@ -187,12 +207,39 @@ public static class SambaConfigReader
             }
         }
 
-        if (current != null)
+        // Añadir el último recurso procesado al finalizar el archivo
+        if (current != null && !shares.Contains(current))
+        {
             shares.Add(current);
+        }
 
         sw.Stop();
         Console.WriteLine($"[CONF] #{callId} ← LoadShares completado en {sw.ElapsedMilliseconds} ms. Shares: {shares.Count}");
 
         return shares;
+    }
+
+    /// <summary>
+    /// Elimina comentarios al final de la línea (# o ;) respetando que no estén dentro de comillas.
+    /// </summary>
+    private static string StripInlineComment(string line)
+    {
+        bool inQuotes = false;
+
+        for (int i = 0; i < line.Length; i++)
+        {
+            char c = line[i];
+
+            if (c == '"')
+            {
+                inQuotes = !inQuotes;
+            }
+            else if (!inQuotes && (c == '#' || c == ';'))
+            {
+                return line.Substring(0, i).Trim();
+            }
+        }
+
+        return line.Trim();
     }
 }

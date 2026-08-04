@@ -18,7 +18,7 @@ class Program
 
         if (!hasDisplay && isTerminal)
         {
-            CliApp.Run();
+            CliApp.RunAsync();
             return;
         }
 
