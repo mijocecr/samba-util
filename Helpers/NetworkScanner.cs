@@ -421,6 +421,8 @@ namespace SAMBA_Util.Helpers
         public string? Comment { get; set; }
         public string Access { get; set; } = "Unknown";
         public string IP { get; set; }
+        public string RemoteOS { get; set; }
+
 
         public NetworkShare(string name)
         {
