@@ -118,9 +118,10 @@ namespace SAMBA_Util.Helpers
             // 4. Intentar abrir con 'gio open' usando la URL SMB
             if (TryExecuteProcess("gio", $"open \"{cleanUrl}\"")) return;
 
-            // 5. Fallback para KDE (Dolphin / KIO)
-            if (TryExecuteProcess("kioclient", $"exec \"{fullUrl}\"") ||
-                TryExecuteProcess("kioclient5", $"exec \"{fullUrl}\"")) return;
+            // Fallback para KDE (Dolphin / KIO) en versiones antiguas, actuales y futuras
+            if (TryExecuteProcess("kioclient6", $"exec \"{fullUrl}\"") ||
+                TryExecuteProcess("kioclient5", $"exec \"{fullUrl}\"") ||
+                TryExecuteProcess("kioclient", $"exec \"{fullUrl}\"")) return;
 
             // 6. Fallback universal con xdg-open
             if (TryExecuteProcess("xdg-open", $"\"{cleanUrl}\"")) return;
