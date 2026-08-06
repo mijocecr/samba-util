@@ -119,7 +119,7 @@ It focuses on reliability and does not modify any Samba settings outside the use
 
 ---
 
-## Youtube Video
-
-https://youtu.be/tZ6jXj-cL4Q
+ Youtube Video
+---
+**https://youtu.be/tZ6jXj-cL4Q**
 
