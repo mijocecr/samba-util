@@ -93,6 +93,9 @@ dotnet run
 -  `samba` 
 - `linux-headers` needed for kernel controller 
 - `cifs-utils`    needed to operate the filesystem
+- `gvfs-backends` -> (Debian/Ubuntu) needed to operate the filesystem
+- `gvfs-fuse` -> (Debian/Ubuntu) needed to operate the filesystem
+- `smbclient` -> (Debian/Ubuntu) needed to operate samba 
 - .NET 9.0 runtime (or self‑contained build)  
 - `sudo` privileges for administrative actions  
 - Access to `/etc/samba/smb.conf`
@@ -116,4 +119,7 @@ It focuses on reliability and does not modify any Samba settings outside the use
 
 ---
 
+ Youtube Video
+---
+**https://youtu.be/tZ6jXj-cL4Q**
 
