@@ -1,14 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
-using System.Threading.Tasks;
-using System.Text;
 using System.IO;
 using System.Linq;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace SAMBA_Util.Helpers
 {
@@ -107,7 +105,7 @@ namespace SAMBA_Util.Helpers
         {
             var devices = new List<NetworkDevice>();
 
-            string subnet = GetSubnetFromInterface(ifaceName);
+            string? subnet = GetSubnetFromInterface(ifaceName);
             if (subnet == null)
                 return devices;
 
@@ -170,8 +168,9 @@ namespace SAMBA_Util.Helpers
             string user = CredStore.User;
             string pass = CredStore.Password;
 
-            if (string.IsNullOrWhiteSpace(user))
-                return "guest%";
+            // Si es 'guest' o está vacío, se retorna "%" para forzar Null Session anónima pura
+            if (string.IsNullOrWhiteSpace(user) || user.Equals("guest", StringComparison.OrdinalIgnoreCase))
+                return "%";
 
             return $"{user}%{pass}";
         }
@@ -188,13 +187,15 @@ namespace SAMBA_Util.Helpers
 
             string os = await DetectOSAsync(ip, ip);
 
+          
             // ---------------------------------------------------------
-            // WINDOWS → RPC netshareenumall
-            // ---------------------------------------------------------
+// WINDOWS → RPC netshareenumall
+// ---------------------------------------------------------
             if (os == "Windows")
             {
                 string userSpec = BuildUserSpec(ip, os);
 
+                // 1. Intento inicial (Null Session / Anónimo con '%')
                 string rpcOut = await ShellHelper.RunAsync(
                     $"rpcclient -U {userSpec} {ip} -c \"netshareenumall\""
                 );
@@ -202,29 +203,54 @@ namespace SAMBA_Util.Helpers
                 Console.WriteLine("[Scanner] RPC output:");
                 Console.WriteLine(rpcOut);
 
-                foreach (var line in rpcOut.Split('\n'))
+                // 2. Si la sesión anónima es rechazada y el usuario ha configurado credenciales reales, reintentar
+                if (rpcOut.Contains("NT_STATUS") && !string.IsNullOrWhiteSpace(CredStore.User) && !CredStore.User.Equals("guest", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (!line.Contains("netname:")) continue;
+                    Console.WriteLine("[Scanner] Intento anónimo rechazado. Reintentando RPC con credenciales...");
+                    string credSpec = $"{CredStore.User}%{CredStore.Password}";
 
-                    string name = line.Replace("netname:", "").Trim();
-                    if (string.IsNullOrWhiteSpace(name)) continue;
+                    rpcOut = await ShellHelper.RunAsync(
+                        $"rpcclient -U {credSpec} {ip} -c \"netshareenumall\""
+                    );
 
-                    shares.Add(new NetworkShare(name)
+                    Console.WriteLine("[Scanner] RPC Credential output:");
+                    Console.WriteLine(rpcOut);
+                }
+
+                // 3. Procesar las líneas de respuesta si fue exitoso
+                if (!rpcOut.Contains("NT_STATUS"))
+                {
+                    foreach (var line in rpcOut.Split('\n'))
                     {
-                        IP = ip,
-                        Access = "Authenticated",
-                        Comment = "Windows RPC"
-                    });
+                        if (!line.Contains("netname:")) continue;
+
+                        string name = line.Replace("netname:", "").Trim();
+            
+                        // Descartar entradas vacías y recursos administrativos ocultos de Windows (ADMIN$, C$, IPC$)
+                        if (string.IsNullOrWhiteSpace(name) || name.EndsWith("$")) continue;
+
+                        shares.Add(new NetworkShare(name)
+                        {
+                            IP = ip,
+                            Access = "Authenticated",
+                            Comment = "Windows RPC"
+                        });
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("[Scanner] Error de acceso RPC en el servidor Windows (NT_STATUS). Se requieren credenciales.");
                 }
 
                 return shares;
             }
-
+            
+            
             // ---------------------------------------------------------
             // NON-WINDOWS → SMBCLIENT
             // ---------------------------------------------------------
             string outGuest = await ShellHelper.RunAsync(
-                $"smbclient -gL //{ip} -U guest% --option='client min protocol=SMB2'"
+                $"smbclient -gL //{ip} -U % --option='client min protocol=SMB2'"
             );
 
             Console.WriteLine("[Scanner] Guest output:");
@@ -241,7 +267,7 @@ namespace SAMBA_Util.Helpers
             }
 
             if (!string.IsNullOrWhiteSpace(CredStore.User) &&
-                CredStore.User != "guest")
+                !CredStore.User.Equals("guest", StringComparison.OrdinalIgnoreCase))
             {
                 string userSpec = BuildUserSpec(ip, os);
 
@@ -304,7 +330,7 @@ namespace SAMBA_Util.Helpers
             string userSpec = BuildUserSpec(ip, os);
 
             string guestCmd =
-                $"smbclient //{ip}/{share} -U guest% --option='client min protocol=SMB2' -c \"ls\"";
+                $"smbclient //{ip}/{share} -U % --option='client min protocol=SMB2' -c \"ls\"";
 
             string guestOut = await ShellHelper.RunAsync(guestCmd);
 
@@ -356,7 +382,7 @@ namespace SAMBA_Util.Helpers
                     await limiter.WaitAsync();
                     try
                     {
-                        var ping = new Ping();
+                        using var ping = new Ping();
                         var reply = await ping.SendPingAsync(ip, 200);
 
                         if (reply.Status == IPStatus.Success)
@@ -420,9 +446,8 @@ namespace SAMBA_Util.Helpers
         public string Name { get; set; }
         public string? Comment { get; set; }
         public string Access { get; set; } = "Unknown";
-        public string IP { get; set; }
-        public string RemoteOS { get; set; }
-
+        public string IP { get; set; } = "";
+        public string RemoteOS { get; set; } = "";
 
         public NetworkShare(string name)
         {
