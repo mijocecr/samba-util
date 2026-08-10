@@ -253,7 +253,11 @@ namespace SAMBA_Util.Helpers
                 };
 
                 using var process = Process.Start(psi);
-                return process != null;
+                if (process == null) return false;
+
+                // Esperar a que el proceso termine para validar si funcionó realmente
+                process.WaitForExit(3000);
+                return process.ExitCode == 0;
             }
             catch
             {
