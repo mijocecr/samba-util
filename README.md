@@ -100,6 +100,8 @@ dotnet run
 - `sudo` privileges for administrative actions  
 - Access to `/etc/samba/smb.conf`
 
+  For all Arch based distros run `sudo pacman -S --needed gvfs gvfs-smb kio-extras samba smbclient cifs-utils xdg-utils` if you have problems with dependencies.
+
 ---
 
 ## License
