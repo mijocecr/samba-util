@@ -1,3 +1,8 @@
+---
+<img width="630" height="738" alt="image" src="https://github.com/user-attachments/assets/52f7b4f3-2773-4e81-b5cd-04b74430b42c" />
+
+---
+
 # SAMBA‑Util
 
 SAMBA‑Util is a graphical application designed to simplify the management of Samba shares, users, and configuration files on Linux systems.  
