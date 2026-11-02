@@ -31,13 +31,15 @@ public partial class MainWindow : Window
         StatusText.Text = "Initializing...";
         await Task.Delay(200);
 
-        // Bucle de validación de contraseña de root
-        while (true)
+        const int maxPasswordAttempts = 3;
+        var authenticated = false;
+        for (var attempt = 1; attempt <= maxPasswordAttempts; attempt++)
         {
             await SolicitarPassword();
 
             if (string.IsNullOrWhiteSpace(Credenciales.AdminPassword))
             {
+                Credenciales.AdminPassword = "";
                 StatusText.Text = "Initialization aborted.";
                 return;
             }
@@ -47,18 +49,31 @@ public partial class MainWindow : Window
 
             if (result.ExitCode == 1001)
             {
-                StatusText.Text = "Incorrect admin password.";
-                await MostrarPasswordIncorrecta();
+                Credenciales.AdminPassword = "";
+                if (attempt < maxPasswordAttempts)
+                {
+                    StatusText.Text = $"Incorrect admin password. Attempt {attempt} of {maxPasswordAttempts}.";
+                    await MostrarPasswordIncorrecta();
+                }
                 continue;
             }
 
             if (result.ExitCode != 0)
             {
+                Credenciales.AdminPassword = "";
                 StatusText.Text = "Admin password validation failed.";
                 return;
             }
 
+            authenticated = true;
             break;
+        }
+
+        if (!authenticated)
+        {
+            Credenciales.AdminPassword = "";
+            StatusText.Text = $"Authentication failed after {maxPasswordAttempts} attempts.";
+            return;
         }
 
         // MOSTRAR DIÁLOGO DE CARGA MIENTRAS SE PROCESA EL ENTORNO
@@ -75,6 +90,13 @@ public partial class MainWindow : Window
             // 3. Actualizar datos en la vista principal
             SharesViewControl.SetShares(shares);
             StatusText.Text = $"Loaded {shares.Count} shares.";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[INIT ERROR] No se pudo inicializar Samba: {ex}");
+            StatusText.Text = "Samba initialization failed.";
+            ShowErrorDialog("Samba initialization failed", ex.Message);
+            return;
         }
         finally
         {
@@ -110,9 +132,10 @@ public partial class MainWindow : Window
     {
         var win = new ConfigWindow();
 
-        win.ConfigSaved += () =>
+        win.ConfigSaved += async () =>
         {
             int count = SharesViewControl.LoadShares();
+            await RefreshStatusSafelyAsync();
             UpdateStatus($"Configuration updated. Reloaded {count} shares.");
         };
 

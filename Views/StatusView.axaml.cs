@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Net.NetworkInformation;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -19,56 +18,9 @@ public partial class StatusView : UserControl
     private readonly List<string> NmbServices = new() { "nmbd", "nmb" };
     private readonly List<string> WinbindServices = new() { "winbind" };
 
-    private const string DefaultSmbConf = @"[global]
-   workgroup = WORKGROUP
-   server string = Samba Server %v
-   netbios name = SAMBA-HOST
-   security = user
-   map to guest = Bad User
-   dns proxy = no
-   logging = systemd
-
-[homes]
-   comment = Home Directories
-   browseable = no
-   writable = yes
-   create mask = 0700
-   directory mask = 0700
-";
-
     public StatusView()
     {
         InitializeComponent();
-        EnsureSambaEnvironment();
-    }
-
-    // ---------------------------------------------------------
-    // AUTOPROVISIONAMIENTO Y VERIFICACIÓN DEL HOST (AppImage Ready)
-    // ---------------------------------------------------------
-    private void EnsureSambaEnvironment()
-    {
-        try
-        {
-            // 1. Asegurar que el directorio /etc/samba existe en el host
-            string sambaDir = "/etc/samba";
-            if (!Directory.Exists(sambaDir))
-            {
-                ShellHelper.EjecutarComoRoot($"mkdir -p {sambaDir}");
-            }
-
-            // 2. Si el archivo smb.conf no existe, crearlo por defecto automáticamente
-            string confPath = System.IO.Path.Combine(sambaDir, "smb.conf");
-            if (!File.Exists(confPath))
-            {
-                // Escribimos temporalmente o mediante root helper
-                File.WriteAllText("/tmp/smb.conf.default", DefaultSmbConf);
-                ShellHelper.EjecutarComoRoot($"cp /tmp/smb.conf.default {confPath} && chmod 644 {confPath}");
-            }
-        }
-        catch (Exception ex)
-        {
-            // Log o manejo silencioso si falta password de root aún
-        }
     }
 
     // ---------------------------------------------------------
@@ -87,6 +39,8 @@ public partial class StatusView : UserControl
         {
             TxtSmbd.Text = "Not installed (Host missing samba package)";
             SetIcon(IconSmbd, "Inactive");
+            TxtFirewall.Text = "Not checked (Samba is not installed)";
+            IconFirewall.Fill = Brushes.Gray;
             TxtTestparm.Text = "❌ Stack de Samba no encontrado en el sistema operativo.";
             UpdateTestparmStyle("❌");
             return;
@@ -108,6 +62,7 @@ public partial class StatusView : UserControl
         // Puertos
         CheckPort("445", IconPort445, TxtPort445);
         CheckPort("139", IconPort139, TxtPort139);
+        CheckFirewall();
 
         // Shares
         CheckShares();
@@ -221,6 +176,115 @@ public partial class StatusView : UserControl
             icon.Fill = Brushes.LimeGreen;
         }
     }
+
+    private void CheckFirewall()
+    {
+        if (TxtPort445.Text != "Open")
+        {
+            TxtFirewall.Text = "TCP 445 is not listening; remote SMB access will fail regardless of firewall.";
+            IconFirewall.Fill = Brushes.Red;
+            return;
+        }
+
+        var ufw = ShellHelper.EjecutarComoRoot(
+            "if command -v ufw >/dev/null 2>&1; then ufw status; else echo __NOT_INSTALLED__; fi");
+        if (!ufw.Stdout.Contains("__NOT_INSTALLED__", StringComparison.Ordinal))
+        {
+            if (ufw.Stdout.Contains("Status: active", StringComparison.OrdinalIgnoreCase))
+            {
+                var allowsSmb = ufw.Stdout.Split('\n').Any(line =>
+                    line.Contains("ALLOW IN", StringComparison.OrdinalIgnoreCase) &&
+                    (line.Contains("445/tcp", StringComparison.OrdinalIgnoreCase) ||
+                     line.Contains("Samba", StringComparison.OrdinalIgnoreCase)));
+                SetFirewallStatus(
+                    allowsSmb
+                        ? "UFW is active; an inbound SMB/TCP 445 allow rule was found. Test from another PC."
+                        : "UFW is active; no inbound SMB/TCP 445 allow rule was found. It may block remote access.",
+                    allowsSmb ? Brushes.LimeGreen : Brushes.OrangeRed);
+                return;
+            }
+        }
+
+        var firewalldState = ShellHelper.EjecutarComoRoot(
+            "if command -v firewall-cmd >/dev/null 2>&1; then firewall-cmd --state; else echo __NOT_INSTALLED__; fi");
+        if (firewalldState.Stdout.Trim().Equals("running", StringComparison.OrdinalIgnoreCase))
+        {
+            var activeZones = ShellHelper.EjecutarComoRoot("firewall-cmd --get-active-zones");
+            var zones = activeZones.Stdout
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Where(line => !char.IsWhiteSpace(line[0]))
+                .Select(line => line.Trim())
+                .ToList();
+
+            var allowsSmb = zones.Any(zone =>
+            {
+                var zoneStatus = ShellHelper.EjecutarComoRoot(
+                    $"firewall-cmd --zone={ShellQuote(zone)} --list-all");
+                var output = zoneStatus.Stdout;
+                var services = output.Split("services:", StringSplitOptions.None).LastOrDefault() ?? "";
+                var ports = output.Split("ports:", StringSplitOptions.None).LastOrDefault() ?? "";
+                return services.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+                           .Contains("samba", StringComparer.OrdinalIgnoreCase) ||
+                       ports.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+                           .Contains("445/tcp", StringComparer.OrdinalIgnoreCase);
+            });
+
+            SetFirewallStatus(
+                allowsSmb
+                    ? "firewalld is active; an SMB/TCP 445 allow rule was found in an active zone. Test from another PC."
+                    : "firewalld is active; no SMB/TCP 445 allow rule was found in active zones. It may block remote access.",
+                allowsSmb ? Brushes.LimeGreen : Brushes.OrangeRed);
+            return;
+        }
+
+        var nftables = ShellHelper.EjecutarComoRoot(
+            "if command -v nft >/dev/null 2>&1; then nft list ruleset | awk '/^[[:space:]]*chain / { chains++ } /hook input/ { input=1 } /policy (drop|reject)/ { blocked=1 } END { if (chains == 0) print \"EMPTY\"; else if (input && blocked) print \"INPUT_FILTER\"; else print \"RULESET\" }'; else echo __NOT_INSTALLED__; fi");
+        if (!nftables.Stdout.Contains("__NOT_INSTALLED__", StringComparison.Ordinal) &&
+            !nftables.Stdout.Contains("EMPTY", StringComparison.Ordinal))
+        {
+            SetFirewallStatus(
+                nftables.Stdout.Contains("INPUT_FILTER", StringComparison.Ordinal)
+                    ? "nftables has an input filtering policy; local inspection cannot confirm TCP 445 is allowed. Test from another PC."
+                    : "An nftables ruleset exists; remote TCP 445 access cannot be confirmed locally. Test from another PC.",
+                Brushes.Orange);
+            return;
+        }
+
+        var iptables = ShellHelper.EjecutarComoRoot(
+            "if command -v iptables >/dev/null 2>&1; then iptables -S INPUT; else echo __NOT_INSTALLED__; fi");
+        if (!iptables.Stdout.Contains("__NOT_INSTALLED__", StringComparison.Ordinal))
+        {
+            var lines = iptables.Stdout.Split('\n');
+            var hasDropPolicy = lines.Any(line =>
+                line.StartsWith("-P INPUT DROP", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("-P INPUT REJECT", StringComparison.OrdinalIgnoreCase));
+            var allowsSmb = lines.Any(line =>
+                line.Contains("--dport 445", StringComparison.OrdinalIgnoreCase) &&
+                line.Contains("-j ACCEPT", StringComparison.OrdinalIgnoreCase));
+            if (hasDropPolicy || allowsSmb)
+            {
+                SetFirewallStatus(
+                    allowsSmb
+                        ? "iptables has an inbound TCP 445 allow rule. Test from another PC."
+                        : "iptables has a DROP/REJECT input policy and no TCP 445 allow rule; it may block remote access.",
+                    allowsSmb ? Brushes.LimeGreen : Brushes.OrangeRed);
+                return;
+            }
+        }
+
+        SetFirewallStatus(
+            "No active UFW/firewalld filtering or blocking rules were detected. Network-level filtering is not checked.",
+            Brushes.LimeGreen);
+    }
+
+    private void SetFirewallStatus(string text, IBrush color)
+    {
+        TxtFirewall.Text = text;
+        IconFirewall.Fill = color;
+    }
+
+    private static string ShellQuote(string value) =>
+        "'" + value.Replace("'", "'\\''", StringComparison.Ordinal) + "'";
 
     // ---------------------------------------------------------
     // SHARES

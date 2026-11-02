@@ -9,24 +9,46 @@ public static class ShellHelper
 {
     private static long _callCount = 0;
 
-    public static (int ExitCode, string Stdout, string Stderr) EjecutarComoRoot(string command)
+    public static (int ExitCode, string Stdout, string Stderr) EjecutarComoRoot(string command) =>
+        EjecutarComoRoot(command, null);
+
+    public static (int ExitCode, string Stdout, string Stderr) EjecutarComoRootConEntrada(string command, string input) =>
+        EjecutarComoRoot(command, input);
+
+    private static (int ExitCode, string Stdout, string Stderr) EjecutarComoRoot(string command, string? commandInput)
     {
         var callId = ++_callCount;
         var sw = Stopwatch.StartNew();
 
+        var password = Credenciales.AdminPassword;
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            Console.WriteLine($"[SHELL] #{callId} Cancelado: no hay contraseña de administrador.");
+            return (1002, "", "ADMIN_PASSWORD_REQUIRED");
+        }
+
+        var pass = password.TrimEnd('\r', '\n');
+        if (pass.Contains('\r') || pass.Contains('\n'))
+            throw new InvalidOperationException("La contraseña no puede contener saltos de línea.");
+
         Console.WriteLine($"[SHELL] #{callId} → EjecutarComoRoot('{command}')");
 
-        // 🔥 SIEMPRE usar bash -c para soportar redirecciones, sed, systemctl, etc.
         var psi = new ProcessStartInfo
         {
             FileName = "sudo",
-            Arguments = $"-S bash -c \"{command.Replace("\"", "\\\"")}\"",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             RedirectStandardInput = true,
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        psi.ArgumentList.Add("-S");
+        psi.ArgumentList.Add("-p");
+        psi.ArgumentList.Add("");
+        psi.ArgumentList.Add("--");
+        psi.ArgumentList.Add("/bin/bash");
+        psi.ArgumentList.Add("-c");
+        psi.ArgumentList.Add(command);
 
         using var process = new Process { StartInfo = psi };
 
@@ -51,31 +73,27 @@ public static class ShellHelper
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 
-        // Enviar contraseña con protección estricta contra Broken Pipe
-        if (!string.IsNullOrEmpty(Credenciales.AdminPassword))
+        try
         {
-            Console.WriteLine($"[SHELL] #{callId} Enviando contraseña…");
-            var pass = Credenciales.AdminPassword.TrimEnd('\r', '\n');
+            process.StandardInput.WriteLine(pass);
+            if (commandInput != null)
+                process.StandardInput.Write(commandInput);
+        }
+        catch (System.IO.IOException)
+        {
+            Console.WriteLine($"[SHELL] #{callId} ADVERTENCIA: el proceso cerró la entrada antes de recibir todos los datos.");
+        }
+        finally
+        {
             try
             {
-                process.StandardInput.WriteLine(pass);
-                process.StandardInput.Flush();
+                process.StandardInput.Close();
             }
             catch (System.IO.IOException)
             {
-                Console.WriteLine($"[SHELL] #{callId} ADVERTENCIA: Pipe cerrado al enviar la contraseña.");
+                Console.WriteLine($"[SHELL] #{callId} ADVERTENCIA: no se pudo cerrar la entrada de sudo.");
             }
         }
-        else
-        {
-            Console.WriteLine($"[SHELL] #{callId} ADVERTENCIA: No hay contraseña configurada");
-        }
-
-        try
-        {
-            process.StandardInput.Close();
-        }
-        catch { }
 
         const int timeoutMs = 15000;
         Console.WriteLine($"[SHELL] #{callId} Esperando hasta {timeoutMs} ms…");
@@ -83,7 +101,14 @@ public static class ShellHelper
         if (!process.WaitForExit(timeoutMs))
         {
             Console.WriteLine($"[SHELL] #{callId} TIMEOUT tras {timeoutMs} ms. Matando proceso…");
-            try { process.Kill(); } catch { }
+            try
+            {
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit();
+            }
+            catch (InvalidOperationException)
+            {
+            }
             return (1, "", "Timeout");
         }
 

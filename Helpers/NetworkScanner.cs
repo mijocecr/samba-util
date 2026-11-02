@@ -197,7 +197,7 @@ namespace SAMBA_Util.Helpers
 
                 // 1. Intento inicial (Null Session / Anónimo con '%')
                 string rpcOut = await ShellHelper.RunAsync(
-                    $"rpcclient -U {userSpec} {ip} -c \"netshareenumall\""
+                    $"rpcclient -U {ShellQuote(userSpec)} {ip} -c \"netshareenumall\""
                 );
 
                 Console.WriteLine("[Scanner] RPC output:");
@@ -210,7 +210,7 @@ namespace SAMBA_Util.Helpers
                     string credSpec = $"{CredStore.User}%{CredStore.Password}";
 
                     rpcOut = await ShellHelper.RunAsync(
-                        $"rpcclient -U {credSpec} {ip} -c \"netshareenumall\""
+                        $"rpcclient -U {ShellQuote(credSpec)} {ip} -c \"netshareenumall\""
                     );
 
                     Console.WriteLine("[Scanner] RPC Credential output:");
@@ -250,7 +250,7 @@ namespace SAMBA_Util.Helpers
             // NON-WINDOWS → SMBCLIENT
             // ---------------------------------------------------------
             string outGuest = await ShellHelper.RunAsync(
-                $"smbclient -gL //{ip} -U % --option='client min protocol=SMB2'"
+                $"smbclient -gL {ShellQuote("//" + ip)} -U % --option='client min protocol=SMB2'"
             );
 
             Console.WriteLine("[Scanner] Guest output:");
@@ -272,7 +272,7 @@ namespace SAMBA_Util.Helpers
                 string userSpec = BuildUserSpec(ip, os);
 
                 string outCred = await ShellHelper.RunAsync(
-                    $"smbclient -gL //{ip} -U {userSpec} --option='client min protocol=SMB2'"
+                    $"smbclient -gL {ShellQuote("//" + ip)} -U {ShellQuote(userSpec)} --option='client min protocol=SMB2'"
                 );
 
                 Console.WriteLine("[Scanner] Credential output:");
@@ -320,6 +320,9 @@ namespace SAMBA_Util.Helpers
             return shares;
         }
 
+        private static string ShellQuote(string value) =>
+            "'" + value.Replace("'", "'\\''", StringComparison.Ordinal) + "'";
+
         // ---------------------------------------------------------
         // ACCESS DETECTION (SMBCLIENT)
         // ---------------------------------------------------------
@@ -330,7 +333,7 @@ namespace SAMBA_Util.Helpers
             string userSpec = BuildUserSpec(ip, os);
 
             string guestCmd =
-                $"smbclient //{ip}/{share} -U % --option='client min protocol=SMB2' -c \"ls\"";
+                $"smbclient {ShellQuote("//" + ip + "/" + share)} -U % --option='client min protocol=SMB2' -c \"ls\"";
 
             string guestOut = await ShellHelper.RunAsync(guestCmd);
 
@@ -338,7 +341,7 @@ namespace SAMBA_Util.Helpers
                 return "Anonymous";
 
             string anonCmd =
-                $"smbclient //{ip}/{share} -N --option='client min protocol=SMB2' -c \"ls\"";
+                $"smbclient {ShellQuote("//" + ip + "/" + share)} -N --option='client min protocol=SMB2' -c \"ls\"";
 
             string anonOut = await ShellHelper.RunAsync(anonCmd);
 
@@ -346,7 +349,7 @@ namespace SAMBA_Util.Helpers
                 return "Anonymous";
 
             string credCmd =
-                $"smbclient //{ip}/{share} -U {userSpec} --option='client min protocol=SMB2' -c \"ls\"";
+                $"smbclient {ShellQuote("//" + ip + "/" + share)} -U {ShellQuote(userSpec)} --option='client min protocol=SMB2' -c \"ls\"";
 
             string credOut = await ShellHelper.RunAsync(credCmd);
 

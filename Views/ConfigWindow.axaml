@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="SAMBA_Util.Views.ConfigWindow"
-        Width="450" Height="320"
+        Width="450" Height="410"
         Title="Samba-util Configuration"
         CanResize="False"
         
@@ -65,6 +65,22 @@
                     <ComboBoxItem Content="777 – Owner rwx, Group rwx, Others rwx" Tag="777"/>
 
                 </ComboBox>
+            </StackPanel>
+
+            <StackPanel Spacing="6">
+                <TextBlock Text="System firewall:"
+                           Foreground="{StaticResource ForegroundBrush}"/>
+                <ToggleSwitch x:Name="FirewallToggle"
+                              OnContent="Enabled"
+                              OffContent="Disabled"
+                              IsEnabled="False"/>
+                <TextBlock x:Name="TxtFirewallStatus"
+                           Text="Checking firewall..."
+                           TextWrapping="Wrap"
+                           Foreground="{StaticResource ForegroundBrush}"/>
+                <TextBlock Text="Disabling the firewall can expose this computer to network traffic."
+                           TextWrapping="Wrap"
+                           Foreground="{StaticResource ForegroundBrush}"/>
             </StackPanel>
 
             <!-- Botones -->

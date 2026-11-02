@@ -1,5 +1,6 @@
 ﻿using Avalonia;
 using System;
+using System.Threading.Tasks;
 using SAMBA_Util.Helpers;
 
 namespace SAMBA_Util;
@@ -11,14 +12,15 @@ class Program
     // yet and stuff might break.
     [STAThread]
    
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
-        bool hasDisplay = Environment.GetEnvironmentVariable("DISPLAY") != null;
+        bool hasDisplay = Environment.GetEnvironmentVariable("DISPLAY") != null ||
+                          Environment.GetEnvironmentVariable("WAYLAND_DISPLAY") != null;
         bool isTerminal = !Console.IsInputRedirected && !Console.IsOutputRedirected;
 
         if (!hasDisplay && isTerminal)
         {
-            CliApp.RunAsync();
+            await CliApp.RunAsync();
             return;
         }
 
