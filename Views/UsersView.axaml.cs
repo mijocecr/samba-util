@@ -42,9 +42,10 @@ public partial class UsersView : UserControl
         return users.Count;
     }
 
+  
     // ---------------------------------------------------------
-    // AÑADIR USUARIO SAMBA (VERSIÓN PROFESIONAL Y COMPATIBLE)
-    // ---------------------------------------------------------
+// AÑADIR USUARIO SAMBA (CORREGIDO Y SEGURO)
+// ---------------------------------------------------------
     private void OnAddUser(object? sender, RoutedEventArgs e)
     {
         var username = UsernameBox.Text?.Trim();
@@ -56,24 +57,25 @@ public partial class UsersView : UserControl
         if (string.IsNullOrEmpty(Credenciales.AdminPassword))
             return;
 
-        // 1) Crear usuario UNIX si no existe (usando 'nologin' genérico compatible con Arch y Debian)
+        // 1) Crear usuario UNIX si no existe
         ShellHelper.EjecutarComoRoot(
             $"bash -c \"id -u '{username}' >/dev/null 2>&1 || useradd -M -s $(which nologin || echo /sbin/nologin) '{username}'\""
         );
 
-        // 2) Crear usuario Samba con contraseña segura (protegiendo contra caracteres especiales)
+        // 2) Crear o actualizar usuario Samba con contraseña
         if (!string.IsNullOrWhiteSpace(password))
         {
-            // Usamos base64 para evitar problemas con comillas o caracteres especiales de bash en la contraseña
-            var passBytes = System.Text.Encoding.UTF8.GetBytes(password);
+            // Pasamos la contraseña duplicada con un salto de línea (\n) para cumplir con el prompt dual de smbpasswd (-s)
+            var passBytes = System.Text.Encoding.UTF8.GetBytes($"{password}\n{password}\n");
             var passBase64 = System.Convert.ToBase64String(passBytes);
 
-            string cmd = $"bash -c \"echo '{passBase64}' | base64 -d | smbpasswd -a -s '{username}'\"";
+            // Usamos printf y base64 para inyectar correctamente ambos saltos de línea al stdin de smbpasswd
+            string cmd = $"bash -c \"printf '%s' '{passBase64}' | base64 -d | smbpasswd -a -s '{username}'\"";
             ShellHelper.EjecutarComoRoot(cmd);
         }
         else
         {
-            // Usuario Samba sin contraseña
+            // Usuario Samba sin contraseña (deshabilitado/guest)
             ShellHelper.EjecutarComoRoot(
                 $"bash -c \"smbpasswd -a -n '{username}'\""
             );
@@ -84,7 +86,9 @@ public partial class UsersView : UserControl
 
         LoadUsers();
     }
-
+    
+    
+    
     // ---------------------------------------------------------
     // ELIMINAR USUARIO SAMBA + UNIX (SEGURO)
     // ---------------------------------------------------------
