@@ -87,26 +87,16 @@ namespace SAMBA_Util.Helpers
             string cleanUrl = BuildSmbUrl(ip, shareName, user, pass, domain, includePassword: false);
             string fullUrl = BuildSmbUrl(ip, shareName, user, pass, domain, includePassword: true);
 
-            // 1. ESTRATEGIA A: Verificar si ya existe el punto de montaje local en /run/user/<UID>/gvfs/
-            string localGvfsPath = GetGvfsLocalPath(ip, shareName);
-
-            if (Directory.Exists(localGvfsPath))
-            {
-                if (TryExecuteProcess("gio", $"open \"{localGvfsPath}\"") ||
-                    TryExecuteProcess("xdg-open", $"\"{localGvfsPath}\""))
-                {
-                    return;
-                }
-            }
-
-            // 2. ESTRATEGIA B: Montar mediante gio mount
+            // 1. Forzar el montaje interactivo / automático primero para asegurar que GVfs registre el volumen
             MountGvfsInteractive(cleanUrl, pass, domain);
 
-            // Pausa táctica para dar tiempo al demonio gvfsd-smb a registrar el volumen en D-Bus
-            Thread.Sleep(600);
+            // Breve pausa para dar tiempo a que el demonio cree el punto de montaje físico
+            Thread.Sleep(800);
 
-            // 3. Verificar nuevamente si la carpeta física ya se creó tras el montaje
-            if (Directory.Exists(localGvfsPath))
+            // 2. Buscar dinámicamente la ruta real montada en gvfs
+            string? localGvfsPath = FindActiveGvfsMount(ip, shareName);
+
+            if (!string.IsNullOrEmpty(localGvfsPath) && Directory.Exists(localGvfsPath))
             {
                 if (TryExecuteProcess("gio", $"open \"{localGvfsPath}\"") ||
                     TryExecuteProcess("xdg-open", $"\"{localGvfsPath}\""))
@@ -115,15 +105,15 @@ namespace SAMBA_Util.Helpers
                 }
             }
 
-            // 4. Intentar abrir con 'gio open' usando la URL SMB
+            // 3. Fallback usando la URL SMB directamente con gio u otros clientes
             if (TryExecuteProcess("gio", $"open \"{cleanUrl}\"")) return;
 
-            // Fallback para KDE (Dolphin / KIO) en versiones antiguas, actuales y futuras
+            // Fallback para KDE (Dolphin / KIO)
             if (TryExecuteProcess("kioclient6", $"exec \"{fullUrl}\"") ||
                 TryExecuteProcess("kioclient5", $"exec \"{fullUrl}\"") ||
                 TryExecuteProcess("kioclient", $"exec \"{fullUrl}\"")) return;
 
-            // 6. Fallback universal con xdg-open
+            // Fallback universal con xdg-open
             if (TryExecuteProcess("xdg-open", $"\"{cleanUrl}\"")) return;
 
             NotifyError($"No se pudo abrir '{cleanUrl}'.");
@@ -174,28 +164,33 @@ namespace SAMBA_Util.Helpers
             }
         }
 
-        private static string GetGvfsLocalPath(string ip, string shareName)
+        private static string? FindActiveGvfsMount(string ip, string shareName)
         {
-            int uid = GetCurrentUnixUid();
-            
-            // Buscar carpetas que coincidan con la IP y el recurso en /run/user/UID/gvfs/
-            string baseGvfsDir = $"/run/user/{uid}/gvfs";
-            
-            if (Directory.Exists(baseGvfsDir))
+            try
             {
-                string targetShareLower = shareName.ToLowerInvariant();
+                int uid = GetCurrentUnixUid();
+                string baseGvfsDir = $"/run/user/{uid}/gvfs";
+
+                if (!Directory.Exists(baseGvfsDir))
+                    return null;
+
+                string targetIp = ip.ToLowerInvariant();
+                string targetShare = shareName.ToLowerInvariant();
+
                 foreach (var dir in Directory.GetDirectories(baseGvfsDir))
                 {
-                    string dirLower = dir.ToLowerInvariant();
-                    if (dirLower.Contains($"server={ip.ToLowerInvariant()}") && dirLower.Contains($"share={targetShareLower}"))
+                    string dirName = Path.GetFileName(dir).ToLowerInvariant();
+                    
+                    // Comprobar que pertenece al protocolo smb y coincide la IP y el recurso compartido
+                    if (dirName.StartsWith("smb-share:") && dirName.Contains(targetIp) && dirName.Contains(targetShare))
                     {
                         return dir;
                     }
                 }
             }
+            catch { }
 
-            // Ruta por defecto estandarizada de GVfs
-            return $"/run/user/{uid}/gvfs/smb-share:server={ip},share={shareName.ToLowerInvariant()}";
+            return null;
         }
 
         private static int GetCurrentUnixUid()
@@ -255,7 +250,6 @@ namespace SAMBA_Util.Helpers
                 using var process = Process.Start(psi);
                 if (process == null) return false;
 
-                // Esperar a que el proceso termine para validar si funcionó realmente
                 process.WaitForExit(3000);
                 return process.ExitCode == 0;
             }
