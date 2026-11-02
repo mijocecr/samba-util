@@ -1,10 +1,9 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        x:Class="SambaUtil.Views.EditUserWindow"
+        x:Class="SAMBA_Util.Views.EditUserWindow"
         Width="420" Height="460"
         Title="Edit User"
         CanResize="False"
-      
         Background="{StaticResource BackgroundBrush}"
         Foreground="{StaticResource ForegroundBrush}">
 
@@ -94,16 +93,12 @@
                 <Button Content="Cancel"
                         Width="90"
                         HorizontalContentAlignment="Center"
-                        
                         Classes="NeutralButton"
-                        
                         Click="OnCancel"/>
 
                 <Button Content="Save"
                         Width="90"
                         HorizontalContentAlignment="Center"
-                        
-                        
                         Classes="AccentButton"
                         Click="OnSave"/>
 

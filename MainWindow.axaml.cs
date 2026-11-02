@@ -31,7 +31,7 @@ public partial class MainWindow : Window
         StatusText.Text = "Initializing...";
         await Task.Delay(200);
 
-        // Bucle de validación de contraseña
+        // Bucle de validación de contraseña de root
         while (true)
         {
             await SolicitarPassword();
@@ -61,34 +61,49 @@ public partial class MainWindow : Window
             break;
         }
 
-        // Cargar shares
-        StatusText.Text = "Loading Samba configuration...";
+        // MOSTRAR DIÁLOGO DE CARGA MIENTRAS SE PROCESA EL ENTORNO
+        var loadingWindow = ShowLoadingDialog("Configuring environment and loading Samba...");
 
-        var shares = await Task.Run(() => SambaConfigReader.LoadShares());
-
-        SharesViewControl.SetShares(shares);
-        StatusText.Text = $"Loaded {shares.Count} shares.";
-
-        // ⭐ Forzar Status como pestaña inicial REAL
-        Dispatcher.UIThread.Post(() =>
+        try
         {
-            MainTabs.SelectedIndex = 0;
-            StatusViewControl.RefreshStatus();
-            _isLoaded = true;
-        });
-    }
+            // 1. Inicialización en segundo plano
+            await SmbInitializer.InitializeEnvironmentAsync();
 
+            // 2. Cargar shares de forma asíncrona
+            var shares = await Task.Run(() => SambaConfigReader.LoadShares());
+
+            // 3. Actualizar datos en la vista principal
+            SharesViewControl.SetShares(shares);
+            StatusText.Text = $"Loaded {shares.Count} shares.";
+        }
+        finally
+        {
+            // CERRAR EL DIÁLOGO DE CARGA DE FORMA SEGURA
+            Dispatcher.UIThread.Post(() =>
+            {
+                loadingWindow.Close();
+            });
+        }
+
+        // Seleccionar la pestaña de estado y refrescar con su propio diálogo de carga
+        MainTabs.SelectedIndex = 0;
+        await RefreshStatusSafelyAsync();
+        _isLoaded = true;
+    }
+   
     // ---------------------------
     // EVENTOS
     // ---------------------------
 
-    private void OnTabChanged(object? sender, SelectionChangedEventArgs e)
+    private async void OnTabChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (!_isLoaded || StatusViewControl == null)
             return;
 
         if (MainTabs.SelectedIndex == 0)
-            StatusViewControl.RefreshStatus();
+        {
+            await RefreshStatusSafelyAsync();
+        }
     }
 
     private async void OnOpenConfig(object? sender, RoutedEventArgs e)
@@ -104,9 +119,9 @@ public partial class MainWindow : Window
         await win.ShowDialog(this);
     }
 
-    private void OnStatusRefreshClicked(object? sender, PointerPressedEventArgs e)
+    private async void OnStatusRefreshClicked(object? sender, PointerPressedEventArgs e)
     {
-        StatusViewControl?.RefreshStatus();
+        await RefreshStatusSafelyAsync();
         UpdateStatus("Status refreshed.");
     }
 
@@ -128,8 +143,28 @@ public partial class MainWindow : Window
     }
 
     // ---------------------------
-    // UTILIDADES
+    // UTILIDADES DE REFRECO Y CARGA
     // ---------------------------
+
+    private async Task RefreshStatusSafelyAsync()
+    {
+        var loadingWindow = ShowLoadingDialog("Refreshing status...");
+        try
+        {
+            // Breve respiro para asegurar que el diálogo de carga se renderice visualmente
+            await Task.Delay(50);
+            
+            // Ejecutar el chequeo de estado
+            StatusViewControl?.RefreshStatus();
+        }
+        finally
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                loadingWindow.Close();
+            });
+        }
+    }
 
     public async Task<(string user, string pass)?> ShowCredentialsDialog()
     {
@@ -367,7 +402,6 @@ public partial class MainWindow : Window
 
         await dialog.ShowDialog(this);
     }
-
 
     public Window ShowLoadingDialog(string message)
     {

@@ -13,6 +13,7 @@ namespace SAMBA_Util.Helpers;
 public class CliApp
 {
     private static readonly string ShareNameRegex = @"^[A-Za-z0-9._\-$ ]+$";
+    private static readonly string[] SambaUnits = { "smb", "smbd", "nmbd", "samba", "samba4" };
 
     public static async Task RunAsync()
     {
@@ -20,7 +21,7 @@ public class CliApp
 
         while (true)
         {
-            Console.Clear();
+            SafeClearScreen();
             Console.WriteLine("===== Samba-Util CLI =====\n");
             Console.WriteLine("1) List shared resources");
             Console.WriteLine("2) Create shared resource");
@@ -56,8 +57,21 @@ public class CliApp
                 default: Console.WriteLine("Invalid option."); break;
             }
 
-            Console.WriteLine("Press ENTER to continue...");
+            Console.WriteLine("\nPress ENTER to continue...");
             Console.ReadLine();
+        }
+    }
+
+    private static void SafeClearScreen()
+    {
+        try
+        {
+            if (!Console.IsOutputRedirected)
+                Console.Clear();
+        }
+        catch
+        {
+            // Ignorar si la terminal no soporta secuencias de borrado
         }
     }
 
@@ -217,8 +231,7 @@ public class CliApp
             return;
         }
 
-        Console.WriteLine($"Editing [{share.Name}]");
-        Console.WriteLine();
+        Console.WriteLine($"Editing [{share.Name}]\n");
 
         Console.WriteLine($"Current path: {share.Path}");
         Console.Write("New path (ENTER to keep): ");
@@ -226,31 +239,28 @@ public class CliApp
         if (!string.IsNullOrWhiteSpace(newPath))
             share.Path = newPath.Trim().Trim('"');
 
-        Console.WriteLine($"ReadOnly (current: {(share.ReadOnly ? "yes" : "no")})");
-        Console.WriteLine("1) yes");
-        Console.WriteLine("2) no");
+        Console.WriteLine($"\nReadOnly (current: {(share.ReadOnly ? "yes" : "no")})");
+        Console.WriteLine("1) yes\n2) no");
         Console.Write("Select (ENTER to keep): ");
         var roSel = Console.ReadLine();
         if (roSel == "1") share.ReadOnly = true;
         if (roSel == "2") share.ReadOnly = false;
 
-        Console.WriteLine($"Allow guests (current: {(share.AllowGuests ? "yes" : "no")})");
-        Console.WriteLine("1) yes");
-        Console.WriteLine("2) no");
+        Console.WriteLine($"\nAllow guests (current: {(share.AllowGuests ? "yes" : "no")})");
+        Console.WriteLine("1) yes\n2) no");
         Console.Write("Select (ENTER to keep): ");
         var guestSel = Console.ReadLine();
         if (guestSel == "1") share.AllowGuests = true;
         if (guestSel == "2") share.AllowGuests = false;
 
-        Console.WriteLine($"Browseable (current: {(share.Browseable ? "yes" : "no")})");
-        Console.WriteLine("1) yes");
-        Console.WriteLine("2) no");
+        Console.WriteLine($"\nBrowseable (current: {(share.Browseable ? "yes" : "no")})");
+        Console.WriteLine("1) yes\n2) no");
         Console.Write("Select (ENTER to keep): ");
         var brSel = Console.ReadLine();
         if (brSel == "1") share.Browseable = true;
         if (brSel == "2") share.Browseable = false;
 
-        Console.WriteLine($"Valid users (current: {share.ValidUsers})");
+        Console.WriteLine($"\nValid users (current: {share.ValidUsers})");
         Console.Write("New value (ENTER to keep): ");
         var vu = Console.ReadLine();
         if (!string.IsNullOrWhiteSpace(vu))
@@ -280,12 +290,8 @@ public class CliApp
         if (!string.IsNullOrWhiteSpace(fg))
             share.ForceGroup = fg;
 
-        Console.WriteLine($"Create mask (current: {share.CreateMask})");
-        Console.WriteLine("1) 0644");
-        Console.WriteLine("2) 0660");
-        Console.WriteLine("3) 0744");
-        Console.WriteLine("4) 0775");
-        Console.WriteLine("5) custom");
+        Console.WriteLine($"\nCreate mask (current: {share.CreateMask})");
+        Console.WriteLine("1) 0644\n2) 0660\n3) 0744\n4) 0775\n5) custom");
         Console.Write("Select (ENTER to keep): ");
         var cmSel = Console.ReadLine();
         switch (cmSel)
@@ -302,11 +308,8 @@ public class CliApp
                 break;
         }
 
-        Console.WriteLine($"Directory mask (current: {share.DirectoryMask})");
-        Console.WriteLine("1) 0755");
-        Console.WriteLine("2) 0770");
-        Console.WriteLine("3) 0775");
-        Console.WriteLine("4) custom");
+        Console.WriteLine($"\nDirectory mask (current: {share.DirectoryMask})");
+        Console.WriteLine("1) 0755\n2) 0770\n3) 0775\n4) custom");
         Console.Write("Select (ENTER to keep): ");
         var dmSel = Console.ReadLine();
         switch (dmSel)
@@ -327,7 +330,7 @@ public class CliApp
         try
         {
             SambaConfigWriter.UpdateShare(share);
-            Console.WriteLine("Share updated.");
+            Console.WriteLine("Share updated successfully.");
         }
         catch (Exception ex)
         {
@@ -343,8 +346,8 @@ public class CliApp
         CredStore.User = null;
         CredStore.Password = null;
 
-        Console.Clear();
-        Console.WriteLine("=== Network Scanner ===");
+        SafeClearScreen();
+        Console.WriteLine("=== Network Scanner ===\n");
 
         var interfaces = NetworkInterface.GetAllNetworkInterfaces()
             .Where(ni =>
@@ -362,7 +365,7 @@ public class CliApp
         int idx = 1;
         foreach (var ni in interfaces)
         {
-            Console.WriteLine($"{idx}) {ni.Name}  ({ni.Description})");
+            Console.WriteLine($"{idx}) {ni.Name} ({ni.Description})");
             idx++;
         }
 
@@ -370,9 +373,7 @@ public class CliApp
         Console.Write("Select interface number: ");
         var sel = Console.ReadLine();
 
-        if (!int.TryParse(sel, out int ifaceNum) ||
-            ifaceNum <= 0 ||
-            ifaceNum > interfaces.Count)
+        if (!int.TryParse(sel, out int ifaceNum) || ifaceNum <= 0 || ifaceNum > interfaces.Count)
         {
             Console.WriteLine("Invalid selection.");
             return;
@@ -380,9 +381,7 @@ public class CliApp
 
         string ifaceName = interfaces[ifaceNum - 1].Name;
 
-        Console.WriteLine();
-        Console.WriteLine($"Scanning network on interface: {ifaceName}...");
-        Console.WriteLine();
+        Console.WriteLine($"\nScanning network on interface: {ifaceName}...\n");
 
         var devices = await NetworkScanner.DiscoverAsync(ifaceName);
 
@@ -404,9 +403,7 @@ public class CliApp
         Console.Write("Select device number (0 to exit): ");
         var devSel = Console.ReadLine();
 
-        if (!int.TryParse(devSel, out int devNum) ||
-            devNum <= 0 ||
-            devNum > devices.Count)
+        if (!int.TryParse(devSel, out int devNum) || devNum <= 0 || devNum > devices.Count)
             return;
 
         var device = devices[devNum - 1];
@@ -418,8 +415,7 @@ public class CliApp
 
         var shares = await NetworkScanner.GetSharesAsync(device.IP);
 
-        Console.WriteLine();
-        Console.WriteLine($"=== Shares on {device.IP} ({device.OS}) ===");
+        Console.WriteLine($"\n=== Shares on {device.IP} ({device.OS}) ===");
 
         int sidx = 1;
         foreach (var s in shares)
@@ -428,8 +424,7 @@ public class CliApp
             sidx++;
         }
 
-        Console.WriteLine();
-        Console.WriteLine("Options:");
+        Console.WriteLine("\nOptions:");
         Console.WriteLine("1) Open share");
         Console.WriteLine("2) Set OS override");
         Console.WriteLine("0) Back");
@@ -453,7 +448,6 @@ public class CliApp
                 }
                 break;
 
-            case "0":
             default:
                 return;
         }
@@ -477,14 +471,11 @@ public class CliApp
         }
 
         var share = shares[num - 1];
-
-        // Limpiar posible formato "NombreShare|Comentario" retornado por el escáner
         string cleanShareName = share.Name.Split('|')[0].Trim();
 
         Console.WriteLine($"Selected: {cleanShareName}");
 
         bool isAnonymous = share.Access == "Anonymous";
-
         string? user = null;
         string? pass = null;
 
@@ -506,28 +497,29 @@ public class CliApp
     // ---------------------------------------------------------
     static void CheckSambaStatus()
     {
-        Console.Clear();
+        SafeClearScreen();
         Console.WriteLine("=== Samba Status ===\n");
 
-        string[] units = { "smb", "smbd", "nmbd", "samba", "samba4" };
         bool any = false;
 
-        foreach (var unit in units)
+        foreach (var unit in SambaUnits)
         {
-            var result = ShellHelper.Ejecutar($"systemctl is-active {unit}");
-            string status = result.Stdout.Trim();
+            try
+            {
+                var result = ShellHelper.Ejecutar($"systemctl is-active {unit}");
+                string status = result.Stdout.Trim();
 
-            if (status == "unknown" || string.IsNullOrWhiteSpace(status))
-                continue;
+                if (status == "unknown" || string.IsNullOrWhiteSpace(status))
+                    continue;
 
-            any = true;
-            Console.WriteLine($"{unit}: {FormatStatus(status)}");
+                any = true;
+                Console.WriteLine($"{unit}: {FormatStatus(status)}");
+            }
+            catch { }
         }
 
         if (!any)
             Console.WriteLine("No Samba services found.");
-
-        Console.WriteLine();
     }
 
     static string FormatStatus(string status)
@@ -543,132 +535,155 @@ public class CliApp
 
     static void RunTestparm()
     {
-        Console.Clear();
+        SafeClearScreen();
         Console.WriteLine("=== Validate Samba Configuration (testparm) ===\n");
 
-        var result = ShellHelper.Ejecutar("testparm -s");
-
-        string stdout = result.Stdout.Trim();
-        string stderr = result.Stderr.Trim();
-
-        if (!string.IsNullOrWhiteSpace(stderr))
+        try
         {
-            Console.WriteLine("Configuration notes / warnings:\n");
-            Console.WriteLine(stderr);
-            Console.WriteLine();
-        }
+            var result = ShellHelper.Ejecutar("testparm -s");
 
-        if (stdout.Contains("Loaded services file OK", StringComparison.OrdinalIgnoreCase))
-        {
-            Console.WriteLine("Configuration is valid.");
-        }
-        else
-        {
-            Console.WriteLine(stdout);
-        }
+            string stdout = result.Stdout.Trim();
+            string stderr = result.Stderr.Trim();
 
-        Console.WriteLine();
+            if (!string.IsNullOrWhiteSpace(stderr))
+            {
+                Console.WriteLine("Configuration notes / warnings:\n");
+                Console.WriteLine(stderr);
+                Console.WriteLine();
+            }
+
+            if (stdout.Contains("Loaded services file OK", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine("Configuration is valid.");
+            }
+            else
+            {
+                Console.WriteLine(stdout);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error running testparm: {ex.Message}");
+        }
     }
 
     static void ReloadSamba()
     {
-        Console.Clear();
+        SafeClearScreen();
         Console.WriteLine("=== Reload Samba ===\n");
 
-        string[] units = { "smb", "smbd", "samba", "samba4" };
         bool reloadedAny = false;
 
-        foreach (var unit in units)
+        foreach (var unit in SambaUnits)
         {
-            var check = ShellHelper.Ejecutar($"systemctl is-active {unit}");
-            if (check.Stdout.Trim() == "unknown" || string.IsNullOrWhiteSpace(check.Stdout))
-                continue;
-
-            Console.WriteLine($"Reloading {unit}...");
-            var res = ShellHelper.EjecutarComoRoot($"systemctl reload {unit}");
-
-            if (res.ExitCode == 0)
+            try
             {
-                Console.WriteLine($"{unit} reloaded.");
-                reloadedAny = true;
+                var check = ShellHelper.Ejecutar($"systemctl is-active {unit}");
+                if (check.Stdout.Trim() == "unknown" || string.IsNullOrWhiteSpace(check.Stdout))
+                    continue;
+
+                Console.WriteLine($"Reloading {unit}...");
+                var res = ShellHelper.EjecutarComoRoot($"systemctl reload {unit}");
+
+                if (res.ExitCode == 0)
+                {
+                    Console.WriteLine($"{unit} reloaded successfully.");
+                    reloadedAny = true;
+                }
+                else
+                {
+                    Console.WriteLine($"{unit} failed to reload.");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                Console.WriteLine($"{unit} failed to reload.");
+                Console.WriteLine($"Error reloading {unit}: {ex.Message}");
             }
         }
 
         if (!reloadedAny)
             Console.WriteLine("No active Samba services found to reload.");
-
-        Console.WriteLine();
     }
 
     static void RestartSamba()
     {
-        Console.Clear();
+        SafeClearScreen();
         Console.WriteLine("=== Restart Samba ===\n");
 
-        string[] units = { "smb", "smbd", "nmbd", "samba", "samba4" };
         bool restartedAny = false;
 
-        foreach (var unit in units)
+        foreach (var unit in SambaUnits)
         {
-            var check = ShellHelper.Ejecutar($"systemctl is-active {unit}");
-            if (check.Stdout.Trim() == "unknown" || string.IsNullOrWhiteSpace(check.Stdout))
-                continue;
-
-            Console.WriteLine($"Restarting {unit}...");
-            var res = ShellHelper.EjecutarComoRoot($"systemctl restart {unit}");
-
-            if (res.ExitCode == 0)
+            try
             {
-                Console.WriteLine($"{unit} restarted.");
-                restartedAny = true;
+                var check = ShellHelper.Ejecutar($"systemctl is-active {unit}");
+                if (check.Stdout.Trim() == "unknown" || string.IsNullOrWhiteSpace(check.Stdout))
+                    continue;
+
+                Console.WriteLine($"Restarting {unit}...");
+                var res = ShellHelper.EjecutarComoRoot($"systemctl restart {unit}");
+
+                if (res.ExitCode == 0)
+                {
+                    Console.WriteLine($"{unit} restarted successfully.");
+                    restartedAny = true;
+                }
+                else
+                {
+                    Console.WriteLine($"{unit} failed to restart.");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                Console.WriteLine($"{unit} failed to restart.");
+                Console.WriteLine($"Error restarting {unit}: {ex.Message}");
             }
         }
 
         if (!restartedAny)
             Console.WriteLine("No active Samba services found to restart.");
-
-        Console.WriteLine();
     }
 
     static void ShowSmbStatus()
     {
-        Console.Clear();
+        SafeClearScreen();
         Console.WriteLine("=== Active SMB Connections ===\n");
 
-        var result = ShellHelper.Ejecutar("smbstatus");
-
-        if (string.IsNullOrWhiteSpace(result.Stdout))
+        try
         {
-            Console.WriteLine("No active connections or smbstatus unavailable.");
-        }
-        else
-        {
-            Console.WriteLine(result.Stdout);
-        }
+            var result = ShellHelper.Ejecutar("smbstatus");
 
-        Console.WriteLine();
+            if (string.IsNullOrWhiteSpace(result.Stdout))
+            {
+                Console.WriteLine("No active connections or smbstatus unavailable.");
+            }
+            else
+            {
+                Console.WriteLine(result.Stdout);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error executing smbstatus: {ex.Message}");
+        }
     }
 
     static void ShowSambaVersion()
     {
-        Console.Clear();
+        SafeClearScreen();
         Console.WriteLine("=== Samba Version ===\n");
 
-        var result = ShellHelper.Ejecutar("smbd --version");
+        try
+        {
+            var result = ShellHelper.Ejecutar("smbd --version");
 
-        if (string.IsNullOrWhiteSpace(result.Stdout))
-            Console.WriteLine("Unable to determine Samba version.");
-        else
-            Console.WriteLine(result.Stdout.Trim());
-
-        Console.WriteLine();
+            if (string.IsNullOrWhiteSpace(result.Stdout))
+                Console.WriteLine("Unable to determine Samba version.");
+            else
+                Console.WriteLine(result.Stdout.Trim());
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching version: {ex.Message}");
+        }
     }
 }

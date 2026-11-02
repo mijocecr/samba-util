@@ -1,7 +1,7 @@
 using System;
 using Avalonia.Controls;
-using Avalonia.Dialogs;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using SAMBA_Util.Helpers;
 
 namespace SAMBA_Util.Views;
@@ -38,22 +38,30 @@ public partial class ConfigWindow : Window
 
     private async void OnBrowseSmbConf(object? sender, RoutedEventArgs e)
     {
-        var dlg = new OpenFileDialog
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel == null) return;
+
+        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "Select smb.conf",
-            AllowMultiple = false
-        };
-
-        dlg.Filters.Add(new FileDialogFilter
-        {
-            Name = "Samba config",
-            Extensions = { "conf" }
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("Samba config")
+                {
+                    Patterns = new[] { "*.conf" }
+                }
+            }
         });
 
-        var result = await dlg.ShowAsync(this);
-
-        if (result != null && result.Length > 0)
-            TxtSmbConf.Text = result[0];
+        if (files.Count > 0)
+        {
+            var path = files[0].TryGetLocalPath();
+            if (!string.IsNullOrEmpty(path))
+            {
+                TxtSmbConf.Text = path;
+            }
+        }
     }
 
     private void OnSave(object? sender, RoutedEventArgs e)

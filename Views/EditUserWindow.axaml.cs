@@ -1,9 +1,10 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using SAMBA_Util.Helpers;
+using System;
+using System.Text;
 
-
-namespace SambaUtil.Views;
+namespace SAMBA_Util.Views;
 
 public partial class EditUserWindow : Window
 {
@@ -13,7 +14,7 @@ public partial class EditUserWindow : Window
     {
         InitializeComponent();
         _username = username;
-        base.WindowStartupLocation= WindowStartupLocation.CenterScreen;
+        base.WindowStartupLocation = WindowStartupLocation.CenterScreen;
         UsernameText.Text = username;
         LoadUserInfo(username);
     }
@@ -56,19 +57,23 @@ public partial class EditUserWindow : Window
 
     private void OnSave(object? sender, RoutedEventArgs e)
     {
-        // Cambiar contraseña
-        if (!string.IsNullOrWhiteSpace(NewPasswordBox.Text))
+        // Cambiar contraseña de forma segura usando Base64
+        var newPass = NewPasswordBox.Text;
+        if (!string.IsNullOrWhiteSpace(newPass))
         {
-            ShellHelper.EjecutarComoRoot(
-                $"bash -c \"echo -e \\\"{NewPasswordBox.Text}\\n{NewPasswordBox.Text}\\\" | smbpasswd {_username}\""
-            );
+            var passBytes = Encoding.UTF8.GetBytes(newPass.ToCharArray());
+            var passBase64 = Convert.ToBase64String(passBytes);
+
+            // smbpasswd pide la contraseña dos veces (nueva y confirmación)
+            string cmd = $"bash -c \"(echo '{passBase64}' | base64 -d; echo '{passBase64}' | base64 -d) | smbpasswd '{_username}'\"";
+            ShellHelper.EjecutarComoRoot(cmd);
         }
 
-        // Cambiar estado
+        // Cambiar estado (Habilitar / Deshabilitar)
         if (EnableCheck.IsChecked == true)
-            ShellHelper.EjecutarComoRoot($"bash -c \"smbpasswd -e {_username}\"");
+            ShellHelper.EjecutarComoRoot($"bash -c \"smbpasswd -e '{_username}'\"");
         else
-            ShellHelper.EjecutarComoRoot($"bash -c \"smbpasswd -d {_username}\"");
+            ShellHelper.EjecutarComoRoot($"bash -c \"smbpasswd -d '{_username}'\"");
 
         Close();
     }

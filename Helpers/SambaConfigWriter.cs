@@ -221,34 +221,34 @@ public static class SambaConfigWriter
     private static IEnumerable<string> ShareToLines(Share s)
     {
         yield return $"[{s.Name}]";
-        yield return $"   path = {CleanPath(s.Path)}";
-        yield return $"   read only = {(s.ReadOnly ? "yes" : "no")}";
-        yield return $"   guest ok = {(s.AllowGuests ? "yes" : "no")}";
-        yield return $"   browseable = {(s.Browseable ? "yes" : "no")}";
+        yield return $"    path = {CleanPath(s.Path)}";
+        yield return $"    read only = {(s.ReadOnly ? "yes" : "no")}";
+        yield return $"    guest ok = {(s.AllowGuests ? "yes" : "no")}";
+        yield return $"    browseable = {(s.Browseable ? "yes" : "no")}";
 
         if (!string.IsNullOrWhiteSpace(s.Comment))
-            yield return $"   comment = {s.Comment}";
+            yield return $"    comment = {s.Comment}";
 
         if (!string.IsNullOrWhiteSpace(s.ValidUsers))
-            yield return $"   valid users = {s.ValidUsers}";
+            yield return $"    valid users = {s.ValidUsers}";
 
         if (!string.IsNullOrWhiteSpace(s.WriteList))
-            yield return $"   write list = {s.WriteList}";
+            yield return $"    write list = {s.WriteList}";
 
         if (!string.IsNullOrWhiteSpace(s.ReadList))
-            yield return $"   read list = {s.ReadList}";
+            yield return $"    read list = {s.ReadList}";
 
         if (!string.IsNullOrWhiteSpace(s.ForceUser))
-            yield return $"   force user = {s.ForceUser}";
+            yield return $"    force user = {s.ForceUser}";
 
         if (!string.IsNullOrWhiteSpace(s.ForceGroup))
-            yield return $"   force group = {s.ForceGroup}";
+            yield return $"    force group = {s.ForceGroup}";
 
         if (!string.IsNullOrWhiteSpace(s.CreateMask))
-            yield return $"   create mask = {s.CreateMask}";
+            yield return $"    create mask = {s.CreateMask}";
 
         if (!string.IsNullOrWhiteSpace(s.DirectoryMask))
-            yield return $"   directory mask = {s.DirectoryMask}";
+            yield return $"    directory mask = {s.DirectoryMask}";
 
         // Preservar cualquier parámetro avanzado no mapeado explícitamente en la UI
         if (s.UnknownParameters != null)
@@ -256,7 +256,7 @@ public static class SambaConfigWriter
             foreach (var param in s.UnknownParameters)
             {
                 if (!string.IsNullOrWhiteSpace(param))
-                    yield return $"   {param}";
+                    yield return $"    {param}";
             }
         }
     }
@@ -274,20 +274,22 @@ public static class SambaConfigWriter
     {
         if (File.Exists("/bin/systemctl") || File.Exists("/usr/bin/systemctl"))
         {
-            var res = ShellHelper.EjecutarComoRoot("systemctl restart smbd");
+            // Probamos primero con 'smb' (distros como Arch Linux, Fedora)
+            var res = ShellHelper.EjecutarComoRoot("systemctl restart smb");
             if (res.ExitCode != 0)
             {
-                ShellHelper.EjecutarComoRoot("systemctl restart smb");
+                // Si falla, probamos con 'smbd' (distros como Debian, Ubuntu)
+                ShellHelper.EjecutarComoRoot("systemctl restart smbd");
             }
             return;
         }
 
         if (File.Exists("/sbin/service") || File.Exists("/usr/sbin/service"))
         {
-            var res = ShellHelper.EjecutarComoRoot("service smbd restart");
+            var res = ShellHelper.EjecutarComoRoot("service smb restart");
             if (res.ExitCode != 0)
             {
-                ShellHelper.EjecutarComoRoot("service smb restart");
+                ShellHelper.EjecutarComoRoot("service smbd restart");
             }
             return;
         }

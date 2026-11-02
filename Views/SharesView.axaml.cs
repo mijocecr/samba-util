@@ -80,13 +80,13 @@ public partial class SharesView : UserControl
 
             if (TopLevel.GetTopLevel(this) is not Window owner)
             {
-                Console.WriteLine("ERROR: No se pudo obtener la ventana padre.");
+                Console.WriteLine("ERROR: Could not get parent window.");
                 return;
             }
 
             var result = await win.ShowDialog<Share?>(owner);
 
-            if (result != null)
+            if (result != null && !string.IsNullOrWhiteSpace(result.Name))
             {
                 SambaConfigWriter.UpdateShare(result);
                 LoadShares();
@@ -117,31 +117,32 @@ public partial class SharesView : UserControl
 
         if (TopLevel.GetTopLevel(this) is not Window owner)
         {
-            Console.WriteLine("ERROR: No se pudo obtener la ventana padre.");
+            Console.WriteLine("ERROR: Could not get parent window.");
             return;
         }
 
-        await win.ShowDialog(owner);
+        var result = await win.ShowDialog<Share?>(owner);
 
-        if (win.Saved)
+        // Validar que se haya guardado y que el nombre no esté vacío
+        if (win.Saved && result != null && !string.IsNullOrWhiteSpace(result.Name))
         {
             try
             {
-                SambaConfigWriter.AddShare(newShare);
+                SambaConfigWriter.AddShare(result);
                 LoadShares();
 
                 if (TopLevel.GetTopLevel(this) is MainWindow main)
-                    main.UpdateStatus($"Share '{newShare.Name}' added successfully.");
+                    main.UpdateStatus($"Share '{result.Name}' added successfully.");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error al agregar share: {ex.Message}");
+                Console.WriteLine($"Error adding share: {ex.Message}");
             }
         }
     }
 
     // ---------------------------------------------------------
-    //  FIX PERMISSIONS (nuevo)
+    //  FIX PERMISSIONS
     // ---------------------------------------------------------
     private async void OnFixPermissions(object? sender, RoutedEventArgs e)
     {
@@ -152,18 +153,21 @@ public partial class SharesView : UserControl
 
             try
             {
-                // Ejecutar chmod
+                // Ejecutar chmod como root
                 var result = ShellHelper.EjecutarComoRoot($"chmod {perms} \"{share.Path}\"");
 
-                // 🔥 Volver a leer permisos reales desde el sistema
+                // Volver a leer permisos reales desde el sistema
                 var (owner, group, mode) = FileSystemHelper.GetPermissions(share.Path);
 
-                //  Revalidar usando los permisos recién leídos
+                // Revalidar usando los permisos actualizados
                 share.Warning = ShareValidator.ValidateShare(share);
 
-                //  Forzar refresco visual del ListBox
-                ListShares.ItemsSource = null;
-                ListShares.ItemsSource = Shares;
+                // Refrescar la vista actualizando temporalmente el elemento en la colección
+                int index = Shares.IndexOf(share);
+                if (index != -1)
+                {
+                    Shares[index] = share;
+                }
 
                 if (TopLevel.GetTopLevel(this) is MainWindow main)
                     main.UpdateStatus($"Permissions fixed for '{share.Name}'");
@@ -174,5 +178,4 @@ public partial class SharesView : UserControl
             }
         }
     }
-
 }

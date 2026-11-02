@@ -2,7 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using System.Collections.Generic;
 using SAMBA_Util.Helpers;
-using SambaUtil.Views;
+
 
 namespace SAMBA_Util.Views;
 
@@ -43,7 +43,7 @@ public partial class UsersView : UserControl
     }
 
     // ---------------------------------------------------------
-    // AÑADIR USUARIO SAMBA (VERSIÓN PROFESIONAL)
+    // AÑADIR USUARIO SAMBA (VERSIÓN PROFESIONAL Y COMPATIBLE)
     // ---------------------------------------------------------
     private void OnAddUser(object? sender, RoutedEventArgs e)
     {
@@ -56,17 +56,19 @@ public partial class UsersView : UserControl
         if (string.IsNullOrEmpty(Credenciales.AdminPassword))
             return;
 
-        // 1) Crear usuario UNIX si no existe
+        // 1) Crear usuario UNIX si no existe (usando 'nologin' genérico compatible con Arch y Debian)
         ShellHelper.EjecutarComoRoot(
-            $"bash -c \"id -u '{username}' >/dev/null 2>&1 || useradd -M -s /usr/sbin/nologin '{username}'\""
+            $"bash -c \"id -u '{username}' >/dev/null 2>&1 || useradd -M -s $(which nologin || echo /sbin/nologin) '{username}'\""
         );
 
-        // 2) Crear usuario Samba con contraseña segura (heredoc)
+        // 2) Crear usuario Samba con contraseña segura (protegiendo contra caracteres especiales)
         if (!string.IsNullOrWhiteSpace(password))
         {
-            string cmd =
-                $"bash -c \"smbpasswd -a '{username}' <<EOF\n{password}\n{password}\nEOF\"";
+            // Usamos base64 para evitar problemas con comillas o caracteres especiales de bash en la contraseña
+            var passBytes = System.Text.Encoding.UTF8.GetBytes(password);
+            var passBase64 = System.Convert.ToBase64String(passBytes);
 
+            string cmd = $"bash -c \"echo '{passBase64}' | base64 -d | smbpasswd -a -s '{username}'\"";
             ShellHelper.EjecutarComoRoot(cmd);
         }
         else
@@ -119,7 +121,7 @@ public partial class UsersView : UserControl
     }
 
     // ---------------------------------------------------------
-    // EDITAR USUARIO (SIN CAMBIOS)
+    // EDITAR USUARIO
     // ---------------------------------------------------------
     private void OnEditUser(object? sender, RoutedEventArgs e)
     {

@@ -51,20 +51,31 @@ public static class ShellHelper
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 
-        // Enviar contraseña
+        // Enviar contraseña con protección estricta contra Broken Pipe
         if (!string.IsNullOrEmpty(Credenciales.AdminPassword))
         {
             Console.WriteLine($"[SHELL] #{callId} Enviando contraseña…");
             var pass = Credenciales.AdminPassword.TrimEnd('\r', '\n');
-            process.StandardInput.WriteLine(pass);
-            process.StandardInput.Flush();
+            try
+            {
+                process.StandardInput.WriteLine(pass);
+                process.StandardInput.Flush();
+            }
+            catch (System.IO.IOException)
+            {
+                Console.WriteLine($"[SHELL] #{callId} ADVERTENCIA: Pipe cerrado al enviar la contraseña.");
+            }
         }
         else
         {
             Console.WriteLine($"[SHELL] #{callId} ADVERTENCIA: No hay contraseña configurada");
         }
 
-        process.StandardInput.Close();
+        try
+        {
+            process.StandardInput.Close();
+        }
+        catch { }
 
         const int timeoutMs = 15000;
         Console.WriteLine($"[SHELL] #{callId} Esperando hasta {timeoutMs} ms…");
@@ -135,8 +146,6 @@ public static class ShellHelper
 
         return (process.ExitCode, stdoutBuilder.ToString(), stderrBuilder.ToString());
     }
-
-    
 
     // ---------------------------------------------------------
     // EJECUCIÓN NORMAL (SIN ROOT)

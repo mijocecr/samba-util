@@ -34,9 +34,6 @@ namespace SAMBA_Util.Helpers
             return "Other";
         }
 
-        // ---------------------------------------------------------
-        // SMB DETECTION (limpio y funcional)
-        // ---------------------------------------------------------
         private static async Task<string?> DetectFromSmbAsync(string ip)
         {
             string user = CredStore.User ?? "guest";
@@ -51,36 +48,21 @@ namespace SAMBA_Util.Helpers
             if (string.IsNullOrWhiteSpace(output))
                 return null;
 
-            // Windows
-            if (output.Contains("microsoft") ||
-                output.Contains("windows"))
+            if (output.Contains("microsoft") || output.Contains("windows"))
                 return "Windows";
 
-            // macOS
-            if (output.Contains("mac os") ||
-                output.Contains("darwin") ||
-                output.Contains("smbx") ||
-                output.Contains("aapl"))
+            if (output.Contains("mac os") || output.Contains("darwin") || output.Contains("smbx") || output.Contains("aapl"))
                 return "macOS";
 
-            // NAS
-            if (output.Contains("synology") ||
-                output.Contains("qnap") ||
-                output.Contains("freenas") ||
-                output.Contains("truenas") ||
-                output.Contains("wd"))
+            if (output.Contains("synology") || output.Contains("qnap") || output.Contains("freenas") || output.Contains("truenas") || output.Contains("wd"))
                 return "NAS";
 
-            // Linux Samba
-            if (output.Contains("samba"))
+            if (output.Contains("samba") || output.Contains("unix"))
                 return "Linux";
 
             return null;
         }
 
-        // ---------------------------------------------------------
-        // SSH BANNER (limpio)
-        // ---------------------------------------------------------
         private static async Task<string?> DetectFromSshAsync(string ip)
         {
             try
@@ -106,21 +88,16 @@ namespace SAMBA_Util.Helpers
                 if (banner.Contains("darwin"))
                     return "macOS";
 
-                if (banner.Contains("freebsd") ||
-                    banner.Contains("openbsd") ||
-                    banner.Contains("netbsd"))
+                if (banner.Contains("freebsd") || banner.Contains("openbsd") || banner.Contains("netbsd"))
                     return "BSD";
 
-                if (banner.Contains("ubuntu") ||
-                    banner.Contains("debian") ||
-                    banner.Contains("fedora") ||
-                    banner.Contains("arch") ||
-                    banner.Contains("manjaro") ||
-                    banner.Contains("opensuse"))
+                // Si menciona explícitamente una distro o es un OpenSSH estándar (que en redes locales suele ser Linux)
+                if (banner.Contains("ubuntu") || banner.Contains("debian") || banner.Contains("fedora") || 
+                    banner.Contains("arch") || banner.Contains("manjaro") || banner.Contains("opensuse") || 
+                    banner.Contains("linux") || banner.Contains("openssh"))
+                {
                     return "Linux";
-
-                if (banner.Contains("linux"))
-                    return "Linux";
+                }
 
                 return "Unix";
             }
@@ -130,9 +107,6 @@ namespace SAMBA_Util.Helpers
             }
         }
 
-        // ---------------------------------------------------------
-        // TTL HEURISTICS (simple)
-        // ---------------------------------------------------------
         private static async Task<string?> DetectFromTtlAsync(string ip)
         {
             try
@@ -148,8 +122,9 @@ namespace SAMBA_Util.Helpers
                 if (ttl >= 120 && ttl <= 135)
                     return "Windows";
 
+                // TTL ~64 es el estándar absoluto para Linux y Unix en redes locales
                 if (ttl >= 60 && ttl <= 70)
-                    return "Unix";
+                    return "Linux"; 
 
                 if (ttl >= 200)
                     return "Router";
@@ -162,9 +137,6 @@ namespace SAMBA_Util.Helpers
             }
         }
 
-        // ---------------------------------------------------------
-        // PORT CHECK
-        // ---------------------------------------------------------
         private static async Task<bool> IsPortOpen(string ip, int port)
         {
             try
