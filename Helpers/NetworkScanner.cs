@@ -81,7 +81,7 @@ namespace SAMBA_Util.Helpers
 
         public static bool TryGetOverride(string ip, out string os)
         {
-            return Overrides.TryGetValue(ip, out os);
+            return Overrides.TryGetValue(ip, out os!);
         }
 
         public static void SetOverride(string ip, string os)
@@ -101,7 +101,7 @@ namespace SAMBA_Util.Helpers
         // ---------------------------------------------------------
         // DISCOVER DEVICES
         // ---------------------------------------------------------
-        public static async Task<List<NetworkDevice>> DiscoverAsync(string ifaceName)
+        public static async Task<List<NetworkDevice>> DiscoverAsync(string ifaceName, CancellationToken cancellationToken = default)
         {
             var devices = new List<NetworkDevice>();
 
@@ -109,10 +109,11 @@ namespace SAMBA_Util.Helpers
             if (subnet == null)
                 return devices;
 
-            var alive = await PingSweepAsync(subnet);
+            var alive = await PingSweepAsync(subnet, cancellationToken);
 
             foreach (var ip in alive)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 string hostname = ip;
 
                 try
@@ -168,7 +169,6 @@ namespace SAMBA_Util.Helpers
             string user = CredStore.User;
             string pass = CredStore.Password;
 
-            // Si es 'guest' o está vacío, se retorna "%" para forzar Null Session anónima pura
             if (string.IsNullOrWhiteSpace(user) || user.Equals("guest", StringComparison.OrdinalIgnoreCase))
                 return "%";
 
@@ -178,32 +178,31 @@ namespace SAMBA_Util.Helpers
         // ---------------------------------------------------------
         // SHARE ENUMERATION (RPC for Windows, SMBCLIENT for others)
         // ---------------------------------------------------------
-        public static async Task<List<NetworkShare>> GetSharesAsync(string ip)
+        public static async Task<List<NetworkShare>> GetSharesAsync(string ip, CancellationToken cancellationToken = default)
         {
-            Console.Clear();
             Console.WriteLine($"[Scanner] === GET SHARES FOR {ip} ===");
 
             var shares = new List<NetworkShare>();
-
             string os = await DetectOSAsync(ip, ip);
 
-          
+            cancellationToken.ThrowIfCancellationRequested();
+
             // ---------------------------------------------------------
-// WINDOWS → RPC netshareenumall
-// ---------------------------------------------------------
+            // WINDOWS → RPC netshareenumall
+            // ---------------------------------------------------------
             if (os == "Windows")
             {
                 string userSpec = BuildUserSpec(ip, os);
 
-                // 1. Intento inicial (Null Session / Anónimo con '%')
                 string rpcOut = await ShellHelper.RunAsync(
                     $"rpcclient -U {ShellQuote(userSpec)} {ip} -c \"netshareenumall\""
                 );
 
+                cancellationToken.ThrowIfCancellationRequested();
+
                 Console.WriteLine("[Scanner] RPC output:");
                 Console.WriteLine(rpcOut);
 
-                // 2. Si la sesión anónima es rechazada y el usuario ha configurado credenciales reales, reintentar
                 if (rpcOut.Contains("NT_STATUS") && !string.IsNullOrWhiteSpace(CredStore.User) && !CredStore.User.Equals("guest", StringComparison.OrdinalIgnoreCase))
                 {
                     Console.WriteLine("[Scanner] Intento anónimo rechazado. Reintentando RPC con credenciales...");
@@ -213,11 +212,12 @@ namespace SAMBA_Util.Helpers
                         $"rpcclient -U {ShellQuote(credSpec)} {ip} -c \"netshareenumall\""
                     );
 
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     Console.WriteLine("[Scanner] RPC Credential output:");
                     Console.WriteLine(rpcOut);
                 }
 
-                // 3. Procesar las líneas de respuesta si fue exitoso
                 if (!rpcOut.Contains("NT_STATUS"))
                 {
                     foreach (var line in rpcOut.Split('\n'))
@@ -225,8 +225,6 @@ namespace SAMBA_Util.Helpers
                         if (!line.Contains("netname:")) continue;
 
                         string name = line.Replace("netname:", "").Trim();
-            
-                        // Descartar entradas vacías y recursos administrativos ocultos de Windows (ADMIN$, C$, IPC$)
                         if (string.IsNullOrWhiteSpace(name) || name.EndsWith("$")) continue;
 
                         shares.Add(new NetworkShare(name)
@@ -237,21 +235,18 @@ namespace SAMBA_Util.Helpers
                         });
                     }
                 }
-                else
-                {
-                    Console.WriteLine("[Scanner] Error de acceso RPC en el servidor Windows (NT_STATUS). Se requieren credenciales.");
-                }
 
                 return shares;
             }
-            
-            
+
             // ---------------------------------------------------------
             // NON-WINDOWS → SMBCLIENT
             // ---------------------------------------------------------
             string outGuest = await ShellHelper.RunAsync(
                 $"smbclient -gL {ShellQuote("//" + ip)} -U % --option='client min protocol=SMB2'"
             );
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             Console.WriteLine("[Scanner] Guest output:");
             Console.WriteLine(outGuest);
@@ -261,7 +256,10 @@ namespace SAMBA_Util.Helpers
                 var parsed = ParseShares(ip, outGuest);
 
                 foreach (var share in parsed)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
                     share.Access = await DetectShareAccess(ip, share.Name, os);
+                }
 
                 return parsed;
             }
@@ -274,6 +272,8 @@ namespace SAMBA_Util.Helpers
                 string outCred = await ShellHelper.RunAsync(
                     $"smbclient -gL {ShellQuote("//" + ip)} -U {ShellQuote(userSpec)} --option='client min protocol=SMB2'"
                 );
+
+                cancellationToken.ThrowIfCancellationRequested();
 
                 Console.WriteLine("[Scanner] Credential output:");
                 Console.WriteLine(outCred);
@@ -370,7 +370,7 @@ namespace SAMBA_Util.Helpers
         // ---------------------------------------------------------
         // PING SWEEP
         // ---------------------------------------------------------
-        private static async Task<List<string>> PingSweepAsync(string subnet)
+        private static async Task<List<string>> PingSweepAsync(string subnet, CancellationToken cancellationToken = default)
         {
             var list = new List<string>();
             var tasks = new List<Task>();
@@ -382,9 +382,10 @@ namespace SAMBA_Util.Helpers
 
                 tasks.Add(Task.Run(async () =>
                 {
-                    await limiter.WaitAsync();
+                    await limiter.WaitAsync(cancellationToken);
                     try
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         using var ping = new Ping();
                         var reply = await ping.SendPingAsync(ip, 200);
 
@@ -395,10 +396,15 @@ namespace SAMBA_Util.Helpers
                     {
                         limiter.Release();
                     }
-                }));
+                }, cancellationToken));
             }
 
-            await Task.WhenAll(tasks);
+            try
+            {
+                await Task.WhenAll(tasks);
+            }
+            catch (OperationCanceledException) { }
+
             return list;
         }
 

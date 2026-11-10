@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="SAMBA_Util.Views.ShareEditorWindow"
-        Width="380" Height="400"
+        Width="380" Height="500"
         Title="Edit Share"
         CanResize="False"
         Background="{StaticResource BackgroundBrush}"
@@ -11,131 +11,69 @@
         <StackPanel Margin="15" Spacing="12">
 
             <!-- BASIC SECTION -->
-            <TextBlock Text="Name"
-                       Foreground="{StaticResource ForegroundBrush}"/>
-            <TextBox x:Name="TxtName"
-                     CornerRadius="6"
-                     Background="{StaticResource ControlBackgroundBrush}"
-                     BorderBrush="{StaticResource BorderBrush}"
-                     Foreground="{StaticResource ForegroundBrush}"/>
+            <TextBlock Text="Name" Foreground="{StaticResource ForegroundBrush}"/>
+            <TextBox x:Name="TxtName" CornerRadius="6" Background="{StaticResource ControlBackgroundBrush}" BorderBrush="{StaticResource BorderBrush}" Foreground="{StaticResource ForegroundBrush}"/>
 
-            <TextBlock Text="Path"
-                       Foreground="{StaticResource ForegroundBrush}"/>
+            <TextBlock Text="Path" Foreground="{StaticResource ForegroundBrush}"/>
             <StackPanel Orientation="Horizontal" Spacing="10">
-                <TextBox x:Name="TxtPath"
-                         Width="240"
-                         IsReadOnly="True"
-                         CornerRadius="6"
-                         Background="{StaticResource ControlBackgroundBrush}"
-                         BorderBrush="{StaticResource BorderBrush}"
-                         Foreground="{StaticResource ForegroundBrush}"/>
-                <Button Content="Browse..."
-                        Width="90"
-                        Click="OnBrowseFolder"/>
+                <TextBox x:Name="TxtPath" Width="240" IsReadOnly="True" CornerRadius="6" Background="{StaticResource ControlBackgroundBrush}" BorderBrush="{StaticResource BorderBrush}" Foreground="{StaticResource ForegroundBrush}"/>
+                <Button Content="Browse..." Width="90" Click="OnBrowseFolder"/>
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" Spacing="25">
-
                 <StackPanel>
-                    <TextBlock Text="Read Only"
-                               Foreground="{StaticResource ForegroundBrush}"/>
+                    <TextBlock Text="Read Only" Foreground="{StaticResource ForegroundBrush}"/>
                     <ToggleSwitch x:Name="TgRO"/>
                 </StackPanel>
-
                 <StackPanel>
-                    <TextBlock Text="Allow Guests"
-                               Foreground="{StaticResource ForegroundBrush}"/>
+                    <TextBlock Text="Allow Guests" Foreground="{StaticResource ForegroundBrush}"/>
                     <ToggleSwitch x:Name="TgGuests"/>
                 </StackPanel>
-
                 <StackPanel>
-                    <TextBlock Text="Browseable"
-                               Foreground="{StaticResource ForegroundBrush}"/>
+                    <TextBlock Text="Browseable" Foreground="{StaticResource ForegroundBrush}"/>
                     <ToggleSwitch x:Name="TgBrowseable"/>
                 </StackPanel>
-
             </StackPanel>
 
-            <TextBlock Text="Comment"
-                       Foreground="{StaticResource ForegroundBrush}"/>
-            <TextBox x:Name="TxtComment"
-                     CornerRadius="6"
-                     Background="{StaticResource ControlBackgroundBrush}"
-                     BorderBrush="{StaticResource BorderBrush}"
-                     Foreground="{StaticResource ForegroundBrush}"/>
+            <TextBlock Text="Comment" Foreground="{StaticResource ForegroundBrush}"/>
+            <TextBox x:Name="TxtComment" CornerRadius="6" Background="{StaticResource ControlBackgroundBrush}" BorderBrush="{StaticResource BorderBrush}" Foreground="{StaticResource ForegroundBrush}"/>
 
             <Grid ColumnDefinitions="Auto,*">
-
                 <!-- ADVANCED SECTION -->
-                <Expander Grid.Column="0"
-                          Header="Advanced Options"
-                          IsExpanded="False"
-                          Foreground="{StaticResource ForegroundBrush}">
-                    
+                <Expander Grid.Column="0" Header="Advanced Options" IsExpanded="False" Foreground="{StaticResource ForegroundBrush}">
                     <StackPanel Spacing="10" Margin="5">
+                        
+                        <TextBlock Text="Follow Symlinks" Foreground="{StaticResource ForegroundBrush}"/>
+                        <ToggleSwitch x:Name="TgFollowSymlinks"/>
 
-                        <TextBlock Text="Valid Users"
-                                   Foreground="{StaticResource ForegroundBrush}"/>
-                        <TextBox x:Name="TxtValidUsers"
-                                 CornerRadius="6"
-                                 Background="{StaticResource ControlBackgroundBrush}"
-                                 BorderBrush="{StaticResource BorderBrush}"
-                                 Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBlock Text="Wide Links" Foreground="{StaticResource ForegroundBrush}"/>
+                        <ToggleSwitch x:Name="TgWideLinks"/>
 
-                        <TextBlock Text="Write List"
-                                   Foreground="{StaticResource ForegroundBrush}"/>
-                        <TextBox x:Name="TxtWriteList"
-                                 CornerRadius="6"
-                                 Background="{StaticResource ControlBackgroundBrush}"
-                                 BorderBrush="{StaticResource BorderBrush}"
-                                 Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBlock Text="Valid Users" Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBox x:Name="TxtValidUsers" CornerRadius="6" Background="{StaticResource ControlBackgroundBrush}" BorderBrush="{StaticResource BorderBrush}" Foreground="{StaticResource ForegroundBrush}"/>
 
-                        <TextBlock Text="Read List"
-                                   Foreground="{StaticResource ForegroundBrush}"/>
-                        <TextBox x:Name="TxtReadList"
-                                 CornerRadius="6"
-                                 Background="{StaticResource ControlBackgroundBrush}"
-                                 BorderBrush="{StaticResource BorderBrush}"
-                                 Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBlock Text="Write List" Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBox x:Name="TxtWriteList" CornerRadius="6" Background="{StaticResource ControlBackgroundBrush}" BorderBrush="{StaticResource BorderBrush}" Foreground="{StaticResource ForegroundBrush}"/>
 
-                        <TextBlock Text="Force User"
-                                   Foreground="{StaticResource ForegroundBrush}"/>
-                        <TextBox x:Name="TxtForceUser"
-                                 CornerRadius="6"
-                                 Background="{StaticResource ControlBackgroundBrush}"
-                                 BorderBrush="{StaticResource BorderBrush}"
-                                 Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBlock Text="Read List" Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBox x:Name="TxtReadList" CornerRadius="6" Background="{StaticResource ControlBackgroundBrush}" BorderBrush="{StaticResource BorderBrush}" Foreground="{StaticResource ForegroundBrush}"/>
 
-                        <TextBlock Text="Force Group"
-                                   Foreground="{StaticResource ForegroundBrush}"/>
-                        <TextBox x:Name="TxtForceGroup"
-                                 CornerRadius="6"
-                                 Background="{StaticResource ControlBackgroundBrush}"
-                                 BorderBrush="{StaticResource BorderBrush}"
-                                 Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBlock Text="Force User" Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBox x:Name="TxtForceUser" CornerRadius="6" Background="{StaticResource ControlBackgroundBrush}" BorderBrush="{StaticResource BorderBrush}" Foreground="{StaticResource ForegroundBrush}"/>
 
-                        <!-- CREATE MASK (COMBOBOX) -->
-                        <TextBlock Text="Create Mask"
-                                   Foreground="{StaticResource ForegroundBrush}"/>
-                        <ComboBox x:Name="CmbCreateMask"
-                                  CornerRadius="6"
-                                  Background="{StaticResource ControlBackgroundBrush}"
-                                  BorderBrush="{StaticResource BorderBrush}"
-                                  Foreground="{StaticResource ForegroundBrush}">
+                        <TextBlock Text="Force Group" Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBox x:Name="TxtForceGroup" CornerRadius="6" Background="{StaticResource ControlBackgroundBrush}" BorderBrush="{StaticResource BorderBrush}" Foreground="{StaticResource ForegroundBrush}"/>
+
+                        <TextBlock Text="Create Mask" Foreground="{StaticResource ForegroundBrush}"/>
+                        <ComboBox x:Name="CmbCreateMask" CornerRadius="6" Background="{StaticResource ControlBackgroundBrush}" BorderBrush="{StaticResource BorderBrush}" Foreground="{StaticResource ForegroundBrush}">
                             <ComboBoxItem Content="755 – rwx r-x r-x" Tag="755"/>
                             <ComboBoxItem Content="775 – rwx rwx r-x" Tag="775"/>
                             <ComboBoxItem Content="770 – rwx rwx ---" Tag="770"/>
                             <ComboBoxItem Content="777 – rwx rwx rwx" Tag="777"/>
                         </ComboBox>
 
-                        <!-- DIRECTORY MASK (COMBOBOX) -->
-                        <TextBlock Text="Directory Mask"
-                                   Foreground="{StaticResource ForegroundBrush}"/>
-                        <ComboBox x:Name="CmbDirectoryMask"
-                                  CornerRadius="6"
-                                  Background="{StaticResource ControlBackgroundBrush}"
-                                  BorderBrush="{StaticResource BorderBrush}"
-                                  Foreground="{StaticResource ForegroundBrush}">
+                        <TextBlock Text="Directory Mask" Foreground="{StaticResource ForegroundBrush}"/>
+                        <ComboBox x:Name="CmbDirectoryMask" CornerRadius="6" Background="{StaticResource ControlBackgroundBrush}" BorderBrush="{StaticResource BorderBrush}" Foreground="{StaticResource ForegroundBrush}">
                             <ComboBoxItem Content="755 – rwx r-x r-x" Tag="755"/>
                             <ComboBoxItem Content="775 – rwx rwx r-x" Tag="775"/>
                             <ComboBoxItem Content="770 – rwx rwx ---" Tag="770"/>
@@ -146,14 +84,7 @@
                 </Expander>
 
                 <!-- SAVE BUTTON -->
-                <Button Grid.Column="1"
-                        Content="Save"
-                        HorizontalAlignment="Right"
-                        HorizontalContentAlignment="Center"
-                        VerticalAlignment="Top"
-                        Width="90"
-                        Click="OnSave"/>
-                
+                <Button Grid.Column="1" Content="Save" HorizontalAlignment="Right" HorizontalContentAlignment="Center" VerticalAlignment="Top" Width="90" Click="OnSave"/>
             </Grid>
 
         </StackPanel>

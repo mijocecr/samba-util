@@ -26,6 +26,18 @@ public partial class ConfigWindow : Window
         // Cargar ruta smb.conf
         TxtSmbConf.Text = _config.SmbConfPath;
 
+        // Seleccionar protocolo SMB actual en el ComboBox
+        foreach (ComboBoxItem item in ProtocolCombo.Items)
+        {
+            if (item.Tag?.ToString() == _config.MinProtocol)
+            {
+                ProtocolCombo.SelectedItem = item;
+                break;
+            }
+        }
+        if (ProtocolCombo.SelectedItem == null && ProtocolCombo.Items.Count > 0)
+            ProtocolCombo.SelectedIndex = 0; // Fallback a SMB2
+
         // Seleccionar permiso actual en el ComboBox
         foreach (ComboBoxItem item in PermCombo.Items)
         {
@@ -128,6 +140,12 @@ public partial class ConfigWindow : Window
         // Guardar ruta
         _config.SmbConfPath = TxtSmbConf.Text?.Trim() ?? "/etc/samba/smb.conf";
 
+        // Guardar protocolo SMB mínimo
+        if (ProtocolCombo.SelectedItem is ComboBoxItem protoItem && protoItem.Tag is string protoStr)
+        {
+            _config.MinProtocol = protoStr;
+        }
+
         // Guardar permisos desde el ComboBox
         if (PermCombo.SelectedItem is ComboBoxItem item &&
             item.Tag is string permStr &&
@@ -137,7 +155,7 @@ public partial class ConfigWindow : Window
         }
         else
         {
-            _config.DefaultPermissions = "755"; // fallback seguro
+            _config.DefaultPermissions = "755";
         }
 
         ConfigManager.Save(_config);

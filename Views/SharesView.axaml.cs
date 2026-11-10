@@ -144,25 +144,26 @@ public partial class SharesView : UserControl
     // ---------------------------------------------------------
     //  FIX PERMISSIONS
     // ---------------------------------------------------------
+   
     private async void OnFixPermissions(object? sender, RoutedEventArgs e)
     {
         if (sender is Button btn && btn.DataContext is Share share)
         {
             var config = ConfigManager.Load();
-            string perms = config.DefaultPermissions ?? "0755";
+            string perms = config.DefaultPermissions ?? "755";
 
             try
             {
-                // Ejecutar chmod como root
-                var result = ShellHelper.EjecutarComoRoot($"chmod {perms} \"{share.Path}\"");
+                // Ejecutar chmod recursivo (-R) como root para corregir el subárbol
+                var result = ShellHelper.EjecutarComoRoot($"chmod -R {perms} \"{share.Path}\"");
 
-                // Volver a leer permisos reales desde el sistema
-                var (owner, group, mode) = FileSystemHelper.GetPermissions(share.Path);
+                if (result.ExitCode != 0)
+                {
+                    throw new InvalidOperationException(result.Stderr);
+                }
 
-                // Revalidar usando los permisos actualizados
                 share.Warning = ShareValidator.ValidateShare(share);
 
-                // Refrescar la vista actualizando temporalmente el elemento en la colección
                 int index = Shares.IndexOf(share);
                 if (index != -1)
                 {
@@ -170,7 +171,7 @@ public partial class SharesView : UserControl
                 }
 
                 if (TopLevel.GetTopLevel(this) is MainWindow main)
-                    main.UpdateStatus($"Permissions fixed for '{share.Name}'");
+                    main.UpdateStatus($"Recursive permissions fixed for '{share.Name}'");
             }
             catch (Exception ex)
             {
@@ -178,4 +179,6 @@ public partial class SharesView : UserControl
             }
         }
     }
+    
+    
 }

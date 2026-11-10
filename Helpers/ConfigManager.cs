@@ -14,6 +14,9 @@ public static class ConfigManager
     {
         public string SmbConfPath { get; set; } = "/etc/samba/smb.conf";
         public string DefaultPermissions { get; set; } = "777";
+        
+        // Propiedad añadida para el protocolo mínimo de Samba
+        public string MinProtocol { get; set; } = "SMB2";
     }
 
     public static AppConfig Load()

@@ -2,66 +2,84 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="SAMBA_Util.Views.NetworkView">
 
-    <Grid RowDefinitions="Auto,*,*,Auto" Margin="10">
+    <Grid RowDefinitions="Auto,*" Margin="14">
 
-        <!-- Fila superior: ComboBox + Botón Scan -->
-        <StackPanel Orientation="Horizontal"
-                    Spacing="10"
-                    Grid.Row="0"
-                    HorizontalAlignment="Center"
-                    Margin="0,0,0,10">
+        <!-- Barra superior organizada en filas verticales -->
+        <Border Grid.Row="0"
+                Background="{StaticResource ControlBackgroundBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="14"
+                Margin="0,0,0,12">
+            
+            <StackPanel Spacing="12">
+                
+                <!-- Fila 1: Conexión Directa -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Direct Connection (IP / Hostname)" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource ForegroundBrush}"/>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBox x:Name="TxtQuickIp" Grid.Column="0" Height="32" Watermark="Enter IP or hostname (e.g. 192.168.1.50)" VerticalContentAlignment="Center"/>
+                        <Button x:Name="BtnQuickConnect" Grid.Column="1" Content="Connect" Height="32" Width="130" Margin="8,0,0,0" Classes="AccentButton" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Click="OnQuickConnectClicked"/>
+                    </Grid>
+                </StackPanel>
 
-            <!-- Selector de interfaz -->
-            <ComboBox x:Name="InterfaceSelector"
-                      Width="220"
-                      HorizontalAlignment="Left"/>
-
-            <!-- Botón Scan -->
-            <Button x:Name="ScanButton"
-                    Content="Scan Network"
+                <!-- Fila 2: Selector de Interfaz y Botón de Escaneo -->
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
+                        <TextBlock Text="Network Interface" FontSize="11" Foreground="{StaticResource ForegroundBrush}" Opacity="0.7"/>
+                        <ComboBox x:Name="InterfaceSelector" Height="32" HorizontalAlignment="Stretch"/>
+                    </StackPanel>
                     
-                    Height="32"
-                    Width="150"
-                    HorizontalContentAlignment="Center"
-                    VerticalContentAlignment="Center"
-                    HorizontalAlignment="Right"/>
-        </StackPanel>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Bottom">
+                        <Button x:Name="ScanButton" Content="Scan Network" Height="32" Width="130" VerticalContentAlignment="Center" HorizontalContentAlignment="Center"/>
+                    </StackPanel>
+                </Grid>
 
-        <!-- Lista de dispositivos -->
-        <Border Grid.Row="1"
-                Background="{StaticResource ControlBackgroundBrush}"
-                BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="1"
-                Cursor="Hand"
-                CornerRadius="6"
-                Padding="10"
-                Margin="0,0,0,10">
-
-            <ScrollViewer>
-                <StackPanel x:Name="DevicesPanel" Spacing="10"/>
-            </ScrollViewer>
+            </StackPanel>
         </Border>
 
-        <!-- Lista de shares -->
-        <Border Grid.Row="2"
-                Background="{StaticResource ControlBackgroundBrush}"
-                BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="1"
-                CornerRadius="6"
-                Padding="10"
-                Margin="0,0,0,10">
+        <!-- Sección inferior dinámica: por defecto 1 columna (solo Shares), al escanear pasa a 2 columnas (Devices + Shares) -->
+        <Grid x:Name="MainContentGrid" Grid.Row="1" ColumnDefinitions="0,0,*">
 
-            <ScrollViewer>
-                <StackPanel x:Name="SharesPanel" Spacing="10"/>
-            </ScrollViewer>
-        </Border>
+            <!-- Columna Izquierda: Dispositivos de red detectados (Oculta por defecto) -->
+            <Grid x:Name="DevicesColumn" Grid.Column="0" RowDefinitions="Auto,*" IsVisible="False">
+                <TextBlock Grid.Row="0" Text="Discovered Network Devices" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource ForegroundBrush}" Margin="2,0,0,6"/>
+                <Border Grid.Row="1"
+                        Background="{StaticResource ControlBackgroundBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="10">
+                    <ScrollViewer>
+                        <StackPanel x:Name="DevicesPanel" Spacing="8">
+                            <TextBlock Text="No devices scanned yet." Foreground="{StaticResource ForegroundBrush}" Opacity="0.5" FontStyle="Italic" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
 
-        <!-- Barra de estado -->
-        <TextBlock Grid.Row="3"
-                   x:Name="StatusText"
-                   Text="Ready"
-                   HorizontalAlignment="Center"
-                   Foreground="{StaticResource ForegroundBrush}"
-                   FontSize="14"/>
+            <!-- Separador visual entre columnas -->
+            <Rectangle x:Name="ColumnSeparator" Grid.Column="1" Width="0"/>
+
+            <!-- Columna Derecha: Recursos compartidos disponibles (Ocupa  el ancho por defecto) -->
+            <Grid x:Name="SharesColumn" Grid.Column="2" RowDefinitions="Auto,*">
+                <TextBlock Grid.Row="0" Text="Available Shared Folders" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource ForegroundBrush}" Margin="2,0,0,6"/>
+                <Border Grid.Row="1"
+                        Background="{StaticResource ControlBackgroundBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="10">
+                    <ScrollViewer>
+                        <StackPanel x:Name="SharesPanel" Spacing="8">
+                            <TextBlock Text="Enter an IP above or scan the network to list shares." Foreground="{StaticResource ForegroundBrush}" Opacity="0.5" FontStyle="Italic" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+
+        </Grid>
+
     </Grid>
 </UserControl>

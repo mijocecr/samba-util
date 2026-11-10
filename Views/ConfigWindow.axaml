@@ -1,100 +1,113 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="SAMBA_Util.Views.ConfigWindow"
-        Width="450" Height="410"
+        Width="450" Height="500"
         Title="Samba-util Configuration"
         CanResize="False"
-        
         Background="{StaticResource BackgroundBrush}"
         Foreground="{StaticResource ForegroundBrush}">
 
-    <Border Margin="20"
-            Padding="20"
-            Background="{StaticResource ControlBackgroundBrush}"
-            BorderBrush="{StaticResource BorderBrush}"
-            BorderThickness="1"
-            CornerRadius="10">
+    <ScrollViewer Background="{StaticResource BackgroundBrush}">
+        <Border Margin="20"
+                Padding="20"
+                Background="{StaticResource ControlBackgroundBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="10">
 
-        <StackPanel Spacing="15">
+            <StackPanel Spacing="15">
 
-            <!-- Título -->
-            <TextBlock Text="Global Configuration"
-                       FontSize="20"
-                       
-                       FontWeight="Bold"
-                       Foreground="{StaticResource ForegroundBrush}"/>
-
-            <!-- Samba config path -->
-            <StackPanel Spacing="6">
-                <TextBlock Text="Samba config path:"
+                <!-- Título -->
+                <TextBlock Text="Global Configuration"
+                           FontSize="20"
+                           FontWeight="Bold"
                            Foreground="{StaticResource ForegroundBrush}"/>
 
-                <DockPanel LastChildFill="False">
+                <!-- Samba config path -->
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Samba config path:"
+                               Foreground="{StaticResource ForegroundBrush}"/>
 
-                    <TextBox x:Name="TxtSmbConf"
-                             Background="{StaticResource ControlBackgroundBrush}"
-                             BorderBrush="{StaticResource BorderBrush}"
-                             Foreground="{StaticResource ForegroundBrush}"
-                             CornerRadius="6"
-                             IsReadOnly="True"
-                             Width="325"/>
+                    <DockPanel LastChildFill="False">
+                        <TextBox x:Name="TxtSmbConf"
+                                 Background="{StaticResource ControlBackgroundBrush}"
+                                 BorderBrush="{StaticResource BorderBrush}"
+                                 Foreground="{StaticResource ForegroundBrush}"
+                                 CornerRadius="6"
+                                 IsReadOnly="True"
+                                 Width="325"/>
 
-                    <Button x:Name="BtnBrowseSmbConf"
-                            Content="..."
-                            Width="40"
-                            Margin="6,0,0,0"
-                            Classes="AccentButton"/>
-                </DockPanel>
+                        <Button x:Name="BtnBrowseSmbConf"
+                                Content="..."
+                                Width="40"
+                                Margin="6,0,0,0"
+                                Classes="AccentButton"/>
+                    </DockPanel>
+                </StackPanel>
+
+                <!-- Minimum SMB Protocol (NUEVO) -->
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Minimum SMB Protocol:"
+                               Foreground="{StaticResource ForegroundBrush}"/>
+
+                    <ComboBox x:Name="ProtocolCombo"
+                              Background="{StaticResource ControlBackgroundBrush}"
+                              BorderBrush="{StaticResource BorderBrush}"
+                              Foreground="{StaticResource ForegroundBrush}"
+                              CornerRadius="6"
+                              Width="365">
+                        <ComboBoxItem Content="SMB2 (Recommended)" Tag="SMB2"/>
+                        <ComboBoxItem Content="SMB3" Tag="SMB3"/>
+                        <ComboBoxItem Content="SMB1 / NT1 (Legacy)" Tag="NT1"/>
+                    </ComboBox>
+                </StackPanel>
+
+                <!-- Default permissions -->
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Default permissions:"
+                               Foreground="{StaticResource ForegroundBrush}"/>
+
+                    <ComboBox x:Name="PermCombo"
+                              Background="{StaticResource ControlBackgroundBrush}"
+                              BorderBrush="{StaticResource BorderBrush}"
+                              Foreground="{StaticResource ForegroundBrush}"
+                              CornerRadius="6"
+                              Width="365">
+                        <ComboBoxItem Content="755 – Owner rwx, Group r-x, Others r-x" Tag="755"/>
+                        <ComboBoxItem Content="775 – Owner rwx, Group rwx, Others r-x" Tag="775"/>
+                        <ComboBoxItem Content="770 – Owner rwx, Group rwx, Others ---" Tag="770"/>
+                        <ComboBoxItem Content="777 – Owner rwx, Group rwx, Others rwx" Tag="777"/>
+                    </ComboBox>
+                </StackPanel>
+
+                <StackPanel Spacing="6">
+                    <TextBlock Text="System firewall:"
+                               Foreground="{StaticResource ForegroundBrush}"/>
+                    <ToggleSwitch x:Name="FirewallToggle"
+                                  OnContent="Enabled"
+                                  OffContent="Disabled"
+                                  IsEnabled="False"/>
+                    <TextBlock x:Name="TxtFirewallStatus"
+                               Text="Checking firewall..."
+                               TextWrapping="Wrap"
+                               Foreground="{StaticResource ForegroundBrush}"/>
+                    <TextBlock Text="Disabling the firewall can expose this computer to network traffic."
+                               TextWrapping="Wrap"
+                               Foreground="{StaticResource ForegroundBrush}"/>
+                </StackPanel>
+
+                <!-- Botones -->
+                <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,5,0,10"
+                            VerticalAlignment="Center">
+                    <Button Content="Save"
+                            Classes="AccentButton"
+                            Click="OnSave"/>
+                    <Button Content="Close"
+                            Classes="NeutralButton"
+                            Click="OnClose"/>
+                </StackPanel>
+
             </StackPanel>
-
-            <!-- Default permissions (COMBOBOX GitHub style) -->
-            <StackPanel Spacing="6">
-                <TextBlock Text="Default permissions:"
-                           Foreground="{StaticResource ForegroundBrush}"/>
-
-                <ComboBox x:Name="PermCombo"
-                          Background="{StaticResource ControlBackgroundBrush}"
-                          BorderBrush="{StaticResource BorderBrush}"
-                          Foreground="{StaticResource ForegroundBrush}"
-                          CornerRadius="6"
-                          Width="365">
-
-                    <ComboBoxItem Content="755 – Owner rwx, Group r-x, Others r-x" Tag="755"/>
-                    <ComboBoxItem Content="775 – Owner rwx, Group rwx, Others r-x" Tag="775"/>
-                    <ComboBoxItem Content="770 – Owner rwx, Group rwx, Others ---" Tag="770"/>
-                    <ComboBoxItem Content="777 – Owner rwx, Group rwx, Others rwx" Tag="777"/>
-
-                </ComboBox>
-            </StackPanel>
-
-            <StackPanel Spacing="6">
-                <TextBlock Text="System firewall:"
-                           Foreground="{StaticResource ForegroundBrush}"/>
-                <ToggleSwitch x:Name="FirewallToggle"
-                              OnContent="Enabled"
-                              OffContent="Disabled"
-                              IsEnabled="False"/>
-                <TextBlock x:Name="TxtFirewallStatus"
-                           Text="Checking firewall..."
-                           TextWrapping="Wrap"
-                           Foreground="{StaticResource ForegroundBrush}"/>
-                <TextBlock Text="Disabling the firewall can expose this computer to network traffic."
-                           TextWrapping="Wrap"
-                           Foreground="{StaticResource ForegroundBrush}"/>
-            </StackPanel>
-
-            <!-- Botones -->
-            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,5,0,10"
-                        VerticalAlignment="Center">
-                <Button Content="Save"
-                        Classes="AccentButton"
-                        Click="OnSave"/>
-                <Button Content="Close"
-                        Classes="NeutralButton"
-                        Click="OnClose"/>
-            </StackPanel>
-
-        </StackPanel>
-
-    </Border>
+        </Border>
+    </ScrollViewer>
 </Window>

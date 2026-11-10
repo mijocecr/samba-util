@@ -155,6 +155,12 @@ public static class SambaConfigReader
                     case "comment":
                         current.Comment = value;
                         break;
+                    case "follow symlinks":
+                        current.FollowSymlinks = IsTrue(value);
+                        break;
+                    case "wide links":
+                        current.WideLinks = IsTrue(value);
+                        break;
                     case "valid users":
                         current.ValidUsers = value;
                         break;
