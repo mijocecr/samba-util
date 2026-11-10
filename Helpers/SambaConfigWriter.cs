@@ -12,12 +12,10 @@ public static class SambaConfigWriter
 {
     private static long _callCountSave = 0;
 
-    private static bool IsSpecialShare(string name)
-    {
-        return name.Equals("printers", StringComparison.OrdinalIgnoreCase)
-            || name.Equals("print$", StringComparison.OrdinalIgnoreCase)
-            || name.Equals("IPC$", StringComparison.OrdinalIgnoreCase);
-    }
+    // Secciones que SAMBA-Util nunca escribe ni elimina: se conservan tal cual
+    // estén en smb.conf. [homes] se ignora al leer (no se puede editar desde la UI),
+    // así que debe preservarse aquí para no perderla al guardar.
+    private static bool IsSpecialShare(string name) => SambaSections.IsSpecial(name);
 
     private static void ValidateShareName(string name)
     {
@@ -30,7 +28,7 @@ public static class SambaConfigWriter
             );
 
         if (name.Equals("global", StringComparison.OrdinalIgnoreCase) ||
-            name.Equals("homes", StringComparison.OrdinalIgnoreCase))
+            IsSpecialShare(name))
         {
             throw new InvalidOperationException($"Share name '{name}' is reserved.");
         }
@@ -60,36 +58,45 @@ public static class SambaConfigWriter
         if (string.IsNullOrWhiteSpace(smbConf))
             throw new InvalidOperationException("La ruta del archivo smb.conf no está configurada.");
 
-        string backup = smbConf + ".bak";
-        string temp = Path.Combine(Path.GetTempPath(), $"samba-util-{Guid.NewGuid():N}.conf");
+        string smbConfFull = Path.GetFullPath(smbConf);
 
-        var originalLines = File.Exists(smbConf)
-            ? File.ReadAllLines(smbConf).ToList()
+        // Solo se reescriben los shares que viven en smb.conf. Los que vienen de
+        // un include se quedan en su archivo y nunca se duplican aquí.
+        var managedShares = sharesToSave
+            .Where(share => !IsSpecialShare(share.Name))
+            .Where(share => string.IsNullOrWhiteSpace(share.SourceFile) ||
+                            PathsEqual(share.SourceFile, smbConfFull))
+            .ToList();
+
+        var skipped = sharesToSave.Except(managedShares).ToList();
+        if (skipped.Count > 0)
+        {
+            Console.WriteLine(
+                $"[WRITE] #{callId} Omitiendo {skipped.Count} share(s) definidos en includes: " +
+                string.Join(", ", skipped.Select(s => $"{s.Name} ({s.SourceFile})")));
+        }
+
+        var originalLines = File.Exists(smbConfFull)
+            ? File.ReadAllLines(smbConfFull).ToList()
             : new List<string>();
 
-        var globalSection = ExtractGlobalSection(originalLines);
-        var originalShares = SambaConfigReader.LoadShares();
+        var blocks = SplitIntoBlocks(originalLines);
+        var managedByName = managedShares.ToDictionary(s => s.Name, StringComparer.OrdinalIgnoreCase);
 
-        var output = new List<string>();
-        output.AddRange(globalSection);
-        output.Add("");
+        var output = BuildConfigLines(blocks, managedByName, managedShares);
 
-        var uiShareNames = sharesToSave.Select(x => x.Name).ToList();
+        WriteConfig(output, smbConfFull, callId);
 
-        foreach (var s in originalShares)
-        {
-            if (IsSpecialShare(s.Name) && !uiShareNames.Any(u => u.Equals(s.Name, StringComparison.OrdinalIgnoreCase)))
-            {
-                output.AddRange(ShareToLines(s));
-                output.Add("");
-            }
-        }
+        sw.Stop();
+        Console.WriteLine($"[WRITE] #{callId} ← SaveAllShares completado en {sw.ElapsedMilliseconds} ms");
+    }
 
-        foreach (var s in sharesToSave)
-        {
-            output.AddRange(ShareToLines(s));
-            output.Add("");
-        }
+    // Valida con testparm, hace backup, copia el archivo y reinicia Samba.
+    // Se usa tanto al guardar shares como al cambiar opciones de [global].
+    private static void WriteConfig(List<string> output, string smbConfFull, long callId)
+    {
+        string backup = smbConfFull + ".bak";
+        string temp = Path.Combine(Path.GetTempPath(), $"samba-util-{Guid.NewGuid():N}.conf");
 
         try
         {
@@ -109,10 +116,10 @@ public static class SambaConfigWriter
                     $"La configuración de Samba generada no es válida: {test.Stderr}{test.Stdout}");
             }
 
-            if (File.Exists(smbConf))
+            if (File.Exists(smbConfFull))
             {
                 var backupResult = ShellHelper.EjecutarComoRoot(
-                    $"cp -p {ShellQuote(smbConf)} {ShellQuote(backup)}");
+                    $"cp -p {ShellQuote(smbConfFull)} {ShellQuote(backup)}");
                 if (backupResult.ExitCode != 0)
                 {
                     throw new InvalidOperationException(
@@ -121,7 +128,7 @@ public static class SambaConfigWriter
             }
 
             var copyResult = ShellHelper.EjecutarComoRoot(
-                $"cp {ShellQuote(temp)} {ShellQuote(smbConf)}");
+                $"cp {ShellQuote(temp)} {ShellQuote(smbConfFull)}");
             if (copyResult.ExitCode != 0)
             {
                 Console.WriteLine($"[WRITE] #{callId} ERROR al copiar smb.conf");
@@ -130,15 +137,141 @@ public static class SambaConfigWriter
             }
 
             RestartSambaService();
-
-            sw.Stop();
-            Console.WriteLine($"[WRITE] #{callId} ← SaveAllShares completado en {sw.ElapsedMilliseconds} ms");
         }
         finally
         {
             if (File.Exists(temp))
                 File.Delete(temp);
         }
+    }
+
+    // Escribe "server min protocol" en [global] de smb.conf para que el ajuste
+    // también se aplique al servidor Samba, no solo al cliente smbclient.
+    // Devuelve true si el archivo cambió; false si ya tenía el valor pedido.
+    public static bool SetServerMinProtocol(string? protocol)
+    {
+        var normalized = ConfigManager.NormalizeProtocol(protocol);
+        var callId = ++_callCountSave;
+
+        var config = ConfigManager.Load();
+        string smbConf = config.SmbConfPath;
+        if (string.IsNullOrWhiteSpace(smbConf))
+            throw new InvalidOperationException("La ruta del archivo smb.conf no está configurada.");
+
+        string smbConfFull = Path.GetFullPath(smbConf);
+        var originalLines = File.Exists(smbConfFull)
+            ? File.ReadAllLines(smbConfFull).ToList()
+            : new List<string>();
+
+        var output = BuildServerMinProtocolLines(originalLines, normalized);
+
+        if (originalLines.SequenceEqual(output))
+        {
+            Console.WriteLine($"[WRITE] #{callId} server min protocol ya es {normalized}; no se reescribe smb.conf.");
+            return false;
+        }
+
+        WriteConfig(output, smbConfFull, callId);
+
+        var effective = GetEffectiveServerMinProtocol(smbConfFull);
+        if (effective is not null &&
+            !string.Equals(effective, normalized, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"smb.conf se escribió, pero testparm sigue reportando " +
+                $"'{effective}' como server min protocol (esperado '{normalized}').");
+        }
+
+        Console.WriteLine($"[WRITE] #{callId} server min protocol = {normalized} aplicado y verificado.");
+        return true;
+    }
+
+    // Valor que Samba aplica realmente para "server min protocol", según testparm.
+    public static string? GetEffectiveServerMinProtocol(string? smbConfPath = null)
+    {
+        string path = smbConfPath ?? ConfigManager.Load().SmbConfPath;
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            return null;
+
+        var result = ShellHelper.EjecutarComoRoot(
+            $"testparm -s --parameter-name=\"server min protocol\" {ShellQuote(path)}");
+        if (result.ExitCode != 0)
+            return null;
+
+        // testparm imprime el valor en stdout; avisos como "Weak crypto..." van a
+        // stderr, así que se busca el token de protocolo en stdout y, si no
+        // aparece, se revisa también stderr como respaldo.
+        var pattern = @"^\s*(NT1|SMB2(?:_\d+)?|SMB3(?:_\d+)?)\s*$";
+        var match = Regex.Match(result.Stdout, pattern,
+            RegexOptions.IgnoreCase | RegexOptions.Multiline);
+        if (match.Success)
+            return match.Groups[1].Value;
+
+        match = Regex.Match(result.Stdout + "\n" + result.Stderr, pattern,
+            RegexOptions.IgnoreCase | RegexOptions.Multiline);
+        return match.Success ? match.Groups[1].Value : null;
+    }
+
+    private static readonly Regex ServerMinProtocolRegex = new(
+        @"^\s*server\s+min\s+protocol\s*=",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // Sustituye/inserta la directiva en [global] y elimina duplicados,
+    // conservando el resto del archivo tal cual.
+    private static List<string> BuildServerMinProtocolLines(List<string> originalLines, string protocol)
+    {
+        var blocks = SplitIntoBlocks(originalLines);
+        var output = new List<string>();
+        bool globalFound = false;
+
+        foreach (var block in blocks)
+        {
+            if (block.Name is null)
+            {
+                output.AddRange(block.Lines);
+                continue;
+            }
+
+            if (!block.Name.Equals("global", StringComparison.OrdinalIgnoreCase))
+            {
+                output.AddRange(block.Lines);
+                continue;
+            }
+
+            globalFound = true;
+            bool written = false;
+            foreach (var line in block.Lines)
+            {
+                if (ServerMinProtocolRegex.IsMatch(line))
+                {
+                    if (!written)
+                    {
+                        output.Add($"    server min protocol = {protocol}");
+                        written = true;
+                    }
+                    // Duplicados: se descartan.
+                    continue;
+                }
+
+                output.Add(line);
+
+                // Insertar justo después de la cabecera [global] si no existía.
+                if (!written && line.TrimStart().StartsWith('['))
+                {
+                    output.Add($"    server min protocol = {protocol}");
+                    written = true;
+                }
+            }
+        }
+
+        if (!globalFound)
+        {
+            output.Insert(0, "");
+            output.Insert(0, $"    server min protocol = {protocol}");
+            output.Insert(0, "[global]");
+        }
+
+        return output;
     }
 
     public static void AddShare(Share newShare)
@@ -156,6 +289,11 @@ public static class SambaConfigWriter
     public static void DeleteShare(string name)
     {
         var shares = SambaConfigReader.LoadShares();
+        var target = shares.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+        if (target is not null)
+            EnsureShareIsEditable(target);
+
         var filtered = shares.Where(s => !s.Name.Equals(name, StringComparison.OrdinalIgnoreCase)).ToList();
         SaveAllShares(filtered);
     }
@@ -164,56 +302,164 @@ public static class SambaConfigWriter
     {
         ValidateShareName(updated.Name);
         var shares = SambaConfigReader.LoadShares();
+
+        var existing = shares.FirstOrDefault(s => s.Name.Equals(updated.Name, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+        {
+            EnsureShareIsEditable(existing);
+
+            // El share pasa a estar gestionado desde smb.conf.
+            updated.SourceFile = existing.SourceFile;
+        }
+
         var list = shares.Where(s => !s.Name.Equals(updated.Name, StringComparison.OrdinalIgnoreCase)).ToList();
         list.Add(updated);
         SaveAllShares(list);
     }
 
-    private static List<string> ExtractGlobalSection(List<string> lines)
+    // Un share definido en un archivo incluido no se puede editar ni borrar
+    // desde aquí: hacerlo lo duplicaría o lo dejaría huérfano en el include.
+    public static bool IsFromInclude(Share share)
     {
-        var result = new List<string>();
-        bool inGlobal = false;
-        bool foundGlobal = false;
-        bool beforeFirstSection = true;
+        if (string.IsNullOrWhiteSpace(share.SourceFile))
+            return false;
+
+        string smbConfFull = Path.GetFullPath(ConfigManager.Load().SmbConfPath);
+        return !PathsEqual(share.SourceFile, smbConfFull);
+    }
+
+    private static void EnsureShareIsEditable(Share share)
+    {
+        if (!IsFromInclude(share))
+            return;
+
+        string smbConfFull = Path.GetFullPath(ConfigManager.Load().SmbConfPath);
+        throw new InvalidOperationException(
+            $"El recurso compartido '{share.Name}' está definido en '{share.SourceFile}' " +
+            $"(incluido desde {smbConfFull}). Edita ese archivo directamente o elimina la " +
+            "directiva include antes de modificarlo desde SAMBA-Util.");
+    }
+
+    private sealed class SectionBlock
+    {
+        public string? Name { get; init; }
+        public List<string> Lines { get; } = new();
+    }
+
+    // Divide el archivo en bloques por sección conservando todas las líneas
+    // originales (comentarios, includes, orden y formato).
+    private static List<SectionBlock> SplitIntoBlocks(List<string> lines)
+    {
+        var blocks = new List<SectionBlock>();
+        var preamble = new SectionBlock { Name = null };
+        var current = preamble;
 
         foreach (var line in lines)
         {
-            string trimmed = line.Trim();
-            bool isSection = trimmed.StartsWith("[") && trimmed.EndsWith("]");
-            bool isInclude = trimmed.Contains('=') &&
-                             trimmed.Split('=', 2)[0].Trim().Equals("include", StringComparison.OrdinalIgnoreCase);
+            var trimmed = line.Trim();
+            int close = trimmed.StartsWith('[') ? trimmed.IndexOf(']') : -1;
 
-            if (isSection)
+            if (close > 0 && !trimmed.StartsWith('#') && !trimmed.StartsWith(';'))
             {
-                beforeFirstSection = false;
-                inGlobal = trimmed.Equals("[global]", StringComparison.OrdinalIgnoreCase);
-                if (inGlobal)
-                {
-                    foundGlobal = true;
-                    result.Add(line);
-                }
+                var name = trimmed[1..close].Trim();
+                current = new SectionBlock { Name = name };
+                blocks.Add(current);
+                current.Lines.Add(line);
                 continue;
             }
 
-            if (inGlobal)
-            {
-                result.Add(line);
-            }
-            else if (isInclude && beforeFirstSection)
-            {
-                result.Add(line);
-            }
-            else if (isInclude)
-            {
-                throw new InvalidOperationException(
-                    "No se puede guardar smb.conf porque contiene una directiva include fuera de [global].");
-            }
+            current.Lines.Add(line);
         }
 
-        if (!foundGlobal)
-            result.Add("[global]");
+        if (preamble.Lines.Any(line => !string.IsNullOrWhiteSpace(line)))
+            blocks.Insert(0, preamble);
 
-        return result;
+        return blocks;
+    }
+
+    private static void AddShareBlock(List<string> output, Share share)
+    {
+        if (output.Count > 0 && !string.IsNullOrWhiteSpace(output[^1]))
+            output.Add("");
+
+        output.AddRange(ShareToLines(share));
+        output.Add("");
+    }
+
+    // Construye el contenido final conservando [global], includes, comentarios y
+    // secciones especiales; reemplaza/elimina/añade solo los shares gestionados.
+    private static List<string> BuildConfigLines(
+        List<SectionBlock> blocks,
+        Dictionary<string, Share> managedByName,
+        List<Share> managedShares)
+    {
+        var written = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var output = new List<string>();
+        bool globalFound = false;
+
+        foreach (var block in blocks)
+        {
+            if (block.Name is null)
+            {
+                // Preámbulo (comentarios y directivas antes de la primera sección).
+                output.AddRange(block.Lines);
+                continue;
+            }
+
+            if (block.Name.Equals("global", StringComparison.OrdinalIgnoreCase))
+            {
+                globalFound = true;
+                output.AddRange(block.Lines);
+                continue;
+            }
+
+            if (IsSpecialShare(block.Name))
+            {
+                // [homes], [printers], etc.: se conservan verbatim.
+                output.AddRange(block.Lines);
+                continue;
+            }
+
+            if (managedByName.TryGetValue(block.Name, out var share))
+            {
+                AddShareBlock(output, share);
+                written.Add(share.Name);
+            }
+            // Si no está en la lista de la UI, el usuario lo eliminó: se descarta.
+        }
+
+        foreach (var share in managedShares)
+        {
+            if (written.Contains(share.Name))
+                continue;
+
+            AddShareBlock(output, share);
+            written.Add(share.Name);
+        }
+
+        if (!globalFound)
+        {
+            output.Insert(0, "[global]");
+            if (output.Count > 1)
+                output.Insert(1, "");
+        }
+
+        return output;
+    }
+
+    private static bool PathsEqual(string first, string second)
+    {
+        try
+        {
+            return string.Equals(
+                Path.GetFullPath(first),
+                Path.GetFullPath(second),
+                StringComparison.Ordinal);
+        }
+        catch (Exception)
+        {
+            return string.Equals(first, second, StringComparison.Ordinal);
+        }
     }
 
     private static string ShellQuote(string value) =>

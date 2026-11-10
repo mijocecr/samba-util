@@ -292,7 +292,7 @@ public partial class StatusView : UserControl
     private void CheckShares()
     {
         var (exit, outp, err) = ShellHelper.EjecutarComoRoot(
-            $"bash -c \"smbclient -L localhost -N 2>&1 || true\""
+            $"bash -c \"smbclient -L localhost -N {ConfigManager.ClientMinProtocolOption()} 2>&1 || true\""
         );
 
         if (outp.Contains("Sharename", StringComparison.OrdinalIgnoreCase))

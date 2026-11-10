@@ -243,7 +243,7 @@ namespace SAMBA_Util.Helpers
             // NON-WINDOWS → SMBCLIENT
             // ---------------------------------------------------------
             string outGuest = await ShellHelper.RunAsync(
-                $"smbclient -gL {ShellQuote("//" + ip)} -U % --option='client min protocol=SMB2'"
+                $"smbclient -gL {ShellQuote("//" + ip)} -U % {ConfigManager.ClientMinProtocolOption()}"
             );
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -270,7 +270,7 @@ namespace SAMBA_Util.Helpers
                 string userSpec = BuildUserSpec(ip, os);
 
                 string outCred = await ShellHelper.RunAsync(
-                    $"smbclient -gL {ShellQuote("//" + ip)} -U {ShellQuote(userSpec)} --option='client min protocol=SMB2'"
+                    $"smbclient -gL {ShellQuote("//" + ip)} -U {ShellQuote(userSpec)} {ConfigManager.ClientMinProtocolOption()}"
                 );
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -333,7 +333,7 @@ namespace SAMBA_Util.Helpers
             string userSpec = BuildUserSpec(ip, os);
 
             string guestCmd =
-                $"smbclient {ShellQuote("//" + ip + "/" + share)} -U % --option='client min protocol=SMB2' -c \"ls\"";
+                $"smbclient {ShellQuote("//" + ip + "/" + share)} -U % {ConfigManager.ClientMinProtocolOption()} -c \"ls\"";
 
             string guestOut = await ShellHelper.RunAsync(guestCmd);
 
@@ -341,7 +341,7 @@ namespace SAMBA_Util.Helpers
                 return "Anonymous";
 
             string anonCmd =
-                $"smbclient {ShellQuote("//" + ip + "/" + share)} -N --option='client min protocol=SMB2' -c \"ls\"";
+                $"smbclient {ShellQuote("//" + ip + "/" + share)} -N {ConfigManager.ClientMinProtocolOption()} -c \"ls\"";
 
             string anonOut = await ShellHelper.RunAsync(anonCmd);
 
@@ -349,7 +349,7 @@ namespace SAMBA_Util.Helpers
                 return "Anonymous";
 
             string credCmd =
-                $"smbclient {ShellQuote("//" + ip + "/" + share)} -U {ShellQuote(userSpec)} --option='client min protocol=SMB2' -c \"ls\"";
+                $"smbclient {ShellQuote("//" + ip + "/" + share)} -U {ShellQuote(userSpec)} {ConfigManager.ClientMinProtocolOption()} -c \"ls\"";
 
             string credOut = await ShellHelper.RunAsync(credCmd);
 

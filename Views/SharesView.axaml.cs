@@ -31,8 +31,7 @@ public partial class SharesView : UserControl
             Shares.Add(s);
 
         // Validar permisos aquí también
-        foreach (var s in Shares)
-            s.Warning = ShareValidator.ValidateShare(s);
+        ApplyWarnings();
     }
 
     // ---------------------------------------------------------
@@ -48,10 +47,19 @@ public partial class SharesView : UserControl
             Shares.Add(s);
 
         // Validar permisos SOLO cuando el usuario abre la pestaña
-        foreach (var s in Shares)
-            s.Warning = ShareValidator.ValidateShare(s);
+        ApplyWarnings();
 
         return Shares.Count;
+    }
+
+    private void ApplyWarnings()
+    {
+        foreach (var s in Shares)
+        {
+            s.Warning = SambaConfigWriter.IsFromInclude(s)
+                ? $"Defined in {s.SourceFile} (included from smb.conf). Edit that file directly."
+                : ShareValidator.ValidateShare(s);
+        }
     }
 
     // ---------------------------------------------------------
@@ -61,11 +69,21 @@ public partial class SharesView : UserControl
     {
         if (sender is Button btn && btn.DataContext is Share share)
         {
-            SambaConfigWriter.DeleteShare(share.Name);
-            LoadShares();
+            try
+            {
+                SambaConfigWriter.DeleteShare(share.Name);
+                LoadShares();
 
-            if (TopLevel.GetTopLevel(this) is MainWindow main)
-                main.UpdateStatus($"Share '{share.Name}' deleted successfully.");
+                if (TopLevel.GetTopLevel(this) is MainWindow main)
+                    main.UpdateStatus($"Share '{share.Name}' deleted successfully.");
+            }
+            catch (Exception ex)
+            {
+                share.Warning = ex.Message;
+
+                if (TopLevel.GetTopLevel(this) is MainWindow main)
+                    main.UpdateStatus($"Could not delete '{share.Name}': {ex.Message}");
+            }
         }
     }
 
@@ -88,11 +106,21 @@ public partial class SharesView : UserControl
 
             if (result != null && !string.IsNullOrWhiteSpace(result.Name))
             {
-                SambaConfigWriter.UpdateShare(result);
-                LoadShares();
+                try
+                {
+                    SambaConfigWriter.UpdateShare(result);
+                    LoadShares();
 
-                if (TopLevel.GetTopLevel(this) is MainWindow main)
-                    main.UpdateStatus($"Share '{result.Name}' updated successfully.");
+                    if (TopLevel.GetTopLevel(this) is MainWindow main)
+                        main.UpdateStatus($"Share '{result.Name}' updated successfully.");
+                }
+                catch (Exception ex)
+                {
+                    result.Warning = ex.Message;
+
+                    if (TopLevel.GetTopLevel(this) is MainWindow main)
+                        main.UpdateStatus($"Could not update '{result.Name}': {ex.Message}");
+                }
             }
         }
     }

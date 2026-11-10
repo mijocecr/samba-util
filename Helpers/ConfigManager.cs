@@ -35,6 +35,21 @@ public static class ConfigManager
         }
     }
 
+    // Valores admitidos por la app para el protocolo mínimo (cliente y servidor).
+    public static string NormalizeProtocol(string? value)
+    {
+        return value?.Trim().ToUpperInvariant() switch
+        {
+            "SMB3" => "SMB3",
+            "NT1" or "SMB1" => "NT1",
+            _ => "SMB2"
+        };
+    }
+
+    // Opción que se pasa a smbclient para respetar el protocolo configurado.
+    public static string ClientMinProtocolOption() =>
+        $"--option='client min protocol={NormalizeProtocol(Load().MinProtocol)}'";
+
     public static void Save(AppConfig config)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(ConfigPath)!);

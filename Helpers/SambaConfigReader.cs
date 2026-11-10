@@ -104,17 +104,17 @@ public static class SambaConfigReader
                 if (clean.StartsWith("[") && clean.EndsWith("]"))
                 {
                     var name = clean[1..^1].Trim();
-                    if (name.Equals("global", StringComparison.OrdinalIgnoreCase))
-                    {
-                        current = null;
-                    }
-                    else if (name.Equals("homes", StringComparison.OrdinalIgnoreCase))
+                    if (name.Equals("global", StringComparison.OrdinalIgnoreCase) ||
+                        SambaSections.IsSpecial(name))
                     {
                         current = null;
                     }
                     else
                     {
                         current = FindOrCreateShare(shares, name);
+                        // Si el mismo nombre aparece en varios archivos, gana la
+                        // última definición: así sabemos dónde hay que escribir.
+                        current.SourceFile = normalizedPath;
                     }
 
                     continue;

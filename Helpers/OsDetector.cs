@@ -40,7 +40,7 @@ namespace SAMBA_Util.Helpers
             string pass = CredStore.Password ?? "";
 
             var result = ShellHelper.Ejecutar(
-                $"smbclient -L //{ip} -U {user}%{pass} --option='client min protocol=SMB2' 2>/dev/null"
+                $"smbclient -L //{ip} -U {user}%{pass} {ConfigManager.ClientMinProtocolOption()} 2>/dev/null"
             );
 
             string output = (result.Stdout + result.Stderr).ToLowerInvariant();

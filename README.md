@@ -94,7 +94,7 @@ cd samba-util
 dotnet run
 ```
 
-When started from an interactive terminal without a graphical display, SAMBA-Util opens its numbered CLI. The CLI provides the same management areas as the graphical app: shares and filesystem permissions, Samba users, network discovery and remote shares, status and service actions, configuration and UFW/firewalld, logs, active connections, and Samba version. At every selection prompt, choose from the options printed on screen; share and user operations use numbered lists rather than requiring you to remember or retype existing names. Administrative actions require sudo authentication at startup.
+When started from an interactive terminal without a graphical display, SAMBA-Util opens its numbered CLI. The CLI provides the same management areas as the graphical app: shares and filesystem permissions, Samba users, network discovery and remote shares, status and service actions, configuration (smb.conf path, default permissions, minimum SMB protocol for client and server) and UFW/firewalld, logs, active connections, and Samba version. At every selection prompt, choose from the options printed on screen; share and user operations use numbered lists rather than requiring you to remember or retype existing names. Administrative actions require sudo authentication at startup.
 
 ## Requirements
 

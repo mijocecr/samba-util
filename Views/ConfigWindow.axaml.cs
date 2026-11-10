@@ -160,6 +160,21 @@ public partial class ConfigWindow : Window
 
         ConfigManager.Save(_config);
 
+        // Aplicar también en el servidor: [global] server min protocol.
+        TxtProtocolStatus.Text = "Applying minimum SMB protocol to Samba...";
+        try
+        {
+            await Task.Run(() => SambaConfigWriter.SetServerMinProtocol(_config.MinProtocol));
+            TxtProtocolStatus.Text =
+                $"Server minimum SMB protocol applied: {ConfigManager.NormalizeProtocol(_config.MinProtocol)}.";
+        }
+        catch (Exception ex)
+        {
+            TxtProtocolStatus.Text =
+                $"Configuration saved, but the server protocol could not be applied: {ex.Message}";
+            return;
+        }
+
         Close();
         if (ConfigSaved != null)
             await ConfigSaved.Invoke();

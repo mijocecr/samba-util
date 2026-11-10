@@ -30,4 +30,8 @@ public class Share
     public string CreateMask { get; set; } = "0744";
     public string DirectoryMask { get; set; } = "0755";
     public string? Warning { get; set; }
+
+    // Archivo del que se leyó el share (smb.conf o un include).
+    // Vacío cuando el share es nuevo y todavía no se ha guardado.
+    public string SourceFile { get; set; } = "";
 }

@@ -711,42 +711,33 @@ public class CliApp
             var config = ConfigManager.Load();
             Console.WriteLine($"\nCurrent smb.conf: {config.SmbConfPath}");
             Console.WriteLine($"Default filesystem permissions: {config.DefaultPermissions}");
+            Console.WriteLine($"Minimum SMB protocol (client and server): {ConfigManager.NormalizeProtocol(config.MinProtocol)}");
             var action = Choose("Configuration", new[]
             {
-                "Change smb.conf path", "Change default permissions used by Fix Share Permissions", "Enable or disable UFW/firewalld"
+                "Change smb.conf path",
+                "Change default permissions used by Fix Share Permissions",
+                "Change minimum SMB protocol (SMB2/SMB3/NT1)",
+                "Enable or disable UFW/firewalld"
             });
             if (action == 0)
                 return;
 
             try
             {
-                if (action == 1)
+                switch (action)
                 {
-                    var path = ReadValue("Absolute path to smb.conf", config.SmbConfPath);
-                    if (path == null)
-                        continue;
-                    if (!Path.IsPathFullyQualified(path))
-                    {
-                        Console.WriteLine("The configuration path must be absolute.");
-                        continue;
-                    }
-                    config.SmbConfPath = path;
-                    ConfigManager.Save(config);
-                    Console.WriteLine("smb.conf path saved.");
-                }
-                else if (action == 2)
-                {
-                    var choices = new[] { "755", "775", "770", "777" };
-                    var selected = Choose("Default permission mode", choices.Select(mode => $"{mode} (octal)").ToArray());
-                    if (selected == 0)
-                        continue;
-                    config.DefaultPermissions = choices[selected - 1];
-                    ConfigManager.Save(config);
-                    Console.WriteLine($"Default permissions set to {config.DefaultPermissions}.");
-                }
-                else
-                {
-                    ConfigureFirewall();
+                    case 1:
+                        ChangeSmbConfPath(config);
+                        break;
+                    case 2:
+                        ChangeDefaultPermissions(config);
+                        break;
+                    case 3:
+                        ChangeMinProtocol(config);
+                        break;
+                    case 4:
+                        ConfigureFirewall();
+                        break;
                 }
             }
             catch (Exception ex)
@@ -754,6 +745,81 @@ public class CliApp
                 Console.WriteLine($"Could not save configuration: {ex.Message}");
             }
             WaitForEnter();
+        }
+    }
+
+    private static void ChangeSmbConfPath(ConfigManager.AppConfig config)
+    {
+        var path = ReadValue("Absolute path to smb.conf", config.SmbConfPath);
+        if (path == null)
+            return;
+        if (!Path.IsPathFullyQualified(path))
+        {
+            Console.WriteLine("The configuration path must be absolute.");
+            return;
+        }
+
+        config.SmbConfPath = path;
+        ConfigManager.Save(config);
+        Console.WriteLine("smb.conf path saved.");
+    }
+
+    private static void ChangeDefaultPermissions(ConfigManager.AppConfig config)
+    {
+        var choices = new[] { "755", "775", "770", "777" };
+        var selected = Choose("Default permission mode", choices.Select(mode => $"{mode} (octal)").ToArray());
+        if (selected == 0)
+            return;
+
+        config.DefaultPermissions = choices[selected - 1];
+        ConfigManager.Save(config);
+        Console.WriteLine($"Default permissions set to {config.DefaultPermissions}.");
+    }
+
+    private static void ChangeMinProtocol(ConfigManager.AppConfig config)
+    {
+        var protocols = new[] { "SMB2", "SMB3", "NT1" };
+        var labels = new[]
+        {
+            "SMB2 (recommended)",
+            "SMB3",
+            "SMB1 / NT1 (legacy, insecure)"
+        };
+
+        var current = ConfigManager.NormalizeProtocol(config.MinProtocol);
+        var selected = Choose($"Minimum SMB protocol (client and server, current: {current})", labels);
+        if (selected == 0)
+            return;
+
+        var protocol = protocols[selected - 1];
+        if (protocol == "NT1")
+        {
+            Console.WriteLine("Warning: SMB1/NT1 is obsolete and insecure. Use it only for legacy devices.");
+            if (AskYesNo("Enable SMB1/NT1 anyway?", false) != true)
+            {
+                Console.WriteLine("Protocol was not changed.");
+                return;
+            }
+        }
+
+        config.MinProtocol = protocol;
+        ConfigManager.Save(config);
+        Console.WriteLine($"Minimum SMB protocol saved in the app configuration: {protocol}.");
+
+        try
+        {
+            var changed = SambaConfigWriter.SetServerMinProtocol(protocol);
+            var effective = SambaConfigWriter.GetEffectiveServerMinProtocol();
+            Console.WriteLine(changed
+                ? "server min protocol written to smb.conf and Samba restarted."
+                : "smb.conf already had that server min protocol; nothing was rewritten.");
+
+            if (effective is not null)
+                Console.WriteLine($"Samba reports the effective server min protocol as {effective}.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"The app configuration was saved, but smb.conf could not be updated: {ex.Message}");
         }
     }
 
@@ -1037,6 +1103,9 @@ public class CliApp
 
         var config = ConfigManager.Load();
         Console.WriteLine($"\nConfiguration: {config.SmbConfPath}");
+        Console.WriteLine($"  Minimum SMB protocol (client and server): {ConfigManager.NormalizeProtocol(config.MinProtocol)}");
+        var effectiveServerProtocol = SambaConfigWriter.GetEffectiveServerMinProtocol(config.SmbConfPath);
+        Console.WriteLine($"  Effective server min protocol in smb.conf: {effectiveServerProtocol ?? "unknown"}");
         var testparm = ShellHelper.EjecutarComoRoot($"testparm -s {ShellQuote(config.SmbConfPath)}");
         var testOutput = testparm.Stdout + testparm.Stderr;
         if (testparm.ExitCode == 0 && testOutput.Contains("Loaded services file OK", StringComparison.OrdinalIgnoreCase))
@@ -1063,7 +1132,8 @@ public class CliApp
             foreach (var share in shares)
                 Console.WriteLine($"  [{share.Name}] {share.Path} (browseable={share.Browseable}, guests={share.AllowGuests})");
 
-        var shareCheck = ShellHelper.EjecutarComoRoot("smbclient -L localhost -N 2>&1");
+        var shareCheck = ShellHelper.EjecutarComoRoot(
+            $"smbclient -L localhost -N {ConfigManager.ClientMinProtocolOption()} 2>&1");
         Console.WriteLine(shareCheck.Stdout.Contains("Sharename", StringComparison.OrdinalIgnoreCase)
             ? "\nLocal SMB enumeration: Samba responded with a share list."
             : $"\nLocal SMB enumeration failed: {(shareCheck.Stderr + shareCheck.Stdout).Trim()}");
