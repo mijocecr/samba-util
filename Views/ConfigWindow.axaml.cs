@@ -13,6 +13,7 @@ public partial class ConfigWindow : Window
     private ConfigManager.AppConfig _config;
     private string? _firewallBackend;
     private bool? _initialFirewallState;
+    private bool _initialPrintingState;
 
     public event Func<Task>? ConfigSaved;
 
@@ -25,6 +26,10 @@ public partial class ConfigWindow : Window
 
         // Cargar ruta smb.conf
         TxtSmbConf.Text = _config.SmbConfPath;
+
+        // Estado real de impresión en smb.conf
+        _initialPrintingState = SambaConfigWriter.IsPrintingEnabled(_config.SmbConfPath);
+        PrintingToggle.IsChecked = _initialPrintingState;
 
         // Seleccionar protocolo SMB actual en el ComboBox
         foreach (var entry in ProtocolCombo.Items)
@@ -196,6 +201,31 @@ public partial class ConfigWindow : Window
         {
             _config.DefaultPermissions = "755";
         }
+
+        // Activar o desactivar la impresión en smb.conf.
+        var desiredPrinting = PrintingToggle.IsChecked == true;
+        if (desiredPrinting != _initialPrintingState)
+        {
+            TxtPrintingStatus.Text = desiredPrinting
+                ? "Enabling Samba printing..."
+                : "Disabling Samba printing...";
+            try
+            {
+                await Task.Run(() => SambaConfigWriter.SetPrintingEnabled(desiredPrinting));
+                _initialPrintingState = SambaConfigWriter.IsPrintingEnabled(_config.SmbConfPath);
+                PrintingToggle.IsChecked = _initialPrintingState;
+                TxtPrintingStatus.Text = _initialPrintingState == desiredPrinting
+                    ? $"Samba printing {(desiredPrinting ? "enabled" : "disabled")}."
+                    : "Samba printing is still controlled by configuration outside the blocks managed by SAMBA-Util; review smb.conf.";
+            }
+            catch (Exception ex)
+            {
+                TxtPrintingStatus.Text = $"Could not change Samba printing: {ex.Message}";
+                PrintingToggle.IsChecked = _initialPrintingState;
+                return;
+            }
+        }
+        _config.PrintingEnabled = _initialPrintingState;
 
         ConfigManager.Save(_config);
 

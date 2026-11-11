@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="SAMBA_Util.Views.ConfigWindow"
-        Width="450" Height="510"
+        Width="450" Height="650"
         Title="Samba-util Configuration"
         CanResize="False"
         Background="{StaticResource BackgroundBrush}"
@@ -83,6 +83,19 @@
                         <ComboBoxItem Content="770 – Owner rwx, Group rwx, Others ---" Tag="770"/>
                         <ComboBoxItem Content="777 – Owner rwx, Group rwx, Others rwx" Tag="777"/>
                     </ComboBox>
+                </StackPanel>
+
+                <!-- Samba printing -->
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Samba printing (CUPS):"
+                               Foreground="{StaticResource ForegroundBrush}"/>
+                    <ToggleSwitch x:Name="PrintingToggle"
+                                  OnContent="Enabled"
+                                  OffContent="Disabled"/>
+                    <TextBlock x:Name="TxtPrintingStatus"
+                               Text="When enabled, adds CUPS settings and the [printers] and [print$] sections if they are missing."
+                               TextWrapping="Wrap"
+                               Foreground="{StaticResource ForegroundBrush}"/>
                 </StackPanel>
 
                 <StackPanel Spacing="6">

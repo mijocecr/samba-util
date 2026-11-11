@@ -49,7 +49,7 @@ public class CliApp
             Console.WriteLine("2) Users        - list, add, edit, and delete Samba/system users");
             Console.WriteLine("3) Network      - discover devices, list/open remote shares, identify OS");
             Console.WriteLine("4) Status       - services, config, ports, firewall, shares, users, IPs");
-            Console.WriteLine("5) Configuration- smb.conf path, default permissions, firewall toggle");
+            Console.WriteLine("5) Configuration- smb.conf path, permissions, protocol, printing, firewall");
             Console.WriteLine("6) Logs         - view the latest Samba log entries");
             Console.WriteLine("7) Connections  - show active SMB connections (smbstatus)");
             Console.WriteLine("8) Samba version");
@@ -761,11 +761,13 @@ public class CliApp
             Console.WriteLine($"\nCurrent smb.conf: {config.SmbConfPath}");
             Console.WriteLine($"Default filesystem permissions: {config.DefaultPermissions}");
             Console.WriteLine($"Minimum SMB protocol (client and server): {ConfigManager.NormalizeProtocol(config.MinProtocol)}");
+            Console.WriteLine($"Samba printing (CUPS): {(SambaConfigWriter.IsPrintingEnabled(config.SmbConfPath) ? "enabled" : "disabled")}");
             var action = Choose("Configuration", new[]
             {
                 "Change smb.conf path",
                 "Change default permissions used by Fix Share Permissions",
                 "Change minimum SMB protocol (SMB2/SMB3/NT1)",
+                "Enable or disable Samba printing (CUPS)",
                 "Enable or disable UFW/firewalld"
             });
             if (action == 0)
@@ -785,6 +787,9 @@ public class CliApp
                         ChangeMinProtocol(config);
                         break;
                     case 4:
+                        ChangePrinting(config);
+                        break;
+                    case 5:
                         ConfigureFirewall();
                         break;
                 }
@@ -869,6 +874,38 @@ public class CliApp
         catch (Exception ex)
         {
             Console.WriteLine($"The app configuration was saved, but smb.conf could not be updated: {ex.Message}");
+        }
+    }
+
+    private static void ChangePrinting(ConfigManager.AppConfig config)
+    {
+        var current = SambaConfigWriter.IsPrintingEnabled(config.SmbConfPath);
+        var selected = Choose(
+            $"Samba printing is currently {(current ? "enabled" : "disabled")}",
+            new[]
+            {
+                "Enable printing (CUPS, [printers] and [print$])",
+                "Disable printing"
+            });
+        if (selected == 0)
+            return;
+
+        var enable = selected == 1;
+        var changed = SambaConfigWriter.SetPrintingEnabled(enable);
+        var effective = SambaConfigWriter.IsPrintingEnabled(config.SmbConfPath);
+
+        config.PrintingEnabled = effective;
+        ConfigManager.Save(config);
+
+        Console.WriteLine(changed
+            ? "smb.conf updated and Samba restarted."
+            : "smb.conf already matched the requested printing state; nothing was rewritten.");
+        Console.WriteLine($"Samba printing is now {(effective ? "enabled" : "disabled")}.");
+
+        if (enable != effective)
+        {
+            Console.WriteLine(
+                "Printing is still controlled by configuration outside the blocks managed by SAMBA-Util; review smb.conf.");
         }
     }
 
@@ -1155,6 +1192,7 @@ public class CliApp
         Console.WriteLine($"  Minimum SMB protocol (client and server): {ConfigManager.NormalizeProtocol(config.MinProtocol)}");
         var effectiveServerProtocol = SambaConfigWriter.GetEffectiveServerMinProtocol(config.SmbConfPath);
         Console.WriteLine($"  Effective server min protocol in smb.conf: {effectiveServerProtocol ?? "unknown"}");
+        Console.WriteLine($"  Samba printing (CUPS): {(SambaConfigWriter.IsPrintingEnabled(config.SmbConfPath) ? "enabled" : "disabled")}");
         var testparm = ShellHelper.EjecutarComoRoot(
             $"testparm -s {ShellQuote(config.SmbConfPath)}", ShellHelper.LongTimeoutMs);
         var testOutput = testparm.Stdout + testparm.Stderr;

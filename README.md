@@ -36,6 +36,11 @@ SAMBA‑Util presents these capabilities through a modern interface that emphasi
 - Handle passwords securely  
 - Detect invalid or outdated credentials  
 
+### Printing
+- Enable or disable Samba printing backed by CUPS
+- Adds `[printers]` and `[print$]` only when they are missing
+- Marks managed changes so they can be reverted without touching custom sections
+
 ### System Integration
 - Read and write `/etc/samba/smb.conf` in a controlled and safe manner  
 - Perform administrative actions using `sudo`  
@@ -94,7 +99,7 @@ cd samba-util
 dotnet run
 ```
 
-When started from an interactive terminal without a graphical display, SAMBA-Util opens its numbered CLI. The CLI provides the same management areas as the graphical app: shares and filesystem permissions, Samba users, network discovery and remote shares, status and service actions, configuration (smb.conf path, default permissions, minimum SMB protocol for client and server) and UFW/firewalld, logs, active connections, and Samba version. At every selection prompt, choose from the options printed on screen; share and user operations use numbered lists rather than requiring you to remember or retype existing names. Administrative actions require sudo authentication at startup.
+When started from an interactive terminal without a graphical display, SAMBA-Util opens its numbered CLI. The CLI provides the same management areas as the graphical app: shares and filesystem permissions, Samba users, network discovery and remote shares, status and service actions, configuration (smb.conf path, default permissions, minimum SMB protocol for client and server, CUPS printing) and UFW/firewalld, logs, active connections, and Samba version. At every selection prompt, choose from the options printed on screen; share and user operations use numbered lists rather than requiring you to remember or retype existing names. Administrative actions require sudo authentication at startup.
 
 ## Requirements
 

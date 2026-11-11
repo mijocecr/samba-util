@@ -12,6 +12,13 @@ public static class SambaConfigWriter
 {
     private static long _callCountSave = 0;
 
+    // Bloques gestionados por SAMBA-Util para impresión. Los marcadores permiten
+    // activar y desactivar sin tocar directivas o secciones propias del usuario.
+    private const string PrintingBeginMarker = "# BEGIN SAMBA-UTIL PRINTING";
+    private const string PrintingEndMarker = "# END SAMBA-UTIL PRINTING";
+    private const string PrintingGlobalBeginMarker = "# BEGIN SAMBA-UTIL PRINTING GLOBAL";
+    private const string PrintingGlobalEndMarker = "# END SAMBA-UTIL PRINTING GLOBAL";
+
     // Secciones que SAMBA-Util nunca escribe ni elimina: se conservan tal cual
     // estén en smb.conf. [homes] se ignora al leer (no se puede editar desde la UI),
     // así que debe preservarse aquí para no perderla al guardar.
@@ -298,6 +305,283 @@ public static class SambaConfigWriter
 
         return output;
     }
+
+    // Comprueba si Samba ya expone impresoras: sección [printers] imprimible y
+    // "load printers" no desactivado en [global].
+    public static bool IsPrintingEnabled(string? smbConfPath = null)
+    {
+        string path = smbConfPath ?? ConfigManager.Load().SmbConfPath;
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            return false;
+
+        try
+        {
+            var blocks = SplitIntoBlocks(File.ReadAllLines(path).ToList());
+            bool printable = false;
+            bool loadPrintersDisabled = false;
+
+            foreach (var block in blocks)
+            {
+                if (block.Name is null)
+                    continue;
+
+                if (block.Name.Equals("global", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Samba usa la última aparición de cada directiva.
+                    foreach (var line in block.Lines)
+                    {
+                        if (TryGetDirective(line, "load printers", out var value))
+                            loadPrintersDisabled = !IsTrue(value);
+                    }
+                    continue;
+                }
+
+                if (!block.Name.Equals("printers", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                foreach (var line in block.Lines)
+                {
+                    if (TryGetDirective(line, "printable", out var value))
+                        printable = IsTrue(value);
+                }
+            }
+
+            return printable && !loadPrintersDisabled;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[PRINT] No se pudo leer {path}: {ex.Message}");
+            return false;
+        }
+    }
+
+    // Añade o elimina la configuración de impresión gestionada por la app.
+    // Devuelve true si smb.conf cambió; false si ya estaba en el estado pedido.
+    public static bool SetPrintingEnabled(bool enabled)
+    {
+        var callId = ++_callCountSave;
+        var config = ConfigManager.Load();
+        string smbConf = config.SmbConfPath;
+        if (string.IsNullOrWhiteSpace(smbConf))
+            throw new InvalidOperationException("La ruta del archivo smb.conf no está configurada.");
+
+        string smbConfFull = Path.GetFullPath(smbConf);
+        var originalLines = File.Exists(smbConfFull)
+            ? File.ReadAllLines(smbConfFull).ToList()
+            : new List<string>();
+
+        var output = BuildPrintingLines(originalLines, enabled);
+
+        if (originalLines.SequenceEqual(output))
+        {
+            Console.WriteLine(
+                $"[WRITE] #{callId} impresión ya está {(enabled ? "activada" : "desactivada")}; " +
+                "no se reescribe smb.conf.");
+            return false;
+        }
+
+        WriteConfig(output, smbConfFull, callId);
+        Console.WriteLine(
+            $"[WRITE] #{callId} impresión {(enabled ? "activada" : "desactivada")} en smb.conf.");
+        return true;
+    }
+
+    // Transformación pura de smb.conf usada por SetPrintingEnabled y por los tests.
+    internal static List<string> BuildPrintingLines(List<string> originalLines, bool enabled)
+    {
+        ArgumentNullException.ThrowIfNull(originalLines);
+
+        var lines = RemoveManagedPrintingBlocks(originalLines);
+        if (!enabled)
+            return lines;
+
+        var blocks = SplitIntoBlocks(lines);
+        var output = new List<string>();
+        bool globalFound = false;
+        bool printersFound = false;
+        bool printDriversFound = false;
+
+        foreach (var block in blocks)
+        {
+            if (block.Name is null)
+            {
+                output.AddRange(block.Lines);
+                continue;
+            }
+
+            if (block.Name.Equals("global", StringComparison.OrdinalIgnoreCase))
+            {
+                globalFound = true;
+                output.AddRange(block.Lines);
+                output.AddRange(ManagedPrintingGlobalLines());
+                continue;
+            }
+
+            if (block.Name.Equals("printers", StringComparison.OrdinalIgnoreCase))
+            {
+                printersFound = true;
+                bool printable = false;
+                bool hasPath = false;
+                foreach (var line in block.Lines)
+                {
+                    if (TryGetDirective(line, "printable", out var printableValue))
+                        printable = IsTrue(printableValue);
+                    if (TryGetDirective(line, "path", out _))
+                        hasPath = true;
+                }
+
+                output.AddRange(block.Lines);
+
+                // Completa una sección propia del usuario sin sobrescribirla.
+                if (!printable || !hasPath)
+                    output.AddRange(ManagedPrintersOverrideLines(!printable, !hasPath));
+
+                continue;
+            }
+
+            if (block.Name.Equals("print$", StringComparison.OrdinalIgnoreCase))
+                printDriversFound = true;
+
+            output.AddRange(block.Lines);
+        }
+
+        if (!globalFound)
+        {
+            var globalBlock = new List<string> { "[global]" };
+            globalBlock.AddRange(ManagedPrintingGlobalLines());
+            globalBlock.Add("");
+            output.InsertRange(0, globalBlock);
+        }
+
+        if (!printersFound)
+        {
+            EnsureBlankLine(output);
+            output.AddRange(ManagedPrintersLines());
+        }
+
+        if (!printDriversFound)
+        {
+            EnsureBlankLine(output);
+            output.AddRange(ManagedPrintDriversLines());
+        }
+
+        return output;
+    }
+
+    private static IEnumerable<string> ManagedPrintingGlobalLines()
+    {
+        yield return $"    {PrintingGlobalBeginMarker}";
+        yield return "    printing = cups";
+        yield return "    printcap name = cups";
+        yield return "    load printers = yes";
+        yield return $"    {PrintingGlobalEndMarker}";
+    }
+
+    private static IEnumerable<string> ManagedPrintersLines()
+    {
+        yield return PrintingBeginMarker;
+        yield return "[printers]";
+        yield return "    comment = All Printers";
+        yield return "    path = /var/spool/samba";
+        yield return "    browseable = no";
+        yield return "    guest ok = no";
+        yield return "    writable = no";
+        yield return "    printable = yes";
+        yield return "    create mask = 0700";
+        yield return PrintingEndMarker;
+    }
+
+    private static IEnumerable<string> ManagedPrintersOverrideLines(bool addPrintable, bool addPath)
+    {
+        yield return $"    {PrintingBeginMarker}";
+        if (addPrintable)
+            yield return "    printable = yes";
+        if (addPath)
+            yield return "    path = /var/spool/samba";
+        yield return $"    {PrintingEndMarker}";
+    }
+
+    private static IEnumerable<string> ManagedPrintDriversLines()
+    {
+        yield return PrintingBeginMarker;
+        yield return "[print$]";
+        yield return "    comment = Printer Drivers";
+        yield return "    path = /var/lib/samba/printers";
+        yield return "    browseable = yes";
+        yield return "    read only = yes";
+        yield return "    guest ok = no";
+        yield return "    write list = root";
+        yield return PrintingEndMarker;
+    }
+
+    private static List<string> RemoveManagedPrintingBlocks(List<string> lines)
+    {
+        var result = new List<string>();
+        bool skipping = false;
+
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+
+            var isSectionBegin = trimmed.Equals(PrintingBeginMarker, StringComparison.OrdinalIgnoreCase);
+            var isGlobalBegin = trimmed.Equals(PrintingGlobalBeginMarker, StringComparison.OrdinalIgnoreCase);
+
+            if (isSectionBegin || isGlobalBegin)
+            {
+                // Las secciones se añadieron con una línea en blanco delante; se
+                // elimina también para que activar y desactivar sea idempotente.
+                if (isSectionBegin && result.Count > 0 && string.IsNullOrWhiteSpace(result[^1]))
+                    result.RemoveAt(result.Count - 1);
+
+                skipping = true;
+                continue;
+            }
+
+            if (skipping)
+            {
+                if (trimmed.Equals(PrintingEndMarker, StringComparison.OrdinalIgnoreCase) ||
+                    trimmed.Equals(PrintingGlobalEndMarker, StringComparison.OrdinalIgnoreCase))
+                    skipping = false;
+                continue;
+            }
+
+            result.Add(line);
+        }
+
+        return result;
+    }
+
+    private static void EnsureBlankLine(List<string> lines)
+    {
+        if (lines.Count > 0 && !string.IsNullOrWhiteSpace(lines[^1]))
+            lines.Add("");
+    }
+
+    private static bool TryGetDirective(string line, string name, out string value)
+    {
+        var trimmed = line.Trim();
+        if (trimmed.StartsWith('#') || trimmed.StartsWith(';'))
+        {
+            value = string.Empty;
+            return false;
+        }
+
+        var parts = trimmed.Split('=', 2, StringSplitOptions.TrimEntries);
+        if (parts.Length != 2 || !parts[0].Equals(name, StringComparison.OrdinalIgnoreCase))
+        {
+            value = string.Empty;
+            return false;
+        }
+
+        value = parts[1];
+        return true;
+    }
+
+    private static bool IsTrue(string value) =>
+        value.Trim().Equals("yes", StringComparison.OrdinalIgnoreCase) ||
+        value.Trim().Equals("true", StringComparison.OrdinalIgnoreCase) ||
+        value.Trim().Equals("1", StringComparison.Ordinal) ||
+        value.Trim().Equals("y", StringComparison.OrdinalIgnoreCase);
 
     public static void AddShare(Share newShare)
     {

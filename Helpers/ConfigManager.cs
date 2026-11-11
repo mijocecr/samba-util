@@ -17,6 +17,9 @@ public static class ConfigManager
         
         // Propiedad añadida para el protocolo mínimo de Samba
         public string MinProtocol { get; set; } = "SMB2";
+
+        // Indica si SAMBA-Util gestiona la impresión (CUPS + [printers] + [print$]).
+        public bool PrintingEnabled { get; set; }
     }
 
     public static AppConfig Load()
