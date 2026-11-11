@@ -27,9 +27,9 @@ public partial class ConfigWindow : Window
         TxtSmbConf.Text = _config.SmbConfPath;
 
         // Seleccionar protocolo SMB actual en el ComboBox
-        foreach (ComboBoxItem item in ProtocolCombo.Items)
+        foreach (var entry in ProtocolCombo.Items)
         {
-            if (item.Tag?.ToString() == _config.MinProtocol)
+            if (entry is ComboBoxItem item && item.Tag?.ToString() == _config.MinProtocol)
             {
                 ProtocolCombo.SelectedItem = item;
                 break;
@@ -39,9 +39,9 @@ public partial class ConfigWindow : Window
             ProtocolCombo.SelectedIndex = 0; // Fallback a SMB2
 
         // Seleccionar permiso actual en el ComboBox
-        foreach (ComboBoxItem item in PermCombo.Items)
+        foreach (var entry in PermCombo.Items)
         {
-            if (item.Tag?.ToString() == _config.DefaultPermissions)
+            if (entry is ComboBoxItem item && item.Tag?.ToString() == _config.DefaultPermissions)
             {
                 PermCombo.SelectedItem = item;
                 break;

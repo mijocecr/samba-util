@@ -13,7 +13,7 @@ namespace SAMBA_Util.Helpers
             // 1) SMB (Windows / macOS / Linux / NAS)
             if (await IsPortOpen(ip, 445))
             {
-                string smb = await DetectFromSmbAsync(ip);
+                string? smb = await DetectFromSmbAsync(ip);
                 if (smb != null)
                     return smb;
             }
@@ -21,13 +21,13 @@ namespace SAMBA_Util.Helpers
             // 2) SSH (Linux / BSD / macOS / Unix)
             if (await IsPortOpen(ip, 22))
             {
-                string ssh = await DetectFromSshAsync(ip);
+                string? ssh = await DetectFromSshAsync(ip);
                 if (ssh != null)
                     return ssh;
             }
 
             // 3) TTL fallback
-            string ttl = await DetectFromTtlAsync(ip);
+            string? ttl = await DetectFromTtlAsync(ip);
             if (ttl != null)
                 return ttl;
 
@@ -118,7 +118,8 @@ namespace SAMBA_Util.Helpers
                 if (reply.Status != IPStatus.Success)
                     return null;
 
-                int ttl = reply.Options.Ttl;
+                // PingReply.Options puede ser null si la respuesta no trae cabecera IP.
+                int ttl = reply.Options?.Ttl ?? 0;
 
                 if (ttl >= 120 && ttl <= 135)
                     return "Windows";

@@ -10,12 +10,14 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <!-- Paquetes principales Avalonia 11 -->
-        <PackageReference Include="Avalonia" Version="11.0.10" />
-        <PackageReference Include="Avalonia.Desktop" Version="11.0.10" />
-        <PackageReference Include="Avalonia.Themes.Fluent" Version="11.0.10" />
-        <PackageReference Include="Avalonia.Fonts.Inter" Version="11.0.10" />
-        <PackageReference Include="Avalonia.Diagnostics" Version="11.0.10" />
+        <!-- Paquetes principales Avalonia 11.
+             11.3.23 arrastra Tmds.DBus.Protocol 0.21.3, que corrige
+             CVE-2026-39959 (antes 0.15.0 con Avalonia 11.0.10). -->
+        <PackageReference Include="Avalonia" Version="11.3.23" />
+        <PackageReference Include="Avalonia.Desktop" Version="11.3.23" />
+        <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.23" />
+        <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.23" />
+        <PackageReference Include="Avalonia.Diagnostics" Version="11.3.23" />
     </ItemGroup>
 
     <!-- Recursos (tus iconos) -->

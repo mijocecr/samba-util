@@ -307,9 +307,10 @@ public partial class NetworkView : UserControl
             var mainWindow = TopLevel.GetTopLevel(this) as MainWindow;
             if (mainWindow == null) return;
 
-            CredStore.User = null;
-            CredStore.Password = null;
-            Console.WriteLine("[DIAGNOSTIC] CredStore cleared (User=null, Password=null).");
+            // Valores por defecto: equivalen a limpiar credenciales (guest / sin contraseña).
+            CredStore.User = "guest";
+            CredStore.Password = "";
+            Console.WriteLine("[DIAGNOSTIC] CredStore reset (User=guest, Password empty).");
 
             SharesPanel.DataContext = null;
             SharesPanel.Children.Clear();
@@ -374,8 +375,14 @@ public partial class NetworkView : UserControl
                     return;
                 }
 
-                CredStore.User = cred.Value.user;
-                CredStore.Password = cred.Value.pass;
+                // isCanceledOrEmpty ya garantiza que hay credenciales, pero el
+                // compilador no deduce el narrowing a través de la variable bool.
+                if (!cred.HasValue)
+                    return;
+
+                var credentials = cred.Value;
+                CredStore.User = credentials.user;
+                CredStore.Password = credentials.pass;
                 Console.WriteLine($"[DIAGNOSTIC] CredStore updated with user: '{CredStore.User}'");
 
                 loading = ShowLoading($"Connecting to {targetName} ({targetIp})...");
@@ -658,8 +665,9 @@ public partial class NetworkView : UserControl
         {
             SetTwoColumnLayout(false);
 
-            CredStore.User = null;
-            CredStore.Password = null;
+            // Valores por defecto: equivalen a limpiar credenciales (guest / sin contraseña).
+            CredStore.User = "guest";
+            CredStore.Password = "";
 
             Log($"Connecting to {ip}...");
             SharesPanel.DataContext = null;
