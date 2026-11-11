@@ -21,6 +21,7 @@ public partial class NetworkView : UserControl
     private bool _isLoadingShares = false;
     private CancellationTokenSource? _currentOperationCts;
     private Guid _activeSessionId = Guid.Empty;
+    private Window? _currentLoadingDialog;
 
     public NetworkView()
     {
@@ -73,17 +74,19 @@ public partial class NetworkView : UserControl
     private async void OnScanClicked(object? sender, RoutedEventArgs e)
     {
         Console.WriteLine("[DIAGNOSTIC] === Scan Network Clicked ===");
-        
-        _activeSessionId = Guid.NewGuid();
-        _currentOperationCts?.Cancel();
-        _currentOperationCts = new CancellationTokenSource();
-        var token = _currentOperationCts.Token;
 
         if (_isLoadingShares)
         {
             Console.WriteLine("[DIAGNOSTIC] Scan blocked: _isLoadingShares is true.");
             return;
         }
+
+        _activeSessionId = Guid.NewGuid();
+        _currentOperationCts?.Cancel();
+        _currentOperationCts = new CancellationTokenSource();
+        var token = _currentOperationCts.Token;
+
+        Window? loading = null;
 
         try
         {
@@ -97,7 +100,7 @@ public partial class NetworkView : UserControl
                 return;
             }
 
-            var loading = main.ShowLoadingDialog("Scanning network...");
+            loading = ShowLoading("Scanning network...");
 
             Log("Starting network scan...");
             DevicesPanel.DataContext = null;
@@ -110,7 +113,6 @@ public partial class NetworkView : UserControl
 
             if (string.IsNullOrWhiteSpace(iface))
             {
-                loading.Close();
                 Log("No interface selected.");
                 Console.WriteLine("[DIAGNOSTIC] Scan aborted: No interface selected.");
                 return;
@@ -123,7 +125,8 @@ public partial class NetworkView : UserControl
                 return;
             }
 
-            loading.Close();
+            CloseLoading(loading);
+            loading = null;
 
             Console.WriteLine($"[DIAGNOSTIC] Scan finished. Devices found: {devices?.Count ?? 0}");
 
@@ -154,15 +157,22 @@ public partial class NetworkView : UserControl
         catch (Exception ex)
         {
             Console.WriteLine($"[DIAGNOSTIC ERROR] OnScanClicked Exception: {ex.Message}\n{ex.StackTrace}");
-            
+
+            CloseLoading(loading);
+            loading = null;
+
             try
             {
                 var main = TopLevel.GetTopLevel(this) as MainWindow;
-                main?.ShowErrorDialog("Scan Error", ex.Message);
+                _ = main?.ShowErrorDialog("Scan Error", ex.Message);
             }
             catch { }
 
             Log("Scan failed with error.");
+        }
+        finally
+        {
+            CloseLoading(loading);
         }
     }
 
@@ -188,15 +198,15 @@ public partial class NetworkView : UserControl
             icon = new Image
             {
                 Source = new Avalonia.Media.Imaging.Bitmap(AssetLoader.Open(uri)),
-                Width = 48,
-                Height = 48,
+                Width = 56,
+                Height = 56,
                 Stretch = Stretch.Uniform,
                 VerticalAlignment = VerticalAlignment.Center
             };
         }
         catch
         {
-            icon = new Image { Width = 48, Height = 48 };
+            icon = new Image { Width = 56, Height = 56 };
         }
 
         var fgBrush = this.FindResource("ForegroundBrush") as IBrush ?? Brushes.White;
@@ -221,14 +231,14 @@ public partial class NetworkView : UserControl
                     Text = cleanName, 
                     Foreground = fgBrush, 
                     FontWeight = FontWeight.Bold, 
-                    FontSize = 14,
+                    FontSize = 13,
                     TextWrapping = TextWrapping.Wrap
                 },
                 new TextBlock 
                 { 
                     Text = $"{dev.IP} • {dev.OS}", 
                     Foreground = new SolidColorBrush(fgColor, 0.7), 
-                    FontSize = 11,
+                    FontSize = 10,
                     TextWrapping = TextWrapping.Wrap
                 }
             }
@@ -236,8 +246,7 @@ public partial class NetworkView : UserControl
 
         var layoutGrid = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("Auto,*"),
-            Margin = new Thickness(2)
+            ColumnDefinitions = new ColumnDefinitions("Auto,*")
         };
 
         layoutGrid.Children.Add(icon);
@@ -245,13 +254,16 @@ public partial class NetworkView : UserControl
 
         layoutGrid.Children.Add(infoPanel);
         Grid.SetColumn(infoPanel, 1);
-        infoPanel.Margin = new Thickness(10, 0, 0, 0);
+        infoPanel.Margin = new Thickness(8, 0, 0, 0);
 
         var border = new Border
         {
             Background = this.FindResource("ControlBackgroundBrush") as IBrush ?? Brushes.Gray,
-            Padding = new Thickness(8),
+            BorderBrush = Brushes.White,
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(2, 6, 6, 6),
             CornerRadius = new CornerRadius(6),
+            Margin = new Thickness(0, 0, 8, 0),
             Cursor = new Avalonia.Input.Cursor(StandardCursorType.Hand),
             Child = layoutGrid
         };
@@ -288,6 +300,7 @@ public partial class NetworkView : UserControl
 
         _isLoadingShares = true;
         DevicesPanel.IsEnabled = false;
+        Window? loading = null;
 
         try
         {
@@ -314,6 +327,8 @@ public partial class NetworkView : UserControl
             };
             SharesPanel.Children.Add(loadingText);
 
+            loading = ShowLoading($"Connecting to {targetName} ({targetIp})...");
+
             List<NetworkShare> shares = new();
             try
             {
@@ -330,7 +345,11 @@ public partial class NetworkView : UserControl
             {
                 SharesPanel.DataContext = null;
                 SharesPanel.Children.Clear();
-                
+
+                // El diálogo de credenciales es modal: cerramos la carga antes de abrirlo.
+                CloseLoading(loading);
+                loading = null;
+
                 var cred = await mainWindow.ShowCredentialsDialog();
                 
                 bool isCanceledOrEmpty = cred == null || 
@@ -358,6 +377,8 @@ public partial class NetworkView : UserControl
                 CredStore.User = cred.Value.user;
                 CredStore.Password = cred.Value.pass;
                 Console.WriteLine($"[DIAGNOSTIC] CredStore updated with user: '{CredStore.User}'");
+
+                loading = ShowLoading($"Connecting to {targetName} ({targetIp})...");
 
                 try
                 {
@@ -401,6 +422,7 @@ public partial class NetworkView : UserControl
         }
         finally
         {
+            CloseLoading(loading);
             DevicesPanel.IsEnabled = true;
 
             if (_activeSessionId == sessionGuid)
@@ -467,8 +489,12 @@ public partial class NetworkView : UserControl
         var openBtn = new Button
         {
             Content = "Open",
-            Width = 85,
-            Height = 30,
+            Width = 64,
+            Height = 22,
+            MinWidth = 0,
+            MinHeight = 0,
+            Padding = new Thickness(8, 0),
+            FontSize = 11,
             HorizontalContentAlignment = HorizontalAlignment.Center,
             VerticalContentAlignment = VerticalAlignment.Center
         };
@@ -476,6 +502,7 @@ public partial class NetworkView : UserControl
         openBtn.Click += async (_, __) =>
         {
             Console.WriteLine($"[DIAGNOSTIC] Share Open Clicked -> Share Name: '{share.Name}', IP: '{share.IP}', Access: '{share.Access}'");
+            Window? loading = null;
             try
             {
                 bool isAnonymous = share.Access?.Equals("Anonymous", StringComparison.OrdinalIgnoreCase) ?? true;
@@ -502,19 +529,28 @@ public partial class NetworkView : UserControl
                     }
                 }
 
-                SmbHelper.OpenShare(
+                loading = ShowLoading($"Opening {share.Name}...");
+
+                // OpenShare puede bloquear varios segundos en Linux; lo ejecutamos fuera del hilo de UI.
+                await Task.Run(() => SmbHelper.OpenShare(
                     share.IP,
                     share.Name,
                     isAnonymous ? null : CredStore.User,
                     isAnonymous ? null : CredStore.Password
-                );
+                ));
 
                 main.ShowToast($"Opening {share.Name}");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[DIAGNOSTIC ERROR] OpenShare Exception: {ex.Message}");
-                main.ShowErrorDialog("Open failed", ex.Message);
+                CloseLoading(loading);
+                loading = null;
+                _ = main.ShowErrorDialog("Open failed", ex.Message);
+            }
+            finally
+            {
+                CloseLoading(loading);
             }
         };
 
@@ -537,17 +573,45 @@ public partial class NetworkView : UserControl
             IsVisible = !string.IsNullOrWhiteSpace(share.Comment)
         };
 
-        var contentStack = new StackPanel
+        var nameText = new TextBlock
         {
-            Spacing = 5,
-            Children =
-            {
-                new TextBlock { Text = share.Name, Foreground = fgBrush, FontSize = 14, FontWeight = FontWeight.Bold, TextWrapping = TextWrapping.Wrap },
-                commentText,
-                accessText,
-                openBtn
-            }
+            Text = share.Name,
+            Foreground = fgBrush,
+            FontSize = 14,
+            FontWeight = FontWeight.Bold,
+            TextWrapping = TextWrapping.Wrap
         };
+
+        commentText.Margin = new Thickness(0, 4, 0, 0);
+        accessText.Margin = new Thickness(0, 4, 0, 0);
+
+        openBtn.HorizontalAlignment = HorizontalAlignment.Right;
+        openBtn.VerticalAlignment = VerticalAlignment.Top;
+        openBtn.Margin = new Thickness(10, 0, 0, 0);
+
+        var cardGrid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+            RowDefinitions = new RowDefinitions("Auto,Auto,Auto")
+        };
+
+        cardGrid.Children.Add(nameText);
+        Grid.SetColumn(nameText, 0);
+        Grid.SetRow(nameText, 0);
+
+        cardGrid.Children.Add(openBtn);
+        Grid.SetColumn(openBtn, 1);
+        Grid.SetRow(openBtn, 0);
+
+        cardGrid.Children.Add(commentText);
+        Grid.SetColumn(commentText, 0);
+        Grid.SetColumnSpan(commentText, 2);
+        Grid.SetRow(commentText, 1);
+
+        cardGrid.Children.Add(accessText);
+        Grid.SetColumn(accessText, 0);
+        Grid.SetColumnSpan(accessText, 2);
+        Grid.SetRow(accessText, 2);
 
         bool isAnonymousShare = share.Access?.Equals("Anonymous", StringComparison.OrdinalIgnoreCase) ?? true;
         var borderBrushColor = isAnonymousShare ? Brushes.LimeGreen : Brushes.DodgerBlue;
@@ -559,7 +623,8 @@ public partial class NetworkView : UserControl
             BorderThickness = new Thickness(1.5),
             Padding = new Thickness(10),
             CornerRadius = new CornerRadius(8),
-            Child = contentStack
+            Margin = new Thickness(0, 0, 8, 0),
+            Child = cardGrid
         };
 
         return border;
@@ -569,6 +634,16 @@ public partial class NetworkView : UserControl
     {
         Console.WriteLine("[DIAGNOSTIC] === Quick Connect Clicked ===");
 
+        if (_isLoadingShares) return;
+
+        string ip = TxtQuickIp.Text?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(ip))
+        {
+            Log("Please enter a valid IP or hostname.");
+            Console.WriteLine("[DIAGNOSTIC] Quick connect aborted: Empty IP/hostname.");
+            return;
+        }
+
         Guid sessionGuid = Guid.NewGuid();
         _activeSessionId = sessionGuid;
 
@@ -576,19 +651,11 @@ public partial class NetworkView : UserControl
         _currentOperationCts = new CancellationTokenSource();
         var token = _currentOperationCts.Token;
 
-        if (_isLoadingShares) return;
         _isLoadingShares = true;
+        Window? loading = null;
 
         try
         {
-            string ip = TxtQuickIp.Text?.Trim() ?? "";
-            if (string.IsNullOrWhiteSpace(ip))
-            {
-                Log("Please enter a valid IP or hostname.");
-                Console.WriteLine("[DIAGNOSTIC] Quick connect aborted: Empty IP/hostname.");
-                return;
-            }
-
             SetTwoColumnLayout(false);
 
             CredStore.User = null;
@@ -597,6 +664,8 @@ public partial class NetworkView : UserControl
             Log($"Connecting to {ip}...");
             SharesPanel.DataContext = null;
             SharesPanel.Children.Clear();
+
+            loading = ShowLoading($"Connecting to {ip}...");
 
             List<NetworkShare> shares = new();
             try
@@ -617,6 +686,10 @@ public partial class NetworkView : UserControl
                 var mainWindow = TopLevel.GetTopLevel(this) as MainWindow;
                 if (mainWindow != null)
                 {
+                    // El diálogo de credenciales es modal: cerramos la carga antes de abrirlo.
+                    CloseLoading(loading);
+                    loading = null;
+
                     Console.WriteLine("[DIAGNOSTIC] QuickConnect showing credentials dialog...");
                     SharesPanel.DataContext = null;
                     SharesPanel.Children.Clear();
@@ -641,6 +714,8 @@ public partial class NetworkView : UserControl
 
                     CredStore.User = cred.Value.user;
                     CredStore.Password = cred.Value.pass;
+
+                    loading = ShowLoading($"Connecting to {ip}...");
 
                     try
                     {
@@ -682,13 +757,61 @@ public partial class NetworkView : UserControl
 
             Log($"Connected to {ip} successfully.");
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[DIAGNOSTIC ERROR] OnQuickConnectClicked Exception: {ex.Message}\n{ex.StackTrace}");
+
+            CloseLoading(loading);
+            loading = null;
+
+            try
+            {
+                var main = TopLevel.GetTopLevel(this) as MainWindow;
+                _ = main?.ShowErrorDialog("Connection Error", ex.Message);
+            }
+            catch { }
+
+            Log("Quick connect failed with error.");
+        }
         finally
         {
+            CloseLoading(loading);
+
             if (_activeSessionId == sessionGuid)
             {
                 _isLoadingShares = false;
             }
         }
+    }
+
+    private Window? ShowLoading(string message)
+    {
+        CloseLoading(_currentLoadingDialog);
+
+        var main = TopLevel.GetTopLevel(this) as MainWindow;
+        if (main == null)
+            return null;
+
+        _currentLoadingDialog = main.ShowLoadingDialog(message);
+        return _currentLoadingDialog;
+    }
+
+    private void CloseLoading(Window? loading)
+    {
+        if (loading == null)
+            return;
+
+        try
+        {
+            loading.Close();
+        }
+        catch
+        {
+            // La ventana pudo haberse cerrado ya.
+        }
+
+        if (ReferenceEquals(_currentLoadingDialog, loading))
+            _currentLoadingDialog = null;
     }
 
     private void Log(string msg)

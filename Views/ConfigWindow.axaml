@@ -1,15 +1,15 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="SAMBA_Util.Views.ConfigWindow"
-        Width="450" Height="500"
+        Width="450" Height="510"
         Title="Samba-util Configuration"
         CanResize="False"
         Background="{StaticResource BackgroundBrush}"
         Foreground="{StaticResource ForegroundBrush}">
 
     <ScrollViewer Background="{StaticResource BackgroundBrush}">
-        <Border Margin="20"
-                Padding="20"
+        <Border Margin="15"
+                Padding="10"
                 Background="{StaticResource ControlBackgroundBrush}"
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"

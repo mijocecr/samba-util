@@ -70,14 +70,18 @@ public static class SmbInitializer
     {
         if (File.Exists("/bin/systemctl") || File.Exists("/usr/bin/systemctl"))
         {
-            var smbd = ShellHelper.EjecutarComoRoot("systemctl enable --now smbd.service");
+            var smbd = ShellHelper.EjecutarComoRoot(
+                "systemctl enable --now smbd.service", ShellHelper.LongTimeoutMs);
             if (smbd.ExitCode != 0)
-                smbd = ShellHelper.EjecutarComoRoot("systemctl enable --now smb.service");
+                smbd = ShellHelper.EjecutarComoRoot(
+                    "systemctl enable --now smb.service", ShellHelper.LongTimeoutMs);
             EnsureSuccess(smbd, "No se pudo habilitar ni iniciar el servicio smbd/smb");
 
-            var nmbd = ShellHelper.EjecutarComoRoot("systemctl enable --now nmbd.service");
+            var nmbd = ShellHelper.EjecutarComoRoot(
+                "systemctl enable --now nmbd.service", ShellHelper.LongTimeoutMs);
             if (nmbd.ExitCode != 0)
-                nmbd = ShellHelper.EjecutarComoRoot("systemctl enable --now nmb.service");
+                nmbd = ShellHelper.EjecutarComoRoot(
+                    "systemctl enable --now nmb.service", ShellHelper.LongTimeoutMs);
             if (nmbd.ExitCode != 0)
                 Console.WriteLine($"[SMB INIT] NetBIOS nmbd no está disponible; SMB por IP sigue dependiendo de smbd. {nmbd.Stderr}");
 
@@ -86,14 +90,18 @@ public static class SmbInitializer
 
         if (File.Exists("/sbin/service") || File.Exists("/usr/sbin/service"))
         {
-            var smbd = ShellHelper.EjecutarComoRoot("service smbd start");
+            var smbd = ShellHelper.EjecutarComoRoot(
+                "service smbd start", ShellHelper.LongTimeoutMs);
             if (smbd.ExitCode != 0)
-                smbd = ShellHelper.EjecutarComoRoot("service smb start");
+                smbd = ShellHelper.EjecutarComoRoot(
+                    "service smb start", ShellHelper.LongTimeoutMs);
             EnsureSuccess(smbd, "No se pudo iniciar el servicio smbd/smb");
 
-            var nmbd = ShellHelper.EjecutarComoRoot("service nmbd start");
+            var nmbd = ShellHelper.EjecutarComoRoot(
+                "service nmbd start", ShellHelper.LongTimeoutMs);
             if (nmbd.ExitCode != 0)
-                nmbd = ShellHelper.EjecutarComoRoot("service nmb start");
+                nmbd = ShellHelper.EjecutarComoRoot(
+                    "service nmb start", ShellHelper.LongTimeoutMs);
             if (nmbd.ExitCode != 0)
                 Console.WriteLine($"[SMB INIT] NetBIOS nmbd no está disponible; SMB por IP sigue dependiendo de smbd. {nmbd.Stderr}");
 
@@ -102,7 +110,8 @@ public static class SmbInitializer
 
         if (File.Exists("/sbin/rc-service"))
         {
-            var samba = ShellHelper.EjecutarComoRoot("rc-update add samba default && rc-service samba start");
+            var samba = ShellHelper.EjecutarComoRoot(
+                "rc-update add samba default && rc-service samba start", ShellHelper.LongTimeoutMs);
             EnsureSuccess(samba, "No se pudo habilitar ni iniciar Samba");
             return;
         }

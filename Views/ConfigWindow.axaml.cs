@@ -56,6 +56,19 @@ public partial class ConfigWindow : Window
     {
         base.OnOpened(e);
 
+        try
+        {
+            await InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[CONFIG ERROR] {ex}");
+            TxtFirewallStatus.Text = $"Could not initialize configuration: {ex.Message}";
+        }
+    }
+
+    private async Task InitializeAsync()
+    {
         if (string.IsNullOrWhiteSpace(Credenciales.AdminPassword))
         {
             TxtFirewallStatus.Text = "Firewall cannot be checked without administrator authentication.";
@@ -81,6 +94,19 @@ public partial class ConfigWindow : Window
     }
 
     private async void OnBrowseSmbConf(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await BrowseSmbConfAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[CONFIG ERROR] {ex}");
+            TxtFirewallStatus.Text = $"Could not select smb.conf: {ex.Message}";
+        }
+    }
+
+    private async Task BrowseSmbConfAsync()
     {
         var topLevel = TopLevel.GetTopLevel(this);
         if (topLevel == null) return;
@@ -109,6 +135,19 @@ public partial class ConfigWindow : Window
     }
 
     private async void OnSave(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await SaveConfigurationAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[CONFIG ERROR] {ex}");
+            TxtFirewallStatus.Text = $"Could not save configuration: {ex.Message}";
+        }
+    }
+
+    private async Task SaveConfigurationAsync()
     {
         var desiredFirewallState = FirewallToggle.IsChecked == true;
         if (_initialFirewallState.HasValue && desiredFirewallState != _initialFirewallState.Value)

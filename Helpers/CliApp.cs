@@ -284,6 +284,32 @@ public class CliApp
         return selected == 0 ? null : shares[selected - 1];
     }
 
+    // Nombres que Samba reserva o que SAMBA-Util conserva y no gestiona.
+    private static bool IsReservedShareName(string name) =>
+        name.Equals("global", StringComparison.OrdinalIgnoreCase) ||
+        SambaSections.IsSpecial(name);
+
+    // Comprueba la ruta antes de hacer al usuario responder el resto de preguntas.
+    private static string? ValidateSharePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return "The share path cannot be empty.";
+
+        if (path.IndexOfAny(new[] { '\r', '\n' }) >= 0)
+            return "The share path cannot contain line breaks.";
+
+        if (!Path.IsPathFullyQualified(path))
+            return "The share path must be absolute (for example /srv/share).";
+
+        if (File.Exists(path))
+            return $"'{path}' is a file, not a directory.";
+
+        if (!Directory.Exists(path))
+            return $"The directory '{path}' does not exist or is not accessible.";
+
+        return null;
+    }
+
     // ---------------------------------------------------------
     //  CREATE SHARE
     // ---------------------------------------------------------
@@ -305,6 +331,22 @@ public class CliApp
             return;
         }
 
+        if (IsReservedShareName(name))
+        {
+            Console.WriteLine($"'{name}' is a reserved share name and cannot be created.");
+            return;
+        }
+
+        var existingShares = LoadSharesOrReport();
+        if (existingShares == null)
+            return;
+
+        if (existingShares.Any(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+        {
+            Console.WriteLine($"A share named '{name}' already exists.");
+            return;
+        }
+
         Console.Write("Path (ENTER to cancel): ");
         var path = Console.ReadLine();
 
@@ -314,10 +356,18 @@ public class CliApp
             return;
         }
 
+        var sharePath = path.Trim().Trim('"');
+        var pathError = ValidateSharePath(sharePath);
+        if (pathError != null)
+        {
+            Console.WriteLine(pathError);
+            return;
+        }
+
         var share = new Share
         {
             Name = name,
-            Path = path.Trim().Trim('"'),
+            Path = sharePath,
             ReadOnly = true,
             AllowGuests = false,
             Browseable = true,
@@ -457,7 +507,8 @@ public class CliApp
         if (AskYesNo("Proceed?", false) != true)
             return;
 
-        var result = ShellHelper.EjecutarComoRoot($"chmod {mode} -- {ShellQuote(share.Path)}");
+        var result = ShellHelper.EjecutarComoRoot(
+            $"chmod -R {mode} -- {ShellQuote(share.Path)}", ShellHelper.LongTimeoutMs);
         if (result.ExitCode != 0)
         {
             Console.WriteLine($"Could not change permissions: {result.Stderr}");
@@ -492,16 +543,11 @@ public class CliApp
 
     private static List<string> LoadUsers()
     {
-        var result = ShellHelper.EjecutarComoRoot("pdbedit -L");
+        var result = ShellHelper.EjecutarComoRoot("pdbedit -L", ShellHelper.LongTimeoutMs);
         if (result.ExitCode != 0)
             throw new InvalidOperationException($"Could not list Samba users: {result.Stderr}");
 
-        return result.Stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries)
-            .Select(line => line.Split(':', 2)[0].Trim())
-            .Where(name => !string.IsNullOrWhiteSpace(name))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        return SambaUsers.ParseList(result.Stdout);
     }
 
     private static string? SelectUser(string prompt)
@@ -582,7 +628,8 @@ public class CliApp
         if (unixAccount.ExitCode != 0)
         {
             var createUnix = ShellHelper.EjecutarComoRoot(
-                $"useradd -M -s \"$(command -v nologin || echo /sbin/nologin)\" -- {ShellQuote(username)}");
+                $"useradd -M -s \"$(command -v nologin || echo /sbin/nologin)\" -- {ShellQuote(username)}",
+                ShellHelper.LongTimeoutMs);
             if (createUnix.ExitCode != 0)
             {
                 Console.WriteLine($"Could not create the local system account: {createUnix.Stderr}");
@@ -623,7 +670,8 @@ public class CliApp
         if (username == null)
             return;
 
-        var info = ShellHelper.EjecutarComoRoot($"pdbedit -L -v {ShellQuote(username)}");
+        var info = ShellHelper.EjecutarComoRoot(
+            $"pdbedit -L -v {ShellQuote(username)}", ShellHelper.LongTimeoutMs);
         var unix = ShellHelper.EjecutarComoRoot($"id -u -- {ShellQuote(username)}");
         Console.WriteLine($"Samba account details for {username}:");
         Console.WriteLine(info.ExitCode == 0 ? info.Stdout : $"Could not load Samba details: {info.Stderr}");
@@ -694,7 +742,8 @@ public class CliApp
 
         if (removeUnix)
         {
-            var unixDelete = ShellHelper.EjecutarComoRoot($"userdel -r -- {ShellQuote(username)}");
+            var unixDelete = ShellHelper.EjecutarComoRoot(
+                $"userdel -r -- {ShellQuote(username)}", ShellHelper.LongTimeoutMs);
             if (unixDelete.ExitCode != 0)
             {
                 Console.WriteLine($"Samba account deleted, but local account deletion failed: {unixDelete.Stderr}");
@@ -1106,7 +1155,8 @@ public class CliApp
         Console.WriteLine($"  Minimum SMB protocol (client and server): {ConfigManager.NormalizeProtocol(config.MinProtocol)}");
         var effectiveServerProtocol = SambaConfigWriter.GetEffectiveServerMinProtocol(config.SmbConfPath);
         Console.WriteLine($"  Effective server min protocol in smb.conf: {effectiveServerProtocol ?? "unknown"}");
-        var testparm = ShellHelper.EjecutarComoRoot($"testparm -s {ShellQuote(config.SmbConfPath)}");
+        var testparm = ShellHelper.EjecutarComoRoot(
+            $"testparm -s {ShellQuote(config.SmbConfPath)}", ShellHelper.LongTimeoutMs);
         var testOutput = testparm.Stdout + testparm.Stderr;
         if (testparm.ExitCode == 0 && testOutput.Contains("Loaded services file OK", StringComparison.OrdinalIgnoreCase))
             Console.WriteLine("  testparm: configuration OK");
@@ -1152,8 +1202,8 @@ public class CliApp
 
     private static void PrintUserConsistency()
     {
-        var sambaResult = ShellHelper.EjecutarComoRoot("pdbedit -L");
-        var unixResult = ShellHelper.EjecutarComoRoot("getent passwd");
+        var sambaResult = ShellHelper.EjecutarComoRoot("pdbedit -L", ShellHelper.LongTimeoutMs);
+        var unixResult = ShellHelper.EjecutarComoRoot("getent passwd", ShellHelper.LongTimeoutMs);
         Console.WriteLine("\nUser consistency:");
         if (sambaResult.ExitCode != 0 || unixResult.ExitCode != 0)
         {
@@ -1209,7 +1259,13 @@ public class CliApp
                 ? "  An active firewalld zone allows Samba or TCP 445. Verify from another computer."
                 : "  No active firewalld zone allows Samba or TCP 445; it may block remote access.");
         }
-        else if (firewall.IsEnabled == false)
+        else if (firewall.Backend is not null)
+        {
+            // Hay un gestor soportado instalado pero inactivo. No inspeccionamos
+            // nftables/iptables para no mezclar reglas de distintos backends.
+            Console.WriteLine($"  {firewall.Backend} is installed but inactive; nftables/iptables rules were not inspected.");
+        }
+        else if (firewall.InspectFallback)
         {
             var nft = ShellHelper.EjecutarComoRoot("nft list ruleset 2>/dev/null");
             if (nft.ExitCode == 0 && !string.IsNullOrWhiteSpace(nft.Stdout))
@@ -1237,43 +1293,43 @@ public class CliApp
         }
     }
 
-    private static (string? Backend, bool? IsEnabled, string Message) DetectFirewall()
+    private static (string? Backend, bool? IsEnabled, bool InspectFallback, string Message) DetectFirewall()
     {
         if (string.IsNullOrWhiteSpace(Credenciales.AdminPassword))
-            return (null, null, "Firewall state could not be checked because administrator authentication is unavailable.");
+            return (null, null, false, "Firewall state could not be checked because administrator authentication is unavailable.");
 
         var ufw = ShellHelper.EjecutarComoRoot(
             "if command -v ufw >/dev/null 2>&1; then ufw status; else echo __UFW_NOT_INSTALLED__; fi");
         if (ufw.ExitCode is 1001 or 1002)
-            return (null, null, "Firewall state could not be checked: sudo authentication failed or is unavailable.");
+            return (null, null, false, "Firewall state could not be checked: sudo authentication failed or is unavailable.");
         var ufwInstalled = !ufw.Stdout.Contains("__UFW_NOT_INSTALLED__", StringComparison.Ordinal);
         if (ufwInstalled && ufw.Stdout.Contains("Status: active", StringComparison.OrdinalIgnoreCase))
-            return ("ufw", true, "UFW is active.");
+            return ("ufw", true, false, "UFW is active.");
 
         var firewalld = ShellHelper.EjecutarComoRoot(
             "if command -v firewall-cmd >/dev/null 2>&1; then firewall-cmd --state 2>&1; else echo __FIREWALLD_NOT_INSTALLED__; fi");
         if (firewalld.ExitCode is 1001 or 1002)
-            return (null, null, "Firewall state could not be checked: sudo authentication failed or is unavailable.");
+            return (null, null, false, "Firewall state could not be checked: sudo authentication failed or is unavailable.");
         var firewalldInstalled = !firewalld.Stdout.Contains("__FIREWALLD_NOT_INSTALLED__", StringComparison.Ordinal);
         if (firewalldInstalled && firewalld.Stdout.Trim().Equals("running", StringComparison.OrdinalIgnoreCase))
-            return ("firewalld", true, "firewalld is active.");
+            return ("firewalld", true, false, "firewalld is active.");
         if (firewalldInstalled)
-            return ("firewalld", false, "firewalld is installed but not running.");
+            return ("firewalld", false, false, "firewalld is installed but not running.");
         if (ufwInstalled)
-            return ("ufw", false, "UFW is installed but inactive.");
+            return ("ufw", false, false, "UFW is installed but inactive.");
 
         var nft = ShellHelper.EjecutarComoRoot("if command -v nft >/dev/null 2>&1; then nft list ruleset; else echo __NFT_NOT_INSTALLED__; fi");
         if (!nft.Stdout.Contains("__NFT_NOT_INSTALLED__", StringComparison.Ordinal) &&
             !string.IsNullOrWhiteSpace(nft.Stdout))
-            return (null, null, "No UFW/firewalld manager found; nftables rules exist and need manual review.");
+            return (null, null, true, "No UFW/firewalld manager found; nftables rules exist and need manual review.");
 
         var iptables = ShellHelper.EjecutarComoRoot("if command -v iptables >/dev/null 2>&1; then iptables -S INPUT; else echo __IPTABLES_NOT_INSTALLED__; fi");
         if (!iptables.Stdout.Contains("__IPTABLES_NOT_INSTALLED__", StringComparison.Ordinal) &&
             (iptables.Stdout.Contains("-P INPUT DROP", StringComparison.OrdinalIgnoreCase) ||
              iptables.Stdout.Contains("-P INPUT REJECT", StringComparison.OrdinalIgnoreCase)))
-            return (null, null, "No UFW/firewalld manager found; iptables has a restrictive INPUT policy that needs review.");
+            return (null, null, true, "No UFW/firewalld manager found; iptables has a restrictive INPUT policy that needs review.");
 
-        return (null, null, "No supported firewall manager (UFW/firewalld) was detected. Other rules and network-level filtering are not controlled here.");
+        return (null, null, true, "No supported firewall manager (UFW/firewalld) was detected. Other rules and network-level filtering are not controlled here.");
     }
 
     static string FormatStatus(string status)
@@ -1295,7 +1351,8 @@ public class CliApp
         try
         {
             var config = ConfigManager.Load();
-            var result = ShellHelper.EjecutarComoRoot($"testparm -s {ShellQuote(config.SmbConfPath)}");
+            var result = ShellHelper.EjecutarComoRoot(
+                $"testparm -s {ShellQuote(config.SmbConfPath)}", ShellHelper.LongTimeoutMs);
 
             string stdout = result.Stdout.Trim();
             string stderr = result.Stderr.Trim();
@@ -1327,37 +1384,53 @@ public class CliApp
         SafeClearScreen();
         Console.WriteLine("=== Reload Samba ===\n");
 
+        var units = GetSambaUnitStates();
+        if (units.Count == 0)
+        {
+            Console.WriteLine("No Samba systemd services were found.");
+            return;
+        }
+
+        var active = units.Where(unit => unit.IsActive).ToList();
+        var skipped = units.Where(unit => !unit.IsActive).ToList();
+
+        if (skipped.Count > 0)
+            Console.WriteLine($"Skipping inactive services: {FormatUnitList(skipped)}.");
+
+        if (active.Count == 0)
+        {
+            Console.WriteLine("No active Samba services found to reload.");
+            return;
+        }
+
         bool reloadedAny = false;
 
-        foreach (var unit in SambaUnits)
+        foreach (var unit in active)
         {
             try
             {
-                var check = ShellHelper.Ejecutar($"systemctl is-active {unit}");
-                if (check.Stdout.Trim() == "unknown" || string.IsNullOrWhiteSpace(check.Stdout))
-                    continue;
-
-                Console.WriteLine($"Reloading {unit}...");
-                var res = ShellHelper.EjecutarComoRoot($"systemctl reload {unit}");
+                Console.WriteLine($"Reloading {unit.DisplayName}...");
+                var res = ShellHelper.EjecutarComoRoot(
+                    $"systemctl reload {unit.Id}", ShellHelper.LongTimeoutMs);
 
                 if (res.ExitCode == 0)
                 {
-                    Console.WriteLine($"{unit} reloaded successfully.");
+                    Console.WriteLine($"{unit.DisplayName} reloaded successfully.");
                     reloadedAny = true;
                 }
                 else
                 {
-                    Console.WriteLine($"{unit} failed to reload.");
+                    Console.WriteLine($"{unit.DisplayName} failed to reload: {FormatCommandError(res)}");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error reloading {unit}: {ex.Message}");
+                Console.WriteLine($"Error reloading {unit.DisplayName}: {ex.Message}");
             }
         }
 
         if (!reloadedAny)
-            Console.WriteLine("No active Samba services found to reload.");
+            Console.WriteLine("No Samba services could be reloaded.");
     }
 
     static void RestartSamba()
@@ -1365,37 +1438,186 @@ public class CliApp
         SafeClearScreen();
         Console.WriteLine("=== Restart Samba ===\n");
 
-        bool restartedAny = false;
+        var units = GetSambaUnitStates();
+        if (units.Count == 0)
+        {
+            Console.WriteLine("No Samba systemd services were found.");
+            return;
+        }
 
-        foreach (var unit in SambaUnits)
+        var active = units.Where(unit => unit.IsActive).ToList();
+        var stopped = units.Where(unit => !unit.IsActive).ToList();
+
+        Console.WriteLine($"Active: {FormatUnitList(active)}");
+        if (stopped.Count > 0)
+            Console.WriteLine($"Stopped or failed: {FormatUnitList(stopped)}");
+
+        List<SambaUnitState> toRestart;
+
+        if (stopped.Count == 0)
+        {
+            //  está activo: reiniciar no puede arrancar nada que estuviera parado.
+            toRestart = active;
+        }
+        else
+        {
+            var options = new List<string>();
+            if (active.Count > 0)
+                options.Add($"Restart only active services ({FormatUnitNames(active)})");
+
+            options.Add(active.Count > 0
+                ? $"Restart active services and start stopped ones ({FormatUnitNames(stopped)})"
+                : $"Start stopped services ({FormatUnitNames(stopped)})");
+
+            var selected = Choose("Choose how to restart Samba", options);
+            if (selected == 0)
+            {
+                Console.WriteLine("Restart canceled.");
+                return;
+            }
+
+            // Si no hay activos, la única opción mostrada es arrancar los parados.
+            toRestart = active.Count > 0 && selected == 1 ? active : units;
+        }
+
+        if (toRestart.Count == 0)
+        {
+            Console.WriteLine("There are no Samba services to restart.");
+            return;
+        }
+
+        bool restartedAny = false;
+        bool restartFailed = false;
+        var changedUnits = new List<SambaUnitState>();
+
+        foreach (var unit in toRestart)
         {
             try
             {
-                var check = ShellHelper.Ejecutar($"systemctl is-active {unit}");
-                if (check.Stdout.Trim() == "unknown" || string.IsNullOrWhiteSpace(check.Stdout))
-                    continue;
-
-                Console.WriteLine($"Restarting {unit}...");
-                var res = ShellHelper.EjecutarComoRoot($"systemctl restart {unit}");
+                var action = unit.IsActive ? "Restarting" : "Starting";
+                Console.WriteLine($"{action} {unit.DisplayName}...");
+                var res = ShellHelper.EjecutarComoRoot(
+                    $"systemctl restart {unit.Id}", ShellHelper.LongTimeoutMs);
 
                 if (res.ExitCode == 0)
                 {
-                    Console.WriteLine($"{unit} restarted successfully.");
+                    var pastTense = unit.IsActive ? "restarted" : "started";
+                    Console.WriteLine($"{unit.DisplayName} {pastTense} successfully.");
                     restartedAny = true;
+                    changedUnits.Add(unit);
                 }
                 else
                 {
-                    Console.WriteLine($"{unit} failed to restart.");
+                    Console.WriteLine($"{unit.DisplayName} failed to restart: {FormatCommandError(res)}");
+                    changedUnits.Add(unit);
+                    restartFailed = true;
+                    break;
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error restarting {unit}: {ex.Message}");
+                Console.WriteLine($"Error restarting {unit.DisplayName}: {ex.Message}");
+                changedUnits.Add(unit);
+                restartFailed = true;
+                break;
+            }
+        }
+
+        if (restartFailed)
+        {
+            Console.WriteLine("\nRestart failed. Rolling back the services that were already changed...");
+
+            // Restauramos en orden inverso: los activos vuelven a arrancarse y
+            // los que estaban parados vuelven a detenerse.
+            foreach (var unit in changedUnits.AsEnumerable().Reverse())
+            {
+                var rollbackCommand = unit.IsActive
+                    ? $"systemctl start {unit.Id}"
+                    : $"systemctl stop {unit.Id}";
+
+                var rollback = ShellHelper.EjecutarComoRoot(rollbackCommand, ShellHelper.LongTimeoutMs);
+                Console.WriteLine(rollback.ExitCode == 0
+                    ? $"{unit.DisplayName} restored to {(unit.IsActive ? "active" : "inactive")}."
+                    : $"Could not restore {unit.DisplayName}: {FormatCommandError(rollback)}");
             }
         }
 
         if (!restartedAny)
-            Console.WriteLine("No active Samba services found to restart.");
+            Console.WriteLine("No Samba services could be restarted.");
+        else if (restartFailed)
+            Console.WriteLine("Restart did not complete; completed services were rolled back.");
+    }
+
+    private sealed class SambaUnitState
+    {
+        public string Id { get; init; } = "";
+        public string ActiveState { get; init; } = "";
+
+        public bool IsActive => ActiveState.Equals("active", StringComparison.OrdinalIgnoreCase);
+
+        // "smb.service" → "smb"
+        public string DisplayName =>
+            Id.EndsWith(".service", StringComparison.OrdinalIgnoreCase) ? Id[..^8] : Id;
+    }
+
+    // Consulta el estado real de cada unidad y descarta las que no están instaladas
+    // (LoadState=not-found) y los alias que apuntan a la misma unidad.
+    private static List<SambaUnitState> GetSambaUnitStates()
+    {
+        var states = new List<SambaUnitState>();
+        var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var unit in SambaUnits)
+        {
+            var result = ShellHelper.Ejecutar(
+                $"systemctl show {unit} --property=Id --property=LoadState --property=ActiveState 2>/dev/null");
+
+            var properties = result.Stdout
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => line.Split('=', 2))
+                .Where(parts => parts.Length == 2)
+                .ToDictionary(
+                    parts => parts[0].Trim(),
+                    parts => parts[1].Trim(),
+                    StringComparer.OrdinalIgnoreCase);
+
+            if (!properties.TryGetValue("Id", out var id) ||
+                !properties.TryGetValue("LoadState", out var loadState) ||
+                !properties.TryGetValue("ActiveState", out var activeState))
+            {
+                continue;
+            }
+
+            if (!loadState.Equals("loaded", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (!seenIds.Add(id))
+                continue;
+
+            states.Add(new SambaUnitState
+            {
+                Id = id,
+                ActiveState = activeState
+            });
+        }
+
+        return states;
+    }
+
+    private static string FormatUnitList(List<SambaUnitState> units) =>
+        units.Count == 0
+            ? "none"
+            : string.Join(", ", units.Select(unit => $"{unit.DisplayName} ({unit.ActiveState})"));
+
+    private static string FormatUnitNames(List<SambaUnitState> units) =>
+        units.Count == 0
+            ? "none"
+            : string.Join(", ", units.Select(unit => unit.DisplayName));
+
+    private static string FormatCommandError((int ExitCode, string Stdout, string Stderr) result)
+    {
+        var message = (result.Stderr + result.Stdout).Trim();
+        return string.IsNullOrWhiteSpace(message) ? $"exit code {result.ExitCode}" : message;
     }
 
     static void ShowSmbStatus()
@@ -1405,9 +1627,15 @@ public class CliApp
 
         try
         {
-            var result = ShellHelper.Ejecutar("smbstatus");
+            // smbstatus necesita root para ver las sesiones de todos los usuarios.
+            var result = ShellHelper.EjecutarComoRoot("smbstatus", ShellHelper.LongTimeoutMs);
 
-            if (string.IsNullOrWhiteSpace(result.Stdout))
+            if (result.ExitCode != 0)
+            {
+                var error = (result.Stderr + result.Stdout).Trim();
+                Console.WriteLine($"Could not run smbstatus: {(string.IsNullOrWhiteSpace(error) ? "unknown error" : error)}");
+            }
+            else if (string.IsNullOrWhiteSpace(result.Stdout))
             {
                 Console.WriteLine("No active connections or smbstatus unavailable.");
             }

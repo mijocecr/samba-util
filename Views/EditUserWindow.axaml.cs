@@ -23,7 +23,7 @@ public partial class EditUserWindow : Window
     {
         // Obtener info Samba
         var (_, sambaInfo, _) = ShellHelper.EjecutarComoRoot(
-            $"bash -c \"pdbedit -L -v {username}\""
+            $"bash -c \"pdbedit -L -v {username}\"", ShellHelper.LongTimeoutMs
         );
 
         SambaUidText.Text = ExtraerUidSamba(sambaInfo);

@@ -49,6 +49,9 @@
       </AvaloniaResource>
     </ItemGroup>
     <ItemGroup>
+      <Compile Remove="tests/**/*.cs" />
+    </ItemGroup>
+    <ItemGroup>
       <None Remove="LICENSE.txt" />
       <Resource Include="LICENSE.txt">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>

@@ -183,7 +183,8 @@ public partial class SharesView : UserControl
             try
             {
                 // Ejecutar chmod recursivo (-R) como root para corregir el subárbol
-                var result = ShellHelper.EjecutarComoRoot($"chmod -R {perms} \"{share.Path}\"");
+                var result = ShellHelper.EjecutarComoRoot(
+                    $"chmod -R {perms} \"{share.Path}\"", ShellHelper.LongTimeoutMs);
 
                 if (result.ExitCode != 0)
                 {

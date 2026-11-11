@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Net.NetworkInformation;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Controls.Shapes;
+using Avalonia.Threading;
 using SAMBA_Util;
 using SAMBA_Util.Helpers;
 using System.Linq;
@@ -18,6 +20,9 @@ public partial class StatusView : UserControl
     private readonly List<string> NmbServices = new() { "nmbd", "nmb" };
     private readonly List<string> WinbindServices = new() { "winbind" };
 
+    private bool _isRefreshing;
+    private bool _isBusy;
+
     public StatusView()
     {
         InitializeComponent();
@@ -26,62 +31,150 @@ public partial class StatusView : UserControl
     // ---------------------------------------------------------
     // REFRESH STATUS
     // ---------------------------------------------------------
-    public void RefreshStatus()
+    public async Task RefreshStatusAsync()
     {
         if (string.IsNullOrWhiteSpace(Credenciales.AdminPassword))
             return;
 
+        if (_isRefreshing)
+            return;
+
+        _isRefreshing = true;
+        try
+        {
+            //  El trabajo con sudo se hace fuera del hilo de UI.
+            var snapshot = await Task.Run(CollectStatus);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                ApplySnapshot(snapshot);
+
+                if (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop &&
+                    desktop.MainWindow is MainWindow mw)
+                {
+                    mw.UpdateStatus("Status refreshed successfully");
+                }
+            });
+        }
+        finally
+        {
+            _isRefreshing = false;
+        }
+    }
+
+    // Recoge el estado sin tocar controles: se ejecuta en segundo plano.
+    private StatusSnapshot CollectStatus()
+    {
         // Validar si el stack está instalado globalmente en el host
         var checkSmbdBinary = ShellHelper.EjecutarComoRoot("which smbd");
         bool isStackInstalled = checkSmbdBinary.ExitCode == 0 && !string.IsNullOrWhiteSpace(checkSmbdBinary.Stdout);
 
         if (!isStackInstalled)
         {
-            TxtSmbd.Text = "Not installed (Host missing samba package)";
-            SetIcon(IconSmbd, "Inactive");
-            TxtFirewall.Text = "Not checked (Samba is not installed)";
-            IconFirewall.Fill = Brushes.Gray;
-            TxtTestparm.Text = "❌ Stack de Samba no encontrado en el sistema operativo.";
-            UpdateTestparmStyle("❌");
-            return;
+            return new StatusSnapshot(
+                IsStackInstalled: false,
+                SmbdText: "Not installed (Host missing samba package)",
+                NmbdText: "",
+                WinbindText: "",
+                TestparmText: "❌ Stack de Samba no encontrado en el sistema operativo.",
+                Port445Text: "",
+                Port139Text: "",
+                FirewallText: "Not checked (Samba is not installed)",
+                FirewallColor: Brushes.Gray,
+                SharesText: "",
+                UserCheckText: "",
+                Ips: new List<(string iface, string ip)>());
         }
 
         // Servicios
-        TxtSmbd.Text = DetectAndCheckService(SmbServices);
-        TxtNmbd.Text = DetectAndCheckService(NmbServices);
-        TxtWinbind.Text = DetectAndCheckService(WinbindServices);
-
-        SetIcon(IconSmbd, TxtSmbd.Text);
-        SetIcon(IconNmbd, TxtNmbd.Text);
-        SetIcon(IconWinbind, TxtWinbind.Text);
+        var smbd = DetectAndCheckService(SmbServices);
+        var nmbd = DetectAndCheckService(NmbServices);
+        var winbind = DetectAndCheckService(WinbindServices);
 
         // testparm (Validación estricta anti-falsos positivos)
-        TxtTestparm.Text = RunTestparm();
-        UpdateTestparmStyle(TxtTestparm.Text);
+        var testparm = RunTestparm();
 
-        // Puertos
-        CheckPort("445", IconPort445, TxtPort445);
-        CheckPort("139", IconPort139, TxtPort139);
-        CheckFirewall();
+        // Puertos y firewall
+        var port445 = CheckPortText("445");
+        var port139 = CheckPortText("139");
+        var (firewallText, firewallColor) = CheckFirewallStatus(port445);
 
-        // Shares
-        CheckShares();
-
-        // Consistencia de usuarios
-        CheckUserConsistency();
+        // Shares y consistencia de usuarios
+        var shares = CheckSharesText();
+        var userCheck = CheckUserConsistencyText();
 
         // Interfaces
-        UpdateIpList();
+        var ips = GetActiveIPs();
 
-        // Timestamp
-        TxtLastUpdate.Text = $"Last update: {DateTime.Now:HH:mm:ss}";
-
-        if (App.Current.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop &&
-            desktop.MainWindow is MainWindow mw)
-        {
-            mw.UpdateStatus("Status refreshed successfully");
-        }
+        return new StatusSnapshot(
+            IsStackInstalled: true,
+            SmbdText: smbd,
+            NmbdText: nmbd,
+            WinbindText: winbind,
+            TestparmText: testparm,
+            Port445Text: port445,
+            Port139Text: port139,
+            FirewallText: firewallText,
+            FirewallColor: firewallColor,
+            SharesText: shares,
+            UserCheckText: userCheck,
+            Ips: ips);
     }
+
+    // Aplica el snapshot en el hilo de UI.
+    private void ApplySnapshot(StatusSnapshot snapshot)
+    {
+        if (!snapshot.IsStackInstalled)
+        {
+            TxtSmbd.Text = snapshot.SmbdText;
+            SetIcon(IconSmbd, "Inactive");
+            TxtFirewall.Text = snapshot.FirewallText;
+            IconFirewall.Fill = snapshot.FirewallColor;
+            TxtTestparm.Text = snapshot.TestparmText;
+            UpdateTestparmStyle(snapshot.TestparmText);
+            return;
+        }
+
+        TxtSmbd.Text = snapshot.SmbdText;
+        TxtNmbd.Text = snapshot.NmbdText;
+        TxtWinbind.Text = snapshot.WinbindText;
+
+        SetIcon(IconSmbd, snapshot.SmbdText);
+        SetIcon(IconNmbd, snapshot.NmbdText);
+        SetIcon(IconWinbind, snapshot.WinbindText);
+
+        TxtTestparm.Text = snapshot.TestparmText;
+        UpdateTestparmStyle(snapshot.TestparmText);
+
+        TxtPort445.Text = snapshot.Port445Text;
+        IconPort445.Fill = snapshot.Port445Text == "Open" ? Brushes.LimeGreen : Brushes.Red;
+
+        TxtPort139.Text = snapshot.Port139Text;
+        IconPort139.Fill = snapshot.Port139Text == "Open" ? Brushes.LimeGreen : Brushes.Red;
+
+        TxtFirewall.Text = snapshot.FirewallText;
+        IconFirewall.Fill = snapshot.FirewallColor;
+
+        TxtShares.Text = snapshot.SharesText;
+        TxtUserCheck.Text = snapshot.UserCheckText;
+
+        ApplyIpList(snapshot.Ips);
+        TxtLastUpdate.Text = $"Last update: {DateTime.Now:HH:mm:ss}";
+    }
+
+    private sealed record StatusSnapshot(
+        bool IsStackInstalled,
+        string SmbdText,
+        string NmbdText,
+        string WinbindText,
+        string TestparmText,
+        string Port445Text,
+        string Port139Text,
+        string FirewallText,
+        IBrush FirewallColor,
+        string SharesText,
+        string UserCheckText,
+        List<(string iface, string ip)> Ips);
 
     // ---------------------------------------------------------
     // SET ICON
@@ -126,7 +219,7 @@ public partial class StatusView : UserControl
     // ---------------------------------------------------------
     private string RunTestparm()
     {
-        var result = ShellHelper.EjecutarComoRoot("testparm -s 2>&1");
+        var result = ShellHelper.EjecutarComoRoot("testparm -s 2>&1", ShellHelper.LongTimeoutMs);
         var output = (result.Stdout + result.Stderr).Trim();
 
         // Verificación rigurosa de la salida real de testparm
@@ -159,31 +252,20 @@ public partial class StatusView : UserControl
     // ---------------------------------------------------------
     // PUERTOS
     // ---------------------------------------------------------
-    private void CheckPort(string port, Ellipse icon, TextBlock txt)
+    private string CheckPortText(string port)
     {
-        var (exit, outp, err) = ShellHelper.EjecutarComoRoot(
+        var (_, outp, _) = ShellHelper.EjecutarComoRoot(
             $"bash -c \"ss -tulpn | grep :{port} || true\""
         );
 
-        if (string.IsNullOrWhiteSpace(outp))
-        {
-            txt.Text = "Closed";
-            icon.Fill = Brushes.Red;
-        }
-        else
-        {
-            txt.Text = "Open";
-            icon.Fill = Brushes.LimeGreen;
-        }
+        return string.IsNullOrWhiteSpace(outp) ? "Closed" : "Open";
     }
 
-    private void CheckFirewall()
+    private (string Text, IBrush Color) CheckFirewallStatus(string port445Text)
     {
-        if (TxtPort445.Text != "Open")
+        if (port445Text != "Open")
         {
-            TxtFirewall.Text = "TCP 445 is not listening; remote SMB access will fail regardless of firewall.";
-            IconFirewall.Fill = Brushes.Red;
-            return;
+            return ("TCP 445 is not listening; remote SMB access will fail regardless of firewall.", Brushes.Red);
         }
 
         var ufw = ShellHelper.EjecutarComoRoot(
@@ -196,12 +278,11 @@ public partial class StatusView : UserControl
                     line.Contains("ALLOW IN", StringComparison.OrdinalIgnoreCase) &&
                     (line.Contains("445/tcp", StringComparison.OrdinalIgnoreCase) ||
                      line.Contains("Samba", StringComparison.OrdinalIgnoreCase)));
-                SetFirewallStatus(
+                return (
                     allowsSmb
                         ? "UFW is active; an inbound SMB/TCP 445 allow rule was found. Test from another PC."
                         : "UFW is active; no inbound SMB/TCP 445 allow rule was found. It may block remote access.",
                     allowsSmb ? Brushes.LimeGreen : Brushes.OrangeRed);
-                return;
             }
         }
 
@@ -229,12 +310,11 @@ public partial class StatusView : UserControl
                            .Contains("445/tcp", StringComparer.OrdinalIgnoreCase);
             });
 
-            SetFirewallStatus(
+            return (
                 allowsSmb
                     ? "firewalld is active; an SMB/TCP 445 allow rule was found in an active zone. Test from another PC."
                     : "firewalld is active; no SMB/TCP 445 allow rule was found in active zones. It may block remote access.",
                 allowsSmb ? Brushes.LimeGreen : Brushes.OrangeRed);
-            return;
         }
 
         var nftables = ShellHelper.EjecutarComoRoot(
@@ -242,12 +322,11 @@ public partial class StatusView : UserControl
         if (!nftables.Stdout.Contains("__NOT_INSTALLED__", StringComparison.Ordinal) &&
             !nftables.Stdout.Contains("EMPTY", StringComparison.Ordinal))
         {
-            SetFirewallStatus(
+            return (
                 nftables.Stdout.Contains("INPUT_FILTER", StringComparison.Ordinal)
                     ? "nftables has an input filtering policy; local inspection cannot confirm TCP 445 is allowed. Test from another PC."
                     : "An nftables ruleset exists; remote TCP 445 access cannot be confirmed locally. Test from another PC.",
                 Brushes.Orange);
-            return;
         }
 
         var iptables = ShellHelper.EjecutarComoRoot(
@@ -263,24 +342,17 @@ public partial class StatusView : UserControl
                 line.Contains("-j ACCEPT", StringComparison.OrdinalIgnoreCase));
             if (hasDropPolicy || allowsSmb)
             {
-                SetFirewallStatus(
+                return (
                     allowsSmb
                         ? "iptables has an inbound TCP 445 allow rule. Test from another PC."
                         : "iptables has a DROP/REJECT input policy and no TCP 445 allow rule; it may block remote access.",
                     allowsSmb ? Brushes.LimeGreen : Brushes.OrangeRed);
-                return;
             }
         }
 
-        SetFirewallStatus(
+        return (
             "No active UFW/firewalld filtering or blocking rules were detected. Network-level filtering is not checked.",
             Brushes.LimeGreen);
-    }
-
-    private void SetFirewallStatus(string text, IBrush color)
-    {
-        TxtFirewall.Text = text;
-        IconFirewall.Fill = color;
     }
 
     private static string ShellQuote(string value) =>
@@ -289,29 +361,31 @@ public partial class StatusView : UserControl
     // ---------------------------------------------------------
     // SHARES
     // ---------------------------------------------------------
-    private void CheckShares()
+    private string CheckSharesText()
     {
-        var (exit, outp, err) = ShellHelper.EjecutarComoRoot(
-            $"bash -c \"smbclient -L localhost -N {ConfigManager.ClientMinProtocolOption()} 2>&1 || true\""
+        var (_, outp, _) = ShellHelper.EjecutarComoRoot(
+            $"bash -c \"smbclient -L localhost -N {ConfigManager.ClientMinProtocolOption()} 2>&1 || true\"",
+            ShellHelper.NetworkTimeoutMs
         );
 
-        if (outp.Contains("Sharename", StringComparison.OrdinalIgnoreCase))
-            TxtShares.Text = "✔ Shares detected";
-        else
-            TxtShares.Text = "❌ No shares detected or Samba not responding";
+        return outp.Contains("Sharename", StringComparison.OrdinalIgnoreCase)
+            ? "✔ Shares detected"
+            : "❌ No shares detected or Samba not responding";
     }
 
     // ---------------------------------------------------------
     // CONSISTENCIA DE USUARIOS
     // ---------------------------------------------------------
-    private void CheckUserConsistency()
+    private string CheckUserConsistencyText()
     {
-        var (exit1, smbUsers, _) = ShellHelper.EjecutarComoRoot(
-            "bash -c \"pdbedit -L | cut -d: -f1 || true\""
+        var (_, smbUsers, _) = ShellHelper.EjecutarComoRoot(
+            "bash -c \"pdbedit -L | cut -d: -f1 || true\"",
+            ShellHelper.LongTimeoutMs
         );
 
-        var (exit2, unixUsers, _) = ShellHelper.EjecutarComoRoot(
-            "bash -c \"getent passwd | cut -d: -f1 || true\""
+        var (_, unixUsers, _) = ShellHelper.EjecutarComoRoot(
+            "bash -c \"getent passwd | cut -d: -f1 || true\"",
+            ShellHelper.LongTimeoutMs
         );
 
         var smb = smbUsers.Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -326,7 +400,7 @@ public partial class StatusView : UserControl
             !u.StartsWith("nobody")
         ).ToList();
 
-        TxtUserCheck.Text =
+        return
             $"Samba users without UNIX account: {(missingUnix.Count == 0 ? "None" : string.Join(", ", missingUnix))}\n" +
             $"UNIX users without Samba account: {(missingSmb.Count == 0 ? "None" : string.Join(", ", missingSmb))}";
     }
@@ -334,27 +408,63 @@ public partial class StatusView : UserControl
     // ---------------------------------------------------------
     // BOTONES
     // ---------------------------------------------------------
-    public void OnRefresh(object? sender, RoutedEventArgs e)
+    public async void OnRefresh(object? sender, RoutedEventArgs e)
     {
-        RefreshStatus();
+        try
+        {
+            await RefreshStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[STATUS ERROR] {ex}");
+        }
     }
 
-    private void OnReload(object? sender, RoutedEventArgs e)
+    private async void OnReload(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await RunServiceActionAsync(
+                "systemctl reload smb.service smbd.service nmb.service nmbd.service winbind.service || true");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[STATUS ERROR] {ex}");
+        }
+    }
+
+    private async void OnRestart(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await RunServiceActionAsync(
+                "systemctl restart smb.service smbd.service nmb.service nmbd.service winbind.service || true");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[STATUS ERROR] {ex}");
+        }
+    }
+
+    private async Task RunServiceActionAsync(string command)
     {
         if (string.IsNullOrWhiteSpace(Credenciales.AdminPassword))
             return;
 
-        ShellHelper.EjecutarComoRoot("systemctl reload smb.service smbd.service nmb.service nmbd.service winbind.service || true");
-        RefreshStatus();
-    }
-
-    private void OnRestart(object? sender, RoutedEventArgs e)
-    {
-        if (string.IsNullOrWhiteSpace(Credenciales.AdminPassword))
+        if (_isBusy)
             return;
 
-        ShellHelper.EjecutarComoRoot("systemctl restart smb.service smbd.service nmb.service nmbd.service winbind.service || true");
-        RefreshStatus();
+        _isBusy = true;
+        try
+        {
+            await Task.Run(() => ShellHelper.EjecutarComoRoot(command, ShellHelper.LongTimeoutMs));
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+
+        await RefreshStatusAsync();
     }
 
     // ---------------------------------------------------------
@@ -384,11 +494,9 @@ public partial class StatusView : UserControl
         return list;
     }
 
-    private void UpdateIpList()
+    private void ApplyIpList(List<(string iface, string ip)> ips)
     {
         IpListPanel.Children.Clear();
-
-        var ips = GetActiveIPs();
 
         if (ips.Count == 0)
         {

@@ -107,7 +107,8 @@ public static class SambaConfigWriter
                     writer.WriteLine(line);
             }
 
-            var test = ShellHelper.EjecutarComoRoot($"testparm -s {ShellQuote(temp)}");
+            var test = ShellHelper.EjecutarComoRoot(
+                $"testparm -s {ShellQuote(temp)}", ShellHelper.LongTimeoutMs);
             if (test.ExitCode != 0)
             {
                 Console.WriteLine($"[WRITE] #{callId} ERROR: testparm falló. smb.conf inválido.");
@@ -136,7 +137,31 @@ public static class SambaConfigWriter
                     $"No se pudo escribir el archivo smb.conf: {copyResult.Stderr}");
             }
 
-            RestartSambaService();
+            try
+            {
+                RestartSambaService();
+            }
+            catch
+            {
+                // Si Samba no reinicia, restauramos el smb.conf anterior para no
+                // dejar el servidor con una configuración que no pudo aplicarse.
+                if (File.Exists(backup))
+                {
+                    var restore = ShellHelper.EjecutarComoRoot(
+                        $"cp -p {ShellQuote(backup)} {ShellQuote(smbConfFull)}",
+                        ShellHelper.LongTimeoutMs);
+
+                    Console.WriteLine(restore.ExitCode == 0
+                        ? $"[WRITE] #{callId} Rollback: smb.conf restaurado desde el backup."
+                        : $"[WRITE] #{callId} Rollback falló: {restore.Stderr}{restore.Stdout}");
+                }
+                else
+                {
+                    Console.WriteLine($"[WRITE] #{callId} No hay backup de smb.conf para restaurar.");
+                }
+
+                throw;
+            }
         }
         finally
         {
@@ -519,10 +544,10 @@ public static class SambaConfigWriter
     {
         if (File.Exists("/bin/systemctl") || File.Exists("/usr/bin/systemctl"))
         {
-            var res = ShellHelper.EjecutarComoRoot("systemctl restart smb");
+            var res = ShellHelper.EjecutarComoRoot("systemctl restart smb", ShellHelper.LongTimeoutMs);
             if (res.ExitCode != 0)
             {
-                res = ShellHelper.EjecutarComoRoot("systemctl restart smbd");
+                res = ShellHelper.EjecutarComoRoot("systemctl restart smbd", ShellHelper.LongTimeoutMs);
             }
 
             if (res.ExitCode != 0)
@@ -533,10 +558,10 @@ public static class SambaConfigWriter
 
         if (File.Exists("/sbin/service") || File.Exists("/usr/sbin/service"))
         {
-            var res = ShellHelper.EjecutarComoRoot("service smb restart");
+            var res = ShellHelper.EjecutarComoRoot("service smb restart", ShellHelper.LongTimeoutMs);
             if (res.ExitCode != 0)
             {
-                res = ShellHelper.EjecutarComoRoot("service smbd restart");
+                res = ShellHelper.EjecutarComoRoot("service smbd restart", ShellHelper.LongTimeoutMs);
             }
 
             if (res.ExitCode != 0)
@@ -547,7 +572,7 @@ public static class SambaConfigWriter
 
         if (File.Exists("/sbin/rc-service"))
         {
-            var res = ShellHelper.EjecutarComoRoot("rc-service samba restart");
+            var res = ShellHelper.EjecutarComoRoot("rc-service samba restart", ShellHelper.LongTimeoutMs);
             if (res.ExitCode != 0)
                 throw new InvalidOperationException($"No se pudo reiniciar Samba: {res.Stderr}");
 

@@ -16,7 +16,12 @@ namespace SAMBA_Util;
 
 public partial class MainWindow : Window
 {
+    private const int StatusTabIndex = 0;
+    private const int UsersTabIndex = 2;
+
     private bool _isLoaded = false;
+    private bool _isRefreshingStatus;
+    private bool _isRefreshingUsers;
 
     public MainWindow()
     {
@@ -28,6 +33,20 @@ public partial class MainWindow : Window
     {
         base.OnOpened(e);
 
+        try
+        {
+            await InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[INIT ERROR] {ex}");
+            try { StatusText.Text = "Initialization failed."; } catch { }
+            try { await ShowErrorDialog("Initialization Error", ex.Message); } catch { }
+        }
+    }
+
+    private async Task InitializeAsync()
+    {
         StatusText.Text = "Initializing...";
         await Task.Delay(200);
 
@@ -95,7 +114,7 @@ public partial class MainWindow : Window
         {
             Console.WriteLine($"[INIT ERROR] No se pudo inicializar Samba: {ex}");
             StatusText.Text = "Samba initialization failed.";
-            ShowErrorDialog("Samba initialization failed", ex.Message);
+            await ShowErrorDialog("Samba initialization failed", ex.Message);
             return;
         }
         finally
@@ -122,24 +141,38 @@ public partial class MainWindow : Window
         if (!_isLoaded || StatusViewControl == null)
             return;
 
-        if (MainTabs.SelectedIndex == 0)
+        if (MainTabs.SelectedIndex == StatusTabIndex)
         {
             await RefreshStatusSafelyAsync();
+        }
+        else if (MainTabs.SelectedIndex == UsersTabIndex)
+        {
+            // Cargamos al cambiar de pestaña, no solo al pulsar el texto del
+            // encabezado: así funciona también con teclado o clic en el borde.
+            await RefreshUsersSafelyAsync();
         }
     }
 
     private async void OnOpenConfig(object? sender, RoutedEventArgs e)
     {
-        var win = new ConfigWindow();
-
-        win.ConfigSaved += async () =>
+        try
         {
-            int count = SharesViewControl.LoadShares();
-            await RefreshStatusSafelyAsync();
-            UpdateStatus($"Configuration updated. Reloaded {count} shares.");
-        };
+            var win = new ConfigWindow();
 
-        await win.ShowDialog(this);
+            win.ConfigSaved += async () =>
+            {
+                int count = SharesViewControl.LoadShares();
+                await RefreshStatusSafelyAsync();
+                UpdateStatus($"Configuration updated. Reloaded {count} shares.");
+            };
+
+            await win.ShowDialog(this);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[CONFIG ERROR] {ex}");
+            await ShowErrorDialog("Configuration Error", ex.Message);
+        }
     }
 
     private async void OnStatusRefreshClicked(object? sender, PointerPressedEventArgs e)
@@ -148,10 +181,14 @@ public partial class MainWindow : Window
         UpdateStatus("Status refreshed.");
     }
 
-    private void OnUsersTabClicked(object? sender, PointerPressedEventArgs e)
+    private async void OnUsersTabClicked(object? sender, PointerPressedEventArgs e)
     {
-        int count = UsersViewControl.LoadUsers();
-        UpdateStatus($"Loaded {count} users.");
+        // Si la pestaña aún no está activa, la carga la hará OnTabChanged.
+        // Si ya lo está, el clic actúa como recarga manual.
+        if (MainTabs.SelectedIndex != UsersTabIndex)
+            return;
+
+        await RefreshUsersSafelyAsync();
     }
 
     private void OnSharesTextClicked(object? sender, PointerPressedEventArgs e)
@@ -171,21 +208,76 @@ public partial class MainWindow : Window
 
     private async Task RefreshStatusSafelyAsync()
     {
-        var loadingWindow = ShowLoadingDialog("Refreshing status...");
+        if (_isRefreshingStatus)
+            return;
+
+        _isRefreshingStatus = true;
+        Window? loadingWindow = null;
         try
         {
+            loadingWindow = ShowLoadingDialog("Refreshing status...");
+
             // Breve respiro para asegurar que el diálogo de carga se renderice visualmente
             await Task.Delay(50);
-            
-            // Ejecutar el chequeo de estado
-            StatusViewControl?.RefreshStatus();
+
+            if (StatusViewControl != null)
+                await StatusViewControl.RefreshStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[STATUS ERROR] {ex}");
+            UpdateStatus("Status refresh failed.");
         }
         finally
         {
-            Dispatcher.UIThread.Post(() =>
+            _isRefreshingStatus = false;
+            if (loadingWindow != null)
             {
-                loadingWindow.Close();
-            });
+                Dispatcher.UIThread.Post(() =>
+                {
+                    loadingWindow.Close();
+                });
+            }
+        }
+    }
+
+    private async Task RefreshUsersSafelyAsync()
+    {
+        if (_isRefreshingUsers)
+            return;
+
+        _isRefreshingUsers = true;
+        Window? loadingWindow = null;
+        try
+        {
+            loadingWindow = ShowLoadingDialog("Loading Samba users...");
+
+            // Breve respiro para asegurar que el diálogo de carga se renderice.
+            await Task.Delay(50);
+
+            if (UsersViewControl == null)
+                return;
+
+            var (count, error) = await UsersViewControl.LoadUsersAsync();
+            UpdateStatus(error is null
+                ? $"Loaded {count} users."
+                : $"Could not load users: {error}.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[USERS ERROR] {ex}");
+            UpdateStatus("Could not load users.");
+        }
+        finally
+        {
+            _isRefreshingUsers = false;
+            if (loadingWindow != null)
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    loadingWindow.Close();
+                });
+            }
         }
     }
 
@@ -254,12 +346,12 @@ public partial class MainWindow : Window
                 Accept();
         };
 
-        dialog.ShowDialog(this);
+        _ = dialog.ShowDialog(this);
 
         return await tcs.Task;
     }
 
-    public async void ShowErrorDialog(string title, string message)
+    public async Task ShowErrorDialog(string title, string message)
     {
         var dialog = new Window
         {
@@ -428,6 +520,11 @@ public partial class MainWindow : Window
 
     public Window ShowLoadingDialog(string message)
     {
+        var foreground = Application.Current?.FindResource("ForegroundBrush") as IBrush;
+        var background = Application.Current?.FindResource("BackgroundBrush") as IBrush;
+        var controlBackground = Application.Current?.FindResource("ControlBackgroundBrush") as IBrush;
+        var borderBrush = Application.Current?.FindResource("BorderBrush") as IBrush;
+
         var progress = new ProgressBar
         {
             IsIndeterminate = true,
@@ -440,16 +537,32 @@ public partial class MainWindow : Window
         {
             VerticalAlignment = VerticalAlignment.Center,
             HorizontalAlignment = HorizontalAlignment.Center,
+            Spacing = 4,
             Children =
             {
                 new TextBlock
                 {
                     Text = message,
                     HorizontalAlignment = HorizontalAlignment.Center,
-                    FontSize = 16
+                    FontSize = 16,
+                    Foreground = foreground,
+                    TextWrapping = TextWrapping.Wrap,
+                    TextAlignment = TextAlignment.Center,
+                    MaxWidth = 300
                 },
                 progress
             }
+        };
+
+        var border = new Border
+        {
+            Margin = new Thickness(12),
+            Padding = new Thickness(18),
+            CornerRadius = new CornerRadius(10),
+            Background = controlBackground,
+            BorderBrush = borderBrush,
+            BorderThickness = new Thickness(1),
+            Child = panel
         };
 
         var win = new Window
@@ -459,7 +572,10 @@ public partial class MainWindow : Window
             Title = "Loading",
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = false,
-            Content = panel
+            ShowInTaskbar = false,
+            Background = background,
+            Foreground = foreground,
+            Content = border
         };
 
         win.Show(this);
