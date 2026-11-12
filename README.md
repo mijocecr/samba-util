@@ -110,6 +110,7 @@ When started from an interactive terminal without a graphical display, SAMBA-Uti
 - `gvfs-backends` -> (Debian/Ubuntu) needed to operate the filesystem
 - `gvfs-fuse` -> (Debian/Ubuntu) needed to operate the filesystem
 - `smbclient` -> (Debian/Ubuntu) needed to operate samba 
+- `cups` -> optional, required to share printers through Samba
 - .NET 10.0 runtime (or self‑contained build)  
 - `sudo` privileges for administrative actions  
 - Access to `/etc/samba/smb.conf`

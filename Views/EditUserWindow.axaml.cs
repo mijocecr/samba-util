@@ -10,13 +10,24 @@ public partial class EditUserWindow : Window
 {
     private readonly string _username;
 
-    public EditUserWindow(string username)
+    // Constructor sin parámetros requerido por el cargador de Avalonia/designer.
+    public EditUserWindow() : this(string.Empty, loadUserInfo: false)
+    {
+    }
+
+    public EditUserWindow(string username) : this(username, loadUserInfo: true)
+    {
+    }
+
+    private EditUserWindow(string username, bool loadUserInfo)
     {
         InitializeComponent();
         _username = username;
         base.WindowStartupLocation = WindowStartupLocation.CenterScreen;
         UsernameText.Text = username;
-        LoadUserInfo(username);
+
+        if (loadUserInfo)
+            LoadUserInfo(username);
     }
 
     private void LoadUserInfo(string username)
