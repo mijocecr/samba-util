@@ -39,12 +39,15 @@ namespace SAMBA_Util.Helpers
             string user = CredStore.User ?? "guest";
             string pass = CredStore.Password ?? "";
 
-            var result = ShellHelper.Ejecutar(
+            // RunAsync no bloquea el hilo llamante: si esto se invoca desde el
+            // hilo de UI (conectar a un dispositivo), el diálogo de carga sigue
+            // repintándose mientras smbclient trabaja.
+            string rawOutput = await ShellHelper.RunAsync(
                 $"smbclient -L //{ip} -U {user}%{pass} {ConfigManager.ClientMinProtocolOption()} 2>/dev/null",
                 ShellHelper.NetworkTimeoutMs
-            );
+            ).ConfigureAwait(false);
 
-            string output = (result.Stdout + result.Stderr).ToLowerInvariant();
+            string output = rawOutput.ToLowerInvariant();
 
             if (string.IsNullOrWhiteSpace(output))
                 return null;
