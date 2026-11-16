@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
@@ -39,32 +40,55 @@ namespace SAMBA_Util.Helpers
             string user = CredStore.User ?? "guest";
             string pass = CredStore.Password ?? "";
 
-            // RunAsync no bloquea el hilo llamante: si esto se invoca desde el
-            // hilo de UI (conectar a un dispositivo), el diálogo de carga sigue
-            // repintándose mientras smbclient trabaja.
-            string rawOutput = await ShellHelper.RunAsync(
-                $"smbclient -L //{ip} -U {user}%{pass} {ConfigManager.ClientMinProtocolOption()} 2>/dev/null",
-                ShellHelper.NetworkTimeoutMs
-            ).ConfigureAwait(false);
+            // La contraseña nunca se pasa en la línea de comandos (sería visible
+            // con `ps` y en los logs). Cuando existe, se usa un fichero temporal
+            // de credenciales (-A) que se elimina al terminar.
+            string authArgs;
+            string? authFile = null;
 
-            string output = rawOutput.ToLowerInvariant();
+            if (string.IsNullOrEmpty(pass))
+            {
+                authArgs = $"-U {ShellHelper.Quote(user)}%";
+            }
+            else
+            {
+                authFile = ShellHelper.CreateCredentialFile(user, pass);
+                authArgs = $"-A {ShellHelper.Quote(authFile)}";
+            }
 
-            if (string.IsNullOrWhiteSpace(output))
+            try
+            {
+                // RunAsync no bloquea el hilo llamante: si esto se invoca desde el
+                // hilo de UI (conectar a un dispositivo), el diálogo de carga sigue
+                // repintándose mientras smbclient trabaja.
+                string rawOutput = await ShellHelper.RunAsync(
+                    $"smbclient -L {ShellHelper.Quote("//" + ip)} {authArgs} {ConfigManager.ClientMinProtocolOption()} 2>/dev/null",
+                    ShellHelper.NetworkTimeoutMs
+                ).ConfigureAwait(false);
+
+                string output = rawOutput.ToLowerInvariant();
+
+                if (string.IsNullOrWhiteSpace(output))
+                    return null;
+
+                if (output.Contains("microsoft") || output.Contains("windows"))
+                    return "Windows";
+
+                if (output.Contains("mac os") || output.Contains("darwin") || output.Contains("smbx") || output.Contains("aapl"))
+                    return "macOS";
+
+                if (output.Contains("synology") || output.Contains("qnap") || output.Contains("freenas") || output.Contains("truenas") || output.Contains("wd"))
+                    return "NAS";
+
+                if (output.Contains("samba") || output.Contains("unix"))
+                    return "Linux";
+
                 return null;
-
-            if (output.Contains("microsoft") || output.Contains("windows"))
-                return "Windows";
-
-            if (output.Contains("mac os") || output.Contains("darwin") || output.Contains("smbx") || output.Contains("aapl"))
-                return "macOS";
-
-            if (output.Contains("synology") || output.Contains("qnap") || output.Contains("freenas") || output.Contains("truenas") || output.Contains("wd"))
-                return "NAS";
-
-            if (output.Contains("samba") || output.Contains("unix"))
-                return "Linux";
-
-            return null;
+            }
+            finally
+            {
+                ShellHelper.DeleteCredentialFile(authFile);
+            }
         }
 
         private static async Task<string?> DetectFromSshAsync(string ip)

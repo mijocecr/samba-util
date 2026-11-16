@@ -57,9 +57,9 @@ SAMBA‑Util presents these capabilities through a modern interface that emphasi
 
 ## Installation
 
-For all Linux distributions there is an AppImage available and
-
-Pre‑built packages on the project’s GitHub page:
+For all Linux distributions there is an AppImage available, as well as a
+self‑contained tarball. Pre‑built packages are published on the project’s
+GitHub page:
 
 **https://github.com/mijocecr/samba-util/releases**
 
@@ -104,18 +104,46 @@ When started from an interactive terminal without a graphical display, SAMBA-Uti
 ## Requirements
 
 - Linux distribution with `systemd`
--  `samba` 
-- `linux-headers` needed for kernel controller 
-- `cifs-utils`    needed to operate the filesystem
-- `gvfs-backends` -> (Debian/Ubuntu) needed to operate the filesystem
-- `gvfs-fuse` -> (Debian/Ubuntu) needed to operate the filesystem
-- `smbclient` -> (Debian/Ubuntu) needed to operate samba 
+- `samba` -> `testparm`, `smbpasswd`, `pdbedit` and the Samba services
+- `smbclient` -> `smbclient` and `rpcclient`, used for network discovery
+- `xdg-utils` -> `xdg-open`, used to open files and remote shares
+- `gvfs-backends` -> (Debian/Ubuntu) needed to open remote shares
+- `gvfs-fuse` -> (Debian/Ubuntu) needed to open remote shares
 - `cups` -> optional, required to share printers through Samba
 - .NET 10.0 runtime (or self‑contained build)  
 - `sudo` privileges for administrative actions  
 - Access to `/etc/samba/smb.conf`
 
-  For all Arch based distros run `sudo pacman -S --needed gvfs gvfs-smb kio-extras samba smbclient cifs-utils xdg-utils` if you have problems with dependencies.
+  For all Arch based distros run `sudo pacman -S --needed gvfs gvfs-smb kio-extras samba smbclient xdg-utils` if you have problems with dependencies.
+
+---
+
+## Building a release
+
+The release artifacts are generated with a single script:
+
+```bash
+scripts/build-release.sh
+```
+
+It writes `dist/<version>/` with the self‑contained single‑file binary, the
+`SAMBA-Util.tar.gz` tarball used by the AUR package, the `SHA256SUMS` file and,
+when `APPIMAGETOOL` is set, the AppImage:
+
+```bash
+APPIMAGETOOL=/path/to/appimagetool-x86_64.AppImage \
+APPIMAGETOOL_FLAGS=--appimage-extract-and-run \
+scripts/build-release.sh
+```
+
+Then create the Git tag `samba-util_v<version>` and upload the files from
+`dist/<version>/` to a GitHub release with the same tag.
+
+---
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for the changes in each release.
 
 ---
 

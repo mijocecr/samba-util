@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -27,6 +28,82 @@ public static class ShellHelper
     public const int ExitStartFailure = 1005;
 
     private static long _callCount;
+
+    // ---------------------------------------------------------
+    // UTILIDADES DE SEGURIDAD
+    // ---------------------------------------------------------
+
+    // Cita un valor para que bash lo trate como un único argumento literal.
+    // Sin esto, un nombre de usuario, una ruta o un recurso compartido con
+    // caracteres como $( ), ` ` o " se ejecutarían como comandos.
+    public static string Quote(string value) =>
+        "'" + value.Replace("'", "'\\''", StringComparison.Ordinal) + "'";
+
+    // Patrones de credenciales que nunca deben aparecer en los logs.
+    private static readonly Regex UserPasswordPattern = new(
+        @"(-U\s+)'?([^\s%']*)'?%'?([^\s']+)'?",
+        RegexOptions.Compiled);
+
+    private static readonly Regex PasswordAssignmentPattern = new(
+        @"(password\s*=\s*)\S+",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private static readonly Regex UrlPasswordPattern = new(
+        @"(://[^/\s:@]+):[^@\s/]+@",
+        RegexOptions.Compiled);
+
+    // Sustituye contraseñas por **** antes de registrar un comando. Es una red
+    // de seguridad: además, los llamadores evitan pasar contraseñas en argv.
+    internal static string RedactSecrets(string command)
+    {
+        if (string.IsNullOrEmpty(command))
+            return command;
+
+        command = UserPasswordPattern.Replace(command, "$1'$2'%****");
+        command = PasswordAssignmentPattern.Replace(command, "$1****");
+        command = UrlPasswordPattern.Replace(command, "$1:****@");
+        return command;
+    }
+
+    // Crea un fichero temporal de credenciales para smbclient/rpcclient (-A)
+    // con permisos 0600. Evita exponer la contraseña en la línea de comandos
+    // (visible con `ps`) y en los logs. El llamador debe borrarlo.
+    public static string CreateCredentialFile(string user, string password)
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"samba-util-auth-{Guid.NewGuid():N}");
+        var content = new StringBuilder();
+        content.Append("username = ").Append(user).Append('\n');
+        content.Append("password = ").Append(password).Append('\n');
+        File.WriteAllText(path, content.ToString());
+
+        try
+        {
+            if (!OperatingSystem.IsWindows())
+                File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+        catch
+        {
+            // En sistemas no Unix SetUnixFileMode no está disponible; el fichero
+            // sigue siendo temporal y se elimina al terminar.
+        }
+
+        return path;
+    }
+
+    public static void DeleteCredentialFile(string? path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return;
+
+        try
+        {
+            File.Delete(path);
+        }
+        catch
+        {
+            // El fichero temporal se elimina en el mejor esfuerzo.
+        }
+    }
 
     // La autenticación sudo es la fase frágil: dos procesos "sudo -S -v"
     // concurrentes pueden competir por el fichero de timestamp y fallar de
@@ -63,7 +140,7 @@ public static class ShellHelper
         }
 
         var effectiveTimeout = timeoutMs <= 0 ? DefaultTimeoutMs : timeoutMs;
-        Console.WriteLine($"[SHELL] #{callId} → EjecutarComoRoot('{command}')");
+        Console.WriteLine($"[SHELL] #{callId} → EjecutarComoRoot('{RedactSecrets(command)}')");
 
         // 1-2) Autenticar/renovar la credencial de sudo de forma serializada.
         //      La contraseña nunca se mezcla con la entrada del comando.
@@ -194,7 +271,7 @@ public static class ShellHelper
     public static (int ExitCode, string Stdout, string Stderr) Ejecutar(string command, int timeoutMs)
     {
         var callId = ++_callCount;
-        Console.WriteLine($"[SHELL] #{callId} → Ejecutar('{command}')");
+        Console.WriteLine($"[SHELL] #{callId} → Ejecutar('{RedactSecrets(command)}')");
         return RunProcess(
             "/bin/bash",
             new[] { "-c", command },
@@ -210,7 +287,7 @@ public static class ShellHelper
     public static async Task<string> RunAsync(string command, int timeoutMs)
     {
         var callId = ++_callCount;
-        Console.WriteLine($"[SHELL] #{callId} → RunAsync('{command}')");
+        Console.WriteLine($"[SHELL] #{callId} → RunAsync('{RedactSecrets(command)}')");
 
         var stdout = new StringBuilder();
         var stderr = new StringBuilder();

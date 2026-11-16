@@ -52,18 +52,24 @@ public partial class ShareEditorWindow : Window
 
     private void SelectComboByTag(ComboBox combo, string? tag)
     {
-        if (tag == null)
+        if (string.IsNullOrWhiteSpace(tag))
             return;
+
+        string normalized = NormalizeMask(tag);
 
         foreach (var item in combo.Items)
         {
-            if (item is ComboBoxItem cbi && cbi.Tag?.ToString() == tag)
+            if (item is ComboBoxItem cbi && NormalizeMask(cbi.Tag?.ToString()) == normalized)
             {
                 combo.SelectedItem = cbi;
                 break;
             }
         }
     }
+
+    // Normaliza una máscara octal para poder comparar 0744 con 744.
+    private static string NormalizeMask(string? mask) =>
+        string.IsNullOrWhiteSpace(mask) ? "" : mask.Trim().TrimStart('0');
 
     private async void OnBrowseFolder(object? sender, RoutedEventArgs e)
     {
@@ -98,8 +104,8 @@ public partial class ShareEditorWindow : Window
         _original.ForceUser = TxtForceUser.Text ?? "";
         _original.ForceGroup = TxtForceGroup.Text ?? "";
 
-        _original.CreateMask = GetSelectedTag(CmbCreateMask, "755");
-        _original.DirectoryMask = GetSelectedTag(CmbDirectoryMask, "755");
+        _original.CreateMask = GetSelectedTag(CmbCreateMask, _original.CreateMask);
+        _original.DirectoryMask = GetSelectedTag(CmbDirectoryMask, _original.DirectoryMask);
 
         Saved = true;
         Close(_original);

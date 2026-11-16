@@ -29,9 +29,11 @@ public static class FileSystemHelper
             // 1. GNU stat (Linux)
             // 2. BSD stat (FreeBSD/macOS)
             // 3. BusyBox stat (Alpine)
+            // La ruta se cita como argumento literal para evitar inyección.
+            string quotedPath = ShellHelper.Quote(path);
             string cmd =
-                $"stat -c \"%U %G %a\" \"{path}\" 2>/dev/null || " +
-                $"stat -f \"%Su %Sg %Op\" \"{path}\" 2>/dev/null";
+                $"stat -c '%U %G %a' {quotedPath} 2>/dev/null || " +
+                $"stat -f '%Su %Sg %Op' {quotedPath} 2>/dev/null";
 
             var result = ShellHelper.Ejecutar(cmd);
             var output = result.Stdout?.Trim() ?? "";

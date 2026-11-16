@@ -7,6 +7,7 @@ using SAMBA_Util.Helpers;
 using SAMBA_Util.Models;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 
 namespace SAMBA_Util.Views;
 
@@ -178,13 +179,19 @@ public partial class SharesView : UserControl
         if (sender is Button btn && btn.DataContext is Share share)
         {
             var config = ConfigManager.Load();
-            string perms = config.DefaultPermissions ?? "755";
+
+            // Validar el modo antes de pasarlo a chmod: si la configuración
+            // contiene algo distinto de 3-4 dígitos octal, usamos 0755.
+            string perms = Regex.IsMatch(config.DefaultPermissions ?? "", @"^[0-7]{3,4}$")
+                ? config.DefaultPermissions!
+                : "0755";
 
             try
             {
-                // Ejecutar chmod recursivo (-R) como root para corregir el subárbol
+                // Ejecutar chmod recursivo (-R) como root para corregir el subárbol.
+                // La ruta va citada y tras `--` para que nunca se interprete como opción.
                 var result = ShellHelper.EjecutarComoRoot(
-                    $"chmod -R {perms} \"{share.Path}\"", ShellHelper.LongTimeoutMs);
+                    $"chmod -R {perms} -- {ShellHelper.Quote(share.Path)}", ShellHelper.LongTimeoutMs);
 
                 if (result.ExitCode != 0)
                 {

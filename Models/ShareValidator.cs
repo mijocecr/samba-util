@@ -37,7 +37,7 @@ public static class ShareValidator
             return "The share has no assigned path.";
 
         if (!Directory.Exists(s.Path))
-            return "The path exists but is not a directory.";
+            return "The share path does not exist or is not a directory.";
 
         // Obtener permisos reales del FS
         var (owner, group, mode) = FileSystemHelper.GetPermissions(s.Path);

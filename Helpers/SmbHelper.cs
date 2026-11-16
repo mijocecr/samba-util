@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -155,7 +156,12 @@ namespace SAMBA_Util.Helpers
                     }
                 }
 
-                process.WaitForExit(4000);
+                if (!process.WaitForExit(4000))
+                {
+                    try { process.Kill(entireProcessTree: true); } catch { }
+                    return false;
+                }
+
                 return process.ExitCode == 0;
             }
             catch
@@ -174,15 +180,24 @@ namespace SAMBA_Util.Helpers
                 if (!Directory.Exists(baseGvfsDir))
                     return null;
 
-                string targetIp = ip.ToLowerInvariant();
-                string targetShare = shareName.ToLowerInvariant();
-
                 foreach (var dir in Directory.GetDirectories(baseGvfsDir))
                 {
-                    string dirName = Path.GetFileName(dir).ToLowerInvariant();
-                    
-                    // Comprobar que pertenece al protocolo smb y coincide la IP y el recurso compartido
-                    if (dirName.StartsWith("smb-share:") && dirName.Contains(targetIp) && dirName.Contains(targetShare))
+                    string dirName = Path.GetFileName(dir);
+
+                    // El directorio tiene el formato
+                    // "smb-share:server=<ip>,share=<recurso>". Comparamos los
+                    // campos exactos: Contains daría falsos positivos
+                    // (10.0.0.1 casaría con 10.0.0.10).
+                    if (!dirName.StartsWith("smb-share:", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    var fields = ParseGvfsFields(dirName);
+                    if (!fields.TryGetValue("server", out var server) ||
+                        !fields.TryGetValue("share", out var share))
+                        continue;
+
+                    if (server.Equals(ip, StringComparison.OrdinalIgnoreCase) &&
+                        share.Equals(shareName, StringComparison.OrdinalIgnoreCase))
                     {
                         return dir;
                     }
@@ -191,6 +206,31 @@ namespace SAMBA_Util.Helpers
             catch { }
 
             return null;
+        }
+
+        // Descompone "smb-share:server=10.0.0.1,share=docs" en pares clave/valor,
+        // decodificando los valores URL-encoded que genera GVfs.
+        private static Dictionary<string, string> ParseGvfsFields(string dirName)
+        {
+            var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            int colon = dirName.IndexOf(':');
+            if (colon < 0)
+                return fields;
+
+            string rest = dirName[(colon + 1)..];
+            foreach (var pair in rest.Split(','))
+            {
+                int eq = pair.IndexOf('=');
+                if (eq <= 0)
+                    continue;
+
+                string key = pair[..eq].Trim();
+                string value = Uri.UnescapeDataString(pair[(eq + 1)..].Trim());
+                fields[key] = value;
+            }
+
+            return fields;
         }
 
         private static int GetCurrentUnixUid()
@@ -250,7 +290,12 @@ namespace SAMBA_Util.Helpers
                 using var process = Process.Start(psi);
                 if (process == null) return false;
 
-                process.WaitForExit(3000);
+                if (!process.WaitForExit(3000))
+                {
+                    try { process.Kill(entireProcessTree: true); } catch { }
+                    return false;
+                }
+
                 return process.ExitCode == 0;
             }
             catch

@@ -1,8 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using SAMBA_Util.Helpers;
-using System;
-using System.Text;
 
 namespace SAMBA_Util.Views;
 
@@ -32,9 +30,11 @@ public partial class EditUserWindow : Window
 
     private void LoadUserInfo(string username)
     {
+        var quotedUser = ShellHelper.Quote(username);
+
         // Obtener info Samba
         var (_, sambaInfo, _) = ShellHelper.EjecutarComoRoot(
-            $"bash -c \"pdbedit -L -v {username}\"", ShellHelper.LongTimeoutMs
+            $"pdbedit -L -v {quotedUser}", ShellHelper.LongTimeoutMs
         );
 
         SambaUidText.Text = ExtraerUidSamba(sambaInfo);
@@ -42,7 +42,7 @@ public partial class EditUserWindow : Window
 
         // Obtener UID UNIX
         var (exitUnix, unixUid, _) = ShellHelper.EjecutarComoRoot(
-            $"bash -c \"id -u {username} 2>/dev/null\""
+            $"id -u -- {quotedUser} 2>/dev/null"
         );
 
         UnixUidText.Text = exitUnix == 0 ? unixUid.Trim() : "No existe";
@@ -60,31 +60,42 @@ public partial class EditUserWindow : Window
     private string ExtraerEstadoSamba(string info)
     {
         foreach (var line in info.Split('\n'))
-            if (line.Contains("Account Flags"))
-                return line.Contains("[D]") ? "Disabled" : "Enabled";
+        {
+            if (!line.Contains("Account Flags"))
+                continue;
+
+            // pdbedit muestra las banderas con relleno, p. ej. "[DU         ]".
+            // Hay que leer el contenido entre corchetes y buscar la 'D'.
+            int open = line.IndexOf('[');
+            int close = line.IndexOf(']');
+            string flags = (open >= 0 && close > open)
+                ? line[(open + 1)..close]
+                : line;
+
+            return flags.Contains('D') ? "Disabled" : "Enabled";
+        }
 
         return "Unknown";
     }
 
     private void OnSave(object? sender, RoutedEventArgs e)
     {
-        // Cambiar contraseña de forma segura usando Base64
+        var quotedUser = ShellHelper.Quote(_username);
+
+        // Cambiar contraseña: smbpasswd -s lee la clave (dos veces) por stdin,
+        // así no aparece en la línea de comandos ni en los logs.
         var newPass = NewPasswordBox.Text;
         if (!string.IsNullOrWhiteSpace(newPass))
         {
-            var passBytes = Encoding.UTF8.GetBytes(newPass.ToCharArray());
-            var passBase64 = Convert.ToBase64String(passBytes);
-
-            // smbpasswd pide la contraseña dos veces (nueva y confirmación)
-            string cmd = $"bash -c \"(echo '{passBase64}' | base64 -d; echo '{passBase64}' | base64 -d) | smbpasswd '{_username}'\"";
-            ShellHelper.EjecutarComoRoot(cmd);
+            ShellHelper.EjecutarComoRootConEntrada(
+                $"smbpasswd -s {quotedUser}", $"{newPass}\n{newPass}\n");
         }
 
         // Cambiar estado (Habilitar / Deshabilitar)
         if (EnableCheck.IsChecked == true)
-            ShellHelper.EjecutarComoRoot($"bash -c \"smbpasswd -e '{_username}'\"");
+            ShellHelper.EjecutarComoRoot($"smbpasswd -e {quotedUser}");
         else
-            ShellHelper.EjecutarComoRoot($"bash -c \"smbpasswd -d '{_username}'\"");
+            ShellHelper.EjecutarComoRoot($"smbpasswd -d {quotedUser}");
 
         Close();
     }

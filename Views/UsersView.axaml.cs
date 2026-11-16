@@ -107,26 +107,24 @@ public partial class UsersView : UserControl
                 return;
 
             // 1) Crear usuario UNIX si no existe
+            var quotedUser = ShellHelper.Quote(username);
             ShellHelper.EjecutarComoRoot(
-                $"bash -c \"id -u '{username}' >/dev/null 2>&1 || useradd -M -s $(which nologin || echo /sbin/nologin) '{username}'\""
+                $"id -u -- {quotedUser} >/dev/null 2>&1 || useradd -M -s \"$(command -v nologin || echo /sbin/nologin)\" -- {quotedUser}"
             );
 
             // 2) Crear o actualizar usuario Samba con contraseña
             if (!string.IsNullOrWhiteSpace(password))
             {
-                // Pasamos la contraseña duplicada con un salto de línea (\n) para cumplir con el prompt dual de smbpasswd (-s)
-                var passBytes = System.Text.Encoding.UTF8.GetBytes($"{password}\n{password}\n");
-                var passBase64 = System.Convert.ToBase64String(passBytes);
-
-                // Usamos printf y base64 para inyectar correctamente ambos saltos de línea al stdin de smbpasswd
-                string cmd = $"bash -c \"printf '%s' '{passBase64}' | base64 -d | smbpasswd -a -s '{username}'\"";
-                ShellHelper.EjecutarComoRoot(cmd);
+                // smbpasswd -s lee la contraseña dos veces (nueva y confirmación)
+                // por stdin: no aparece en la línea de comandos ni en los logs.
+                ShellHelper.EjecutarComoRootConEntrada(
+                    $"smbpasswd -a -s {quotedUser}", $"{password}\n{password}\n");
             }
             else
             {
                 // Usuario Samba sin contraseña (deshabilitado/guest)
                 ShellHelper.EjecutarComoRoot(
-                    $"bash -c \"smbpasswd -a -n '{username}'\""
+                    $"smbpasswd -a -n {quotedUser}"
                 );
             }
 
@@ -156,13 +154,14 @@ public partial class UsersView : UserControl
                     return;
 
                 // 1) Eliminar usuario Samba
+                var quotedUser = ShellHelper.Quote(username);
                 ShellHelper.EjecutarComoRoot(
-                    $"bash -c \"smbpasswd -x '{username}' 2>/dev/null || true\""
+                    $"smbpasswd -x {quotedUser} 2>/dev/null || true"
                 );
 
                 // 2) Comprobar si es usuario UNIX válido
                 var (exitUid, uidOutput, _) = ShellHelper.EjecutarComoRoot(
-                    $"bash -c \"id -u '{username}' 2>/dev/null\""
+                    $"id -u -- {quotedUser} 2>/dev/null"
                 );
 
                 if (exitUid == 0)
@@ -171,7 +170,7 @@ public partial class UsersView : UserControl
                     {
                         // 3) Eliminar usuario UNIX y su home
                         ShellHelper.EjecutarComoRoot(
-                            $"bash -c \"userdel -r '{username}' 2>/dev/null || true\""
+                            $"userdel -r -- {quotedUser} 2>/dev/null || true"
                         );
                     }
                 }

@@ -7,3 +7,4 @@ riderModule.iml
 .vscode/
 *.user
 publish/
+dist/

@@ -1394,6 +1394,8 @@ public class CliApp
 
             string stdout = result.Stdout.Trim();
             string stderr = result.Stderr.Trim();
+            // testparm escribe "Loaded services file OK." en stderr, no en stdout.
+            string combined = $"{stdout}\n{stderr}".Trim();
 
             if (!string.IsNullOrWhiteSpace(stderr))
             {
@@ -1402,13 +1404,13 @@ public class CliApp
                 Console.WriteLine();
             }
 
-            if (result.ExitCode == 0 && stdout.Contains("Loaded services file OK", StringComparison.OrdinalIgnoreCase))
+            if (result.ExitCode == 0 && combined.Contains("Loaded services file OK", StringComparison.OrdinalIgnoreCase))
             {
                 Console.WriteLine("Configuration is valid.");
             }
             else
             {
-                Console.WriteLine($"Configuration validation failed (exit {result.ExitCode}):\n{stdout}");
+                Console.WriteLine($"Configuration validation failed (exit {result.ExitCode}):\n{combined}");
             }
         }
         catch (Exception ex)

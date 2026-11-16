@@ -57,6 +57,11 @@ public static class ConfigManager
     {
         Directory.CreateDirectory(Path.GetDirectoryName(ConfigPath)!);
         string json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
-        File.WriteAllText(ConfigPath, json);
+
+        // Escritura atómica: se escribe a un temporal y se renombra, para no
+        // dejar config.json a medias si el proceso falla a mitad de escritura.
+        string temp = ConfigPath + ".tmp";
+        File.WriteAllText(temp, json);
+        File.Move(temp, ConfigPath, overwrite: true);
     }
 }

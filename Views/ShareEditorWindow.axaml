@@ -66,18 +66,20 @@
 
                         <TextBlock Text="Create Mask" Foreground="{StaticResource ForegroundBrush}"/>
                         <ComboBox x:Name="CmbCreateMask" CornerRadius="6" Background="{StaticResource ControlBackgroundBrush}" BorderBrush="{StaticResource BorderBrush}" Foreground="{StaticResource ForegroundBrush}">
-                            <ComboBoxItem Content="755 – rwx r-x r-x" Tag="755"/>
-                            <ComboBoxItem Content="775 – rwx rwx r-x" Tag="775"/>
-                            <ComboBoxItem Content="770 – rwx rwx ---" Tag="770"/>
-                            <ComboBoxItem Content="777 – rwx rwx rwx" Tag="777"/>
+                            <ComboBoxItem Content="744 – rwx r-- r--" Tag="0744"/>
+                            <ComboBoxItem Content="755 – rwx r-x r-x" Tag="0755"/>
+                            <ComboBoxItem Content="775 – rwx rwx r-x" Tag="0775"/>
+                            <ComboBoxItem Content="770 – rwx rwx ---" Tag="0770"/>
+                            <ComboBoxItem Content="777 – rwx rwx rwx" Tag="0777"/>
                         </ComboBox>
 
                         <TextBlock Text="Directory Mask" Foreground="{StaticResource ForegroundBrush}"/>
                         <ComboBox x:Name="CmbDirectoryMask" CornerRadius="6" Background="{StaticResource ControlBackgroundBrush}" BorderBrush="{StaticResource BorderBrush}" Foreground="{StaticResource ForegroundBrush}">
-                            <ComboBoxItem Content="755 – rwx r-x r-x" Tag="755"/>
-                            <ComboBoxItem Content="775 – rwx rwx r-x" Tag="775"/>
-                            <ComboBoxItem Content="770 – rwx rwx ---" Tag="770"/>
-                            <ComboBoxItem Content="777 – rwx rwx rwx" Tag="777"/>
+                            <ComboBoxItem Content="744 – rwx r-- r--" Tag="0744"/>
+                            <ComboBoxItem Content="755 – rwx r-x r-x" Tag="0755"/>
+                            <ComboBoxItem Content="775 – rwx rwx r-x" Tag="0775"/>
+                            <ComboBoxItem Content="770 – rwx rwx ---" Tag="0770"/>
+                            <ComboBoxItem Content="777 – rwx rwx rwx" Tag="0777"/>
                         </ComboBox>
 
                     </StackPanel>

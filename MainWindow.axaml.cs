@@ -320,17 +320,27 @@ public partial class MainWindow : Window
         dialog.Content = panel;
 
         TaskCompletionSource<(string, string)?> tcs = new();
+        bool completed = false;
+
+        void Complete((string, string)? result)
+        {
+            if (completed)
+                return;
+
+            completed = true;
+            tcs.TrySetResult(result);
+        }
 
         void Accept()
         {
-            tcs.SetResult((userBox.Text ?? "", passBox.Text ?? ""));
+            Complete((userBox.Text ?? "", passBox.Text ?? ""));
             dialog.Close();
         }
 
         okBtn.Click += (_, __) => Accept();
         cancelBtn.Click += (_, __) =>
         {
-            tcs.SetResult(null);
+            Complete(null);
             dialog.Close();
         };
 
@@ -345,6 +355,11 @@ public partial class MainWindow : Window
             if (e.Key == Key.Enter)
                 Accept();
         };
+
+        // Si el usuario cierra la ventana con la X (o por cualquier otra vía),
+        // hay que completar la tarea; de lo contrario el await quedaría colgado
+        // para siempre y la pestaña Network se bloquearía.
+        dialog.Closed += (_, __) => Complete(null);
 
         _ = dialog.ShowDialog(this);
 

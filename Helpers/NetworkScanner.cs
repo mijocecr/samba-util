@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -96,7 +97,9 @@ namespace SAMBA_Util.Helpers
     // ---------------------------------------------------------
     public static class NetworkScanner
     {
-        private static readonly Dictionary<string, string> OsCache = new();
+        // ConcurrentDictionary: DetectOSAsync se ejecuta en paralelo desde
+        // Task.WhenAll, así que la caché debe ser segura para hilos.
+        private static readonly ConcurrentDictionary<string, string> OsCache = new();
 
         // ---------------------------------------------------------
         // DISCOVER DEVICES
@@ -162,17 +165,25 @@ namespace SAMBA_Util.Helpers
         }
 
         // ---------------------------------------------------------
-        // UNIVERSAL USER SPEC (Windows / macOS / Linux)
+        // AUTH ARGS (Windows / macOS / Linux)
         // ---------------------------------------------------------
-        public static string BuildUserSpec(string ip, string os)
+        // Devuelve los argumentos de autenticación para smbclient/rpcclient.
+        // Cuando hay contraseña se usa un fichero temporal (-A) para no
+        // exponerla en la línea de comandos (visible con `ps`) ni en los logs.
+        // El llamador debe borrar AuthFile con ShellHelper.DeleteCredentialFile.
+        private static (string Args, string? AuthFile) BuildAuthArgs()
         {
             string user = CredStore.User;
             string pass = CredStore.Password;
 
             if (string.IsNullOrWhiteSpace(user) || user.Equals("guest", StringComparison.OrdinalIgnoreCase))
-                return "%";
+                return ("-U %", null);
 
-            return $"{user}%{pass}";
+            if (string.IsNullOrEmpty(pass))
+                return ($"-U {ShellQuote(user)}%", null);
+
+            string file = ShellHelper.CreateCredentialFile(user, pass);
+            return ($"-A {ShellQuote(file)}", file);
         }
 
         // ---------------------------------------------------------
@@ -192,11 +203,18 @@ namespace SAMBA_Util.Helpers
             // ---------------------------------------------------------
             if (os == "Windows")
             {
-                string userSpec = BuildUserSpec(ip, os);
-
-                string rpcOut = await ShellHelper.RunAsync(
-                    $"rpcclient -U {ShellQuote(userSpec)} {ip} -c \"netshareenumall\""
-                );
+                string rpcOut;
+                var (authArgs, authFile) = BuildAuthArgs();
+                try
+                {
+                    rpcOut = await ShellHelper.RunAsync(
+                        $"rpcclient {authArgs} {ShellHelper.Quote(ip)} -c \"netshareenumall\""
+                    );
+                }
+                finally
+                {
+                    ShellHelper.DeleteCredentialFile(authFile);
+                }
 
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -206,11 +224,17 @@ namespace SAMBA_Util.Helpers
                 if (rpcOut.Contains("NT_STATUS") && !string.IsNullOrWhiteSpace(CredStore.User) && !CredStore.User.Equals("guest", StringComparison.OrdinalIgnoreCase))
                 {
                     Console.WriteLine("[Scanner] Intento anónimo rechazado. Reintentando RPC con credenciales...");
-                    string credSpec = $"{CredStore.User}%{CredStore.Password}";
-
-                    rpcOut = await ShellHelper.RunAsync(
-                        $"rpcclient -U {ShellQuote(credSpec)} {ip} -c \"netshareenumall\""
-                    );
+                    var (retryArgs, retryFile) = BuildAuthArgs();
+                    try
+                    {
+                        rpcOut = await ShellHelper.RunAsync(
+                            $"rpcclient {retryArgs} {ShellHelper.Quote(ip)} -c \"netshareenumall\""
+                        );
+                    }
+                    finally
+                    {
+                        ShellHelper.DeleteCredentialFile(retryFile);
+                    }
 
                     cancellationToken.ThrowIfCancellationRequested();
 
@@ -258,7 +282,7 @@ namespace SAMBA_Util.Helpers
                 foreach (var share in parsed)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    share.Access = await DetectShareAccess(ip, share.Name, os);
+                    share.Access = await DetectShareAccess(ip, share.Name);
                 }
 
                 return parsed;
@@ -267,11 +291,18 @@ namespace SAMBA_Util.Helpers
             if (!string.IsNullOrWhiteSpace(CredStore.User) &&
                 !CredStore.User.Equals("guest", StringComparison.OrdinalIgnoreCase))
             {
-                string userSpec = BuildUserSpec(ip, os);
-
-                string outCred = await ShellHelper.RunAsync(
-                    $"smbclient -gL {ShellQuote("//" + ip)} -U {ShellQuote(userSpec)} {ConfigManager.ClientMinProtocolOption()}"
-                );
+                var (authArgs, authFile) = BuildAuthArgs();
+                string outCred;
+                try
+                {
+                    outCred = await ShellHelper.RunAsync(
+                        $"smbclient -gL {ShellQuote("//" + ip)} {authArgs} {ConfigManager.ClientMinProtocolOption()}"
+                    );
+                }
+                finally
+                {
+                    ShellHelper.DeleteCredentialFile(authFile);
+                }
 
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -326,11 +357,9 @@ namespace SAMBA_Util.Helpers
         // ---------------------------------------------------------
         // ACCESS DETECTION (SMBCLIENT)
         // ---------------------------------------------------------
-        private static async Task<string> DetectShareAccess(string ip, string share, string os)
+        private static async Task<string> DetectShareAccess(string ip, string share)
         {
             Console.WriteLine($"[Scanner] Testing access for share '{share}'...");
-
-            string userSpec = BuildUserSpec(ip, os);
 
             string guestCmd =
                 $"smbclient {ShellQuote("//" + ip + "/" + share)} -U % {ConfigManager.ClientMinProtocolOption()} -c \"ls\"";
@@ -348,10 +377,17 @@ namespace SAMBA_Util.Helpers
             if (anonOut.Contains("blocks") || anonOut.Contains("NT_STATUS_OK"))
                 return "Anonymous";
 
-            string credCmd =
-                $"smbclient {ShellQuote("//" + ip + "/" + share)} -U {ShellQuote(userSpec)} {ConfigManager.ClientMinProtocolOption()} -c \"ls\"";
-
-            string credOut = await ShellHelper.RunAsync(credCmd);
+            var (authArgs, authFile) = BuildAuthArgs();
+            string credOut;
+            try
+            {
+                credOut = await ShellHelper.RunAsync(
+                    $"smbclient {ShellQuote("//" + ip + "/" + share)} {authArgs} {ConfigManager.ClientMinProtocolOption()} -c \"ls\"");
+            }
+            finally
+            {
+                ShellHelper.DeleteCredentialFile(authFile);
+            }
 
             if (credOut.Contains("blocks") || credOut.Contains("NT_STATUS_OK"))
                 return "Authenticated";

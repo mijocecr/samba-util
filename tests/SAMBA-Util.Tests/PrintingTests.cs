@@ -58,6 +58,29 @@ public class PrintingTests
     }
 
     [Fact]
+    public void BuildPrintingLines_MarcadorSinFinNoDescartaElResto()
+    {
+        // Un marcador de inicio huérfano (sin su "# END ...") no debe hacer que
+        // se descarte el resto del archivo.
+        var input = new List<string>
+        {
+            "[global]",
+            "    workgroup = WORKGROUP",
+            "",
+            "# BEGIN SAMBA-UTIL PRINTING",
+            "[docs]",
+            "    path = /srv/docs",
+            "    read only = yes"
+        };
+
+        var output = SambaConfigWriter.BuildPrintingLines(input, false);
+
+        Assert.Contains("[docs]", output);
+        Assert.Contains("    path = /srv/docs", output);
+        Assert.Contains("    read only = yes", output);
+    }
+
+    [Fact]
     public void BuildPrintingLines_RespetaSeccionPrintersExistente()
     {
         var input = BaseConfig();

@@ -54,4 +54,24 @@ public class ShellHelperTests
 
         Assert.Equal("async", output.Trim());
     }
+
+    [Fact]
+    public void Quote_EscapaComillasSimples()
+    {
+        Assert.Equal("'abc'", ShellHelper.Quote("abc"));
+        Assert.Equal("'a'\\''b'", ShellHelper.Quote("a'b"));
+    }
+
+    [Theory]
+    [InlineData("-U 'user%secret'", "-U 'user'%****")]
+    [InlineData("-U user%secret", "-U 'user'%****")]
+    [InlineData("-U %", "-U %")]
+    [InlineData("smbclient -A '/tmp/x' //1.2.3.4", "smbclient -A '/tmp/x' //1.2.3.4")]
+    [InlineData("mount -o password=secret //host/share", "mount -o password=**** //host/share")]
+    [InlineData("gio mount smb://WORKGROUP;user:secret@10.0.0.1/share",
+        "gio mount smb://WORKGROUP;user:****@10.0.0.1/share")]
+    public void RedactSecrets_EnmascaraCredenciales(string input, string expected)
+    {
+        Assert.Equal(expected, ShellHelper.RedactSecrets(input));
+    }
 }

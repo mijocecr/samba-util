@@ -519,8 +519,9 @@ public static class SambaConfigWriter
         var result = new List<string>();
         bool skipping = false;
 
-        foreach (var line in lines)
+        for (int i = 0; i < lines.Count; i++)
         {
+            var line = lines[i];
             var trimmed = line.Trim();
 
             var isSectionBegin = trimmed.Equals(PrintingBeginMarker, StringComparison.OrdinalIgnoreCase);
@@ -528,6 +529,16 @@ public static class SambaConfigWriter
 
             if (isSectionBegin || isGlobalBegin)
             {
+                // Solo se trata como bloque gestionado si existe su marcador de
+                // fin. Si falta, se conserva la línea tal cual para no descartar
+                // el resto de smb.conf (por ejemplo, secciones del usuario).
+                var endMarker = isSectionBegin ? PrintingEndMarker : PrintingGlobalEndMarker;
+                if (!HasMatchingEndMarker(lines, i + 1, endMarker))
+                {
+                    result.Add(line);
+                    continue;
+                }
+
                 // Las secciones se añadieron con una línea en blanco delante; se
                 // elimina también para que activar y desactivar sea idempotente.
                 if (isSectionBegin && result.Count > 0 && string.IsNullOrWhiteSpace(result[^1]))
@@ -549,6 +560,17 @@ public static class SambaConfigWriter
         }
 
         return result;
+    }
+
+    private static bool HasMatchingEndMarker(List<string> lines, int start, string endMarker)
+    {
+        for (int i = start; i < lines.Count; i++)
+        {
+            if (lines[i].Trim().Equals(endMarker, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     private static void EnsureBlankLine(List<string> lines)
