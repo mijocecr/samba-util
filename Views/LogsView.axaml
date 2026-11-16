@@ -2,16 +2,21 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="SAMBA_Util.Views.LogsView">
 
-    <StackPanel Margin="20" Spacing="18">
+    <!-- Grid: título y botones toman su altura, la tarjeta de logs ocupa el resto -->
+    <Grid Margin="20" RowDefinitions="Auto,Auto,*">
 
         <!-- Título -->
-        <TextBlock Text="Samba Logs"
+        <TextBlock Grid.Row="0"
+                   Text="Samba Logs"
                    FontSize="20"
                    FontWeight="Bold"
                    Foreground="{StaticResource ForegroundBrush}"/>
 
         <!-- Botones -->
-        <StackPanel Orientation="Horizontal" Spacing="10">
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    Spacing="10"
+                    Margin="0,18,0,0">
             <Button Content="Refresh"
                     Classes="NeutralButton"
                     Click="OnRefresh"/>
@@ -22,14 +27,18 @@
         </StackPanel>
 
         <!-- Tarjeta elevada para logs -->
-        <Border Background="{StaticResource ControlBackgroundBrush}"
+        <Border Grid.Row="2"
+                Margin="0,18,0,0"
+                Background="{StaticResource ControlBackgroundBrush}"
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"
                 CornerRadius="10"
                 Padding="14"
                 Effect="drop-shadow(0 4 14 #00000055)">
 
-            <ScrollViewer x:Name="Scroll" Height="400">
+            <ScrollViewer x:Name="Scroll"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
                 <TextBlock x:Name="TxtLogs"
                            FontFamily="Consolas"
                            TextWrapping="Wrap"
@@ -38,5 +47,5 @@
 
         </Border>
 
-    </StackPanel>
+    </Grid>
 </UserControl>

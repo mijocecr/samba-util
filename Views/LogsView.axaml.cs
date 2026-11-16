@@ -5,6 +5,7 @@ using System;
 using System.IO;
 using System.Text;
 using Avalonia.Media;
+using Avalonia.Threading;
 
 namespace SAMBA_Util.Views;
 
@@ -75,8 +76,8 @@ public partial class LogsView : UserControl
 
         TxtLogs.Text = text;
 
-        // Scroll automático al final
-        Scroll.Offset = new Avalonia.Vector(0, Scroll.Extent.Height);
+        // Scroll automático al final, una vez actualizado el layout
+        Dispatcher.UIThread.Post(() => Scroll.ScrollToEnd(), DispatcherPriority.Background);
     }
 
     private void OnRefresh(object? sender, RoutedEventArgs e)
