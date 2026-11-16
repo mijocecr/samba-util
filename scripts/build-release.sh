@@ -72,7 +72,15 @@ dotnet publish "$PROJECT" \
 cp "$ROOT/packaging/samba-util.desktop" "$ROOT/packaging/samba-util.png" "$FOLDER/"
 
 echo "==> Creating SAMBA-Util.tar.gz"
-tar -czf "$DIST/SAMBA-Util.tar.gz" -C "$FOLDER" .
+# Tarball reproducible: orden fijo, propietario y fecha fijos, y gzip sin el
+# nombre/estampado original en su cabecera. Dos builds del mismo código
+# producen un archivo idéntico byte a byte, de modo que el checksum de AUR
+# es estable.
+tar --sort=name \
+    --owner=0 --group=0 --numeric-owner \
+    --mtime='@1577836800' \
+    --pax-option=exthdr.name=%d/PaxHeaders/%f,delete=atime,delete=ctime \
+    -cf - -C "$FOLDER" . | gzip -n -9 > "$DIST/SAMBA-Util.tar.gz"
 
 if [[ -n "${APPIMAGETOOL:-}" ]]; then
     echo "==> Creating AppImage"
