@@ -82,6 +82,16 @@ tar --sort=name \
     --pax-option=exthdr.name=%d/PaxHeaders/%f,delete=atime,delete=ctime \
     -cf - -C "$FOLDER" . | gzip -n -9 > "$DIST/SAMBA-Util.tar.gz"
 
+# El tarball alimenta el paquete AUR, que instala samba-util.desktop y
+# samba-util.png desde su raíz. Si alguno faltase, el paquete quedaría
+# incompleto; abortamos el build en vez de publicar un tarball roto.
+for required in ./samba-util.desktop ./samba-util.png; do
+    if ! tar -tzf "$DIST/SAMBA-Util.tar.gz" | grep -qx -- "$required"; then
+        echo "error: $required no está en SAMBA-Util.tar.gz" >&2
+        exit 1
+    fi
+done
+
 if [[ -n "${APPIMAGETOOL:-}" ]]; then
     echo "==> Creating AppImage"
     APPDIR="$DIST/.AppDir"
