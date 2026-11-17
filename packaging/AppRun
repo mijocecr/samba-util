@@ -1,3 +1,15 @@
 #!/bin/bash
+# AppRun: entry point executed when the AppImage is launched.
 HERE="$(dirname "$(readlink -f "$0")")"
+
+# Prefer the libraries bundled next to the application (OpenSSL, ICU and X11)
+# over the ones from the host, so the AppImage does not depend on the versions
+# installed on the system. The font/GLib stack is intentionally left to the
+# host, as it does on every desktop.
+export LD_LIBRARY_PATH="$HERE/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+# Samba and its tools (smbd, testparm, smbpasswd, ...) live in the sbin
+# directories on several distributions.
+export PATH="$PATH:/usr/sbin:/sbin"
+
 exec "$HERE/usr/bin/SAMBA-Util" "$@"

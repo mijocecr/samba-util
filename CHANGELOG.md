@@ -2,6 +2,38 @@
 
 All notable changes to SAMBA-Util are documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- The configuration window now includes a "Map unknown users to guest"
+  toggle (`map to guest = Bad User`). It is enabled by default and, when
+  disabled, writes `map to guest = Never` to `smb.conf`.
+- The AppImage now bundles its runtime libraries (OpenSSL, ICU and the
+  X11/xcb stack) so it no longer depends on the versions installed on the
+  target system. They are taken from a container based on an older glibc
+  (`packaging/appimage/`), which keeps the AppImage working on distributions
+  such as Ubuntu 22.04+, Debian 12+ and Fedora. The font stack (fontconfig,
+  freetype, GLib, ...) is deliberately left to the host: every desktop
+  provides it, and bundling an older GLib breaks host tools that link it.
+- The AppImage ships AppStream metadata and update information (with a
+  `.zsync` file for delta updates), and provides the `samba-util` name used by
+  its `.desktop` file. Inside the AppImage the desktop file is named after the
+  reverse-DNS component id (`io.github.mijocecr.SambaUtil.desktop`) so that
+  appimagetool finds the AppStream file and appstreamcli validates it without
+  warnings; the AUR tarball keeps the plain `samba-util.desktop` name.
+
+### Fixed
+
+- SAMBA-Util now ensures `usershares.conf` exists in the Samba configuration
+  directory, creating a sensible default when it is missing. Previously, if
+  `smb.conf` included a non-existent `usershares.conf` (for example
+  `include = /etc/samba/usershares.conf`), loading the configuration failed and
+  the app could not start.
+- The UI no longer aborts on systems without any system font. The bundled Inter
+  font is now the default family instead of asking fontconfig for a system
+  default that may not exist (for example in minimal installations).
+
 ## [4.3.0] - 2026-11-16
 
 This is a security and reliability release. It hardens every place where user

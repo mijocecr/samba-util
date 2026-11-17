@@ -20,6 +20,10 @@ public static class ConfigManager
 
         // Indica si SAMBA-Util gestiona la impresión (CUPS + [printers] + [print$]).
         public bool PrintingEnabled { get; set; }
+
+        // Indica si Samba mapea usuarios desconocidos a invitado
+        // (map to guest = Bad User). Activado por defecto.
+        public bool MapToGuestBadUser { get; set; } = true;
     }
 
     public static AppConfig Load()

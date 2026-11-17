@@ -98,6 +98,20 @@
                                Foreground="{StaticResource ForegroundBrush}"/>
                 </StackPanel>
 
+                <!-- Guest mapping -->
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Map unknown users to guest (map to guest = Bad User):"
+                               TextWrapping="Wrap"
+                               Foreground="{StaticResource ForegroundBrush}"/>
+                    <ToggleSwitch x:Name="GuestMapToggle"
+                                  OnContent="Enabled"
+                                  OffContent="Disabled"/>
+                    <TextBlock x:Name="TxtGuestMapStatus"
+                               Text="When enabled, unknown users are mapped to the guest account (map to guest = Bad User). Disable it to use map to guest = Never."
+                               TextWrapping="Wrap"
+                               Foreground="{StaticResource ForegroundBrush}"/>
+                </StackPanel>
+
                 <StackPanel Spacing="6">
                     <TextBlock Text="System firewall:"
                                Foreground="{StaticResource ForegroundBrush}"/>

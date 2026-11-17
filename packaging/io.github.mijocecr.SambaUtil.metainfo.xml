@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.mijocecr.SambaUtil</id>
+
+  <name>SAMBA Util</name>
+  <summary>A simple and modern GUI for managing Samba</summary>
+
+  <developer id="io.github.mijocecr">
+    <name>Miguel Cerrato</name>
+  </developer>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <description>
+    <p>
+      SAMBA Util is a graphical application to configure and manage Samba:
+      shared folders, users, printing and the global Samba configuration,
+      without editing smb.conf by hand.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">io.github.mijocecr.SambaUtil.desktop</launchable>
+
+  <url type="homepage">https://github.com/mijocecr/samba-util</url>
+  <url type="bugtracker">https://github.com/mijocecr/samba-util/issues</url>
+
+  <provides>
+    <binary>SAMBA-Util</binary>
+  </provides>
+
+  <categories>
+    <category>Utility</category>
+  </categories>
+
+  <releases>
+    <release version="4.3.0" date="2026-11-16"/>
+  </releases>
+
+  <content_rating type="oars-1.1"/>
+</component>

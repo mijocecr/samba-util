@@ -18,6 +18,19 @@ public static class SmbInitializer
    logging = systemd
 ";
 
+    // Valores por defecto para usershares.conf. smb.conf puede incluir este
+    // archivo (include = /etc/samba/usershares.conf). Si el include apunta a un
+    // archivo inexistente, Samba lo ignora pero SAMBA-Util abortaba al leer la
+    // configuración; lo creamos con una configuración usershare razonable.
+    private const string DefaultUsersharesConf = @"[global]
+   usershare path = /var/lib/samba/usershares
+   usershare max shares = 100
+   usershare allow guests = yes
+   usershare owner only = yes
+   usershare prefix deny list = /etc /dev /sys /proc
+   usershare prefix allow list = /home /srv /mnt /media /var
+";
+
     public static Task InitializeEnvironmentAsync()
     {
         return Task.Run(() =>
@@ -31,30 +44,45 @@ public static class SmbInitializer
             if (string.IsNullOrWhiteSpace(sambaDir))
                 throw new InvalidOperationException($"La ruta de smb.conf no es válida: '{configuredPath}'.");
 
-            var tempPath = Path.GetTempFileName();
-            try
-            {
-                File.WriteAllText(tempPath, DefaultSmbConf);
+            var createDirectory = ShellHelper.EjecutarComoRoot(
+                $"mkdir -p {ShellQuote(sambaDir)}");
+            EnsureSuccess(createDirectory, "No se pudo crear el directorio de configuración de Samba");
 
-                var createDirectory = ShellHelper.EjecutarComoRoot(
-                    $"mkdir -p {ShellQuote(sambaDir)}");
-                EnsureSuccess(createDirectory, "No se pudo crear el directorio de configuración de Samba");
+            EnsureRootFile(confPath, DefaultSmbConf, "smb.conf");
 
-                var createConfig = ShellHelper.EjecutarComoRoot(
-                    $"if [ ! -e {ShellQuote(confPath)} ]; then install -m 644 {ShellQuote(tempPath)} {ShellQuote(confPath)}; fi");
-                EnsureSuccess(createConfig, "No se pudo crear smb.conf");
+            // smb.conf puede incluir usershares.conf. Si el archivo no existe,
+            // la lectura de la configuración fallaba; lo creamos antes de
+            // arrancar los servicios y de cargar los recursos compartidos.
+            EnsureRootFile(
+                Path.Combine(sambaDir, "usershares.conf"),
+                DefaultUsersharesConf,
+                "usershares.conf");
 
-                var verifyConfig = ShellHelper.EjecutarComoRoot(
-                    $"test -f {ShellQuote(confPath)}");
-                EnsureSuccess(verifyConfig, "No se encontró smb.conf después de la inicialización");
-
-                StartSambaServices();
-            }
-            finally
-            {
-                File.Delete(tempPath);
-            }
+            StartSambaServices();
         });
+    }
+
+    // Crea 'path' con 'content' si aún no existe (como root, modo 644) y
+    // comprueba que queda disponible. No sobreescribe archivos existentes.
+    private static void EnsureRootFile(string path, string content, string label)
+    {
+        var temp = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(temp, content);
+
+            var create = ShellHelper.EjecutarComoRoot(
+                $"if [ ! -e {ShellQuote(path)} ]; then install -m 644 {ShellQuote(temp)} {ShellQuote(path)}; fi");
+            EnsureSuccess(create, $"No se pudo crear {label}");
+
+            var verify = ShellHelper.EjecutarComoRoot(
+                $"test -f {ShellQuote(path)}");
+            EnsureSuccess(verify, $"No se encontró {label} después de la inicialización");
+        }
+        finally
+        {
+            File.Delete(temp);
+        }
     }
 
     private static void EnsureSuccess((int ExitCode, string Stdout, string Stderr) result, string message)

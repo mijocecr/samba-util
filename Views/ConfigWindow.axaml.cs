@@ -14,6 +14,7 @@ public partial class ConfigWindow : Window
     private string? _firewallBackend;
     private bool? _initialFirewallState;
     private bool _initialPrintingState;
+    private bool _initialGuestMapState;
 
     public event Func<Task>? ConfigSaved;
 
@@ -30,6 +31,10 @@ public partial class ConfigWindow : Window
         // Estado real de impresión en smb.conf
         _initialPrintingState = SambaConfigWriter.IsPrintingEnabled(_config.SmbConfPath);
         PrintingToggle.IsChecked = _initialPrintingState;
+
+        // Estado real de map to guest en smb.conf
+        _initialGuestMapState = SambaConfigWriter.IsMapToGuestBadUser(_config.SmbConfPath);
+        GuestMapToggle.IsChecked = _initialGuestMapState;
 
         // Seleccionar protocolo SMB actual en el ComboBox
         foreach (var entry in ProtocolCombo.Items)
@@ -226,6 +231,31 @@ public partial class ConfigWindow : Window
             }
         }
         _config.PrintingEnabled = _initialPrintingState;
+
+        // Activar o desactivar map to guest en smb.conf.
+        var desiredGuestMap = GuestMapToggle.IsChecked == true;
+        if (desiredGuestMap != _initialGuestMapState)
+        {
+            TxtGuestMapStatus.Text = desiredGuestMap
+                ? "Enabling guest mapping (map to guest = Bad User)..."
+                : "Disabling guest mapping (map to guest = Never)...";
+            try
+            {
+                await Task.Run(() => SambaConfigWriter.SetMapToGuestBadUser(desiredGuestMap));
+                _initialGuestMapState = SambaConfigWriter.IsMapToGuestBadUser(_config.SmbConfPath);
+                GuestMapToggle.IsChecked = _initialGuestMapState;
+                TxtGuestMapStatus.Text = _initialGuestMapState == desiredGuestMap
+                    ? $"Guest mapping {(desiredGuestMap ? "enabled" : "disabled")}."
+                    : "Guest mapping is still controlled by configuration outside the blocks managed by SAMBA-Util; review smb.conf.";
+            }
+            catch (Exception ex)
+            {
+                TxtGuestMapStatus.Text = $"Could not change guest mapping: {ex.Message}";
+                GuestMapToggle.IsChecked = _initialGuestMapState;
+                return;
+            }
+        }
+        _config.MapToGuestBadUser = _initialGuestMapState;
 
         ConfigManager.Save(_config);
 

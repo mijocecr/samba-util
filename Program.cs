@@ -1,4 +1,5 @@
 ﻿using Avalonia;
+using Avalonia.Media;
 using System;
 using System.Threading.Tasks;
 using SAMBA_Util.Helpers;
@@ -33,5 +34,9 @@ class Program
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
             .WithInterFont()
+            // Use the bundled Inter font as the default family. Without this,
+            // Avalonia asks fontconfig for the system default and aborts when
+            // the system has no fonts at all (e.g. minimal containers).
+            .With(new FontManagerOptions { DefaultFamilyName = "fonts:Inter#Inter" })
             .LogToTrace();
 }

@@ -306,6 +306,142 @@ public static class SambaConfigWriter
         return output;
     }
 
+    // ---------------------------------------------------------
+    // MAP TO GUEST
+    // ---------------------------------------------------------
+
+    private static readonly Regex MapToGuestRegex = new(
+        @"^\s*map\s+to\s+guest\s*=",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // Indica si Samba mapea a invitado los usuarios desconocidos
+    // (map to guest = Bad User). Cualquier otro valor (Never, Bad Password,
+    // Bad Uid) se considera desactivado.
+    public static bool IsMapToGuestBadUser(string? smbConfPath = null)
+    {
+        string path = smbConfPath ?? ConfigManager.Load().SmbConfPath;
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            return false;
+
+        try
+        {
+            var blocks = SplitIntoBlocks(File.ReadAllLines(path).ToList());
+            string? value = null;
+
+            foreach (var block in blocks)
+            {
+                if (block.Name is null || !block.Name.Equals("global", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                // Samba usa la última aparición de cada directiva.
+                foreach (var line in block.Lines)
+                {
+                    if (TryGetDirective(line, "map to guest", out var directiveValue))
+                        value = directiveValue;
+                }
+            }
+
+            return value is not null &&
+                   value.Trim().Equals("Bad User", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[GUEST] No se pudo leer {path}: {ex.Message}");
+            return false;
+        }
+    }
+
+    // Escribe map to guest = Bad User (activado) o Never (desactivado) en
+    // [global]. Devuelve true si smb.conf cambió.
+    public static bool SetMapToGuestBadUser(bool enabled)
+    {
+        var callId = ++_callCountSave;
+        var config = ConfigManager.Load();
+        string smbConf = config.SmbConfPath;
+        if (string.IsNullOrWhiteSpace(smbConf))
+            throw new InvalidOperationException("La ruta del archivo smb.conf no está configurada.");
+
+        string smbConfFull = Path.GetFullPath(smbConf);
+        var originalLines = File.Exists(smbConfFull)
+            ? File.ReadAllLines(smbConfFull).ToList()
+            : new List<string>();
+
+        var output = BuildMapToGuestLines(originalLines, enabled);
+
+        if (originalLines.SequenceEqual(output))
+        {
+            Console.WriteLine(
+                $"[WRITE] #{callId} map to guest ya está {(enabled ? "Bad User" : "Never")}; " +
+                "no se reescribe smb.conf.");
+            return false;
+        }
+
+        WriteConfig(output, smbConfFull, callId);
+        Console.WriteLine(
+            $"[WRITE] #{callId} map to guest = {(enabled ? "Bad User" : "Never")} aplicado en smb.conf.");
+        return true;
+    }
+
+    // Transformación pura de smb.conf usada por SetMapToGuestBadUser y los tests.
+    internal static List<string> BuildMapToGuestLines(List<string> originalLines, bool enabled)
+    {
+        ArgumentNullException.ThrowIfNull(originalLines);
+
+        var value = enabled ? "Bad User" : "Never";
+        var blocks = SplitIntoBlocks(originalLines);
+        var output = new List<string>();
+        bool globalFound = false;
+
+        foreach (var block in blocks)
+        {
+            if (block.Name is null)
+            {
+                output.AddRange(block.Lines);
+                continue;
+            }
+
+            if (!block.Name.Equals("global", StringComparison.OrdinalIgnoreCase))
+            {
+                output.AddRange(block.Lines);
+                continue;
+            }
+
+            globalFound = true;
+            bool written = false;
+            foreach (var line in block.Lines)
+            {
+                if (MapToGuestRegex.IsMatch(line))
+                {
+                    if (!written)
+                    {
+                        output.Add($"    map to guest = {value}");
+                        written = true;
+                    }
+                    // Duplicados: se descartan.
+                    continue;
+                }
+
+                output.Add(line);
+
+                // Insertar justo después de la cabecera [global] si no existía.
+                if (!written && line.TrimStart().StartsWith('['))
+                {
+                    output.Add($"    map to guest = {value}");
+                    written = true;
+                }
+            }
+        }
+
+        if (!globalFound)
+        {
+            output.Insert(0, "");
+            output.Insert(0, $"    map to guest = {value}");
+            output.Insert(0, "[global]");
+        }
+
+        return output;
+    }
+
     // Comprueba si Samba ya expone impresoras: sección [printers] imprimible y
     // "load printers" no desactivado en [global].
     public static bool IsPrintingEnabled(string? smbConfPath = null)
