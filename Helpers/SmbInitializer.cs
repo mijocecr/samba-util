@@ -102,7 +102,10 @@ public static class SmbInitializer
     private static string ShellQuote(string value) =>
         "'" + value.Replace("'", "'\\''", System.StringComparison.Ordinal) + "'";
 
-    private static void StartSambaServices()
+    // Arranca (y habilita) los servicios de Samba usando el gestor disponible
+    // en el sistema: systemd, SysV/`service` o OpenRC. Se expone para que la
+    // vista Status pueda reintentar el arranque cuando el servicio está parado.
+    public static void StartSambaServices()
     {
         if (File.Exists("/bin/systemctl") || File.Exists("/usr/bin/systemctl"))
         {

@@ -56,7 +56,14 @@
 
             <TextBlock TextWrapping="Wrap"
                        Foreground="{StaticResource ForegroundBrush}"
-                       Text="After installing, make sure the smbd service is running."/>
+                       Text="After installing, enable and start the Samba service:"/>
+
+            <SelectableTextBlock Foreground="{StaticResource ForegroundBrush}" FontFamily="monospace"
+                                 Text="sudo systemctl enable --now smbd"/>
+
+            <TextBlock TextWrapping="Wrap"
+                       Foreground="{StaticResource ForegroundBrush}"
+                       Text="On Fedora, RHEL, Arch and openSUSE the unit is called smb, so use: sudo systemctl enable --now smb"/>
 
             <Button Content="Close"
                     Width="100"

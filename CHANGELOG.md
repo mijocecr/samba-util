@@ -35,6 +35,11 @@ checks at startup whether the user can use `sudo`, and centers button labels.
 - Button labels are now centered everywhere (`HorizontalContentAlignment`), so
   text no longer sits off-center in dialogs such as the firewall confirmation,
   the share editor and the error dialogs, nor in the Logs and Status views.
+- When the `smbd` service is not running, the Status tab now says so
+  explicitly and offers a **Start Samba** button plus the exact command
+  (`sudo systemctl enable --now smbd`, or `smb` on Fedora/RHEL/Arch/openSUSE),
+  instead of only showing a red dot. The "Samba is not installed" notice and
+  the CLI print the same command after the install instructions.
 
 ## [4.4.0] - 2026-11-18
 

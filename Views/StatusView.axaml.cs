@@ -136,6 +136,7 @@ public partial class StatusView : UserControl
             IconFirewall.Fill = snapshot.FirewallColor;
             TxtTestparm.Text = snapshot.TestparmText;
             UpdateTestparmStyle(snapshot.TestparmText);
+            TxtServiceHint.IsVisible = false;
             return;
         }
 
@@ -146,6 +147,10 @@ public partial class StatusView : UserControl
         SetIcon(IconSmbd, snapshot.SmbdText);
         SetIcon(IconNmbd, snapshot.NmbdText);
         SetIcon(IconWinbind, snapshot.WinbindText);
+
+        var serviceHint = ServiceHintFor(snapshot.SmbdText);
+        TxtServiceHint.Text = serviceHint ?? "";
+        TxtServiceHint.IsVisible = serviceHint != null;
 
         TxtTestparm.Text = snapshot.TestparmText;
         UpdateTestparmStyle(snapshot.TestparmText);
@@ -197,6 +202,33 @@ public partial class StatusView : UserControl
     // ---------------------------------------------------------
     // DETECCIÓN DE SERVICIOS
     // ---------------------------------------------------------
+    // Texto de ayuda que se muestra bajo el estado de servicios cuando smbd no
+    // está activo, con el comando exacto para habilitarlo y arrancarlo. Es puro
+    // para poder probarlo: devuelve null cuando no hace falta mostrar nada.
+    internal static string? ServiceHintFor(string? smbdText)
+    {
+        if (string.IsNullOrWhiteSpace(smbdText))
+            return null;
+
+        var text = smbdText.TrimStart();
+
+        // En ejecución (o en tránsito) no hay nada que sugerir.
+        if (text.StartsWith("Active", StringComparison.OrdinalIgnoreCase) ||
+            text.StartsWith("Activating", StringComparison.OrdinalIgnoreCase) ||
+            text.StartsWith("Deactivating", StringComparison.OrdinalIgnoreCase) ||
+            text.StartsWith("Reloading", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        if (text.StartsWith("Unknown", StringComparison.OrdinalIgnoreCase))
+            return "systemd is not available on this system; start the Samba service with your init system.";
+
+        if (text.StartsWith("Not installed", StringComparison.OrdinalIgnoreCase))
+            return "The smbd/smb service unit was not found. Reinstall Samba or enable the service for your distribution.";
+
+        return "The smbd service is not running. Use \"Start Samba\" below, or run: " +
+               "sudo systemctl enable --now smbd (smb on Fedora/RHEL/Arch/openSUSE).";
+    }
+
     private string DetectAndCheckService(List<string> candidates, bool hasSystemctl)
     {
         if (!hasSystemctl)
@@ -436,6 +468,43 @@ public partial class StatusView : UserControl
     {
         try
         {
+            await RefreshStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[STATUS ERROR] {ex}");
+        }
+    }
+
+    private async void OnStart(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(Credenciales.AdminPassword) || _isBusy)
+                return;
+
+            _isBusy = true;
+            try
+            {
+                // Reutiliza el arranque robusto (systemd/`service`/OpenRC) que la
+                // aplicación ya usa al iniciarse, en lugar de un systemctl fijo.
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        SmbInitializer.StartSambaServices();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[STATUS ERROR] Start Samba: {ex.Message}");
+                    }
+                });
+            }
+            finally
+            {
+                _isBusy = false;
+            }
+
             await RefreshStatusAsync();
         }
         catch (Exception ex)

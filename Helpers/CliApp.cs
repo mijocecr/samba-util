@@ -36,6 +36,8 @@ public class CliApp
             Console.WriteLine("  Fedora/RHEL:    sudo dnf install samba");
             Console.WriteLine("  Arch/Manjaro:   sudo pacman -S samba");
             Console.WriteLine("  openSUSE:       sudo zypper install samba");
+            Console.WriteLine("After installing, enable and start the service (smbd on Debian/Ubuntu, smb on Fedora/RHEL/Arch/openSUSE):");
+            Console.WriteLine("  sudo systemctl enable --now smbd");
             return;
         }
 
