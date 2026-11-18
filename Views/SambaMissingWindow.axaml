@@ -28,7 +28,7 @@
 
             <TextBlock TextWrapping="Wrap"
                        Foreground="{StaticResource ForegroundBrush}"
-                       Text="Install Samba with your distribution's package manager, then start SAMBA-Util again:"/>
+                       Text="Install Samba with your distribution's package manager:"/>
 
             <Border Padding="12"
                     Background="{StaticResource BackgroundBrush}"
@@ -53,7 +53,7 @@
 
             <TextBlock TextWrapping="Wrap"
                        Foreground="{StaticResource ForegroundBrush}"
-                       Text="After installing, make sure the smbd service is available (systemctl status smbd)."/>
+                       Text="After installing, make sure the smbd service is running."/>
 
             <Button Content="Close"
                     Width="100"
