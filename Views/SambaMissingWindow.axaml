@@ -1,13 +1,16 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="SAMBA_Util.Views.SambaMissingWindow"
-        Width="560" Height="430"
+        Width="560"
+        SizeToContent="Height"
         Title="Samba is not installed"
         CanResize="False"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource BackgroundBrush}"
         Foreground="{StaticResource ForegroundBrush}">
 
+    <ScrollViewer Background="{StaticResource BackgroundBrush}"
+                  VerticalScrollBarVisibility="Auto">
     <Border Margin="12"
             Padding="18"
             Background="{StaticResource ControlBackgroundBrush}"
@@ -58,9 +61,11 @@
             <Button Content="Close"
                     Width="100"
                     HorizontalAlignment="Right"
+                    HorizontalContentAlignment="Center"
                     Classes="AccentButton"
                     Click="OnClose"/>
 
         </StackPanel>
     </Border>
+    </ScrollViewer>
 </Window>
