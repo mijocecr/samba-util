@@ -41,6 +41,7 @@
                                 Content="..."
                                 Width="40"
                                 Margin="6,0,0,0"
+                                HorizontalContentAlignment="Center"
                                 Classes="AccentButton"/>
                     </Grid>
                 </StackPanel>

@@ -355,8 +355,8 @@ public partial class ConfigWindow : Window
             Background = this.FindResource("BackgroundBrush") as IBrush
         };
         var result = false;
-        var disableButton = new Button { Content = "Disable firewall", Width = 130 };
-        var cancelButton = new Button { Content = "Cancel", Width = 90 };
+        var disableButton = new Button { Content = "Disable firewall", Width = 130, HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Center };
+        var cancelButton = new Button { Content = "Cancel", Width = 90, HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Center };
         disableButton.Click += (_, _) =>
         {
             result = true;

@@ -390,7 +390,8 @@ public partial class MainWindow : Window
         {
             Content = "OK",
             Width = 80,
-            HorizontalAlignment = HorizontalAlignment.Center
+            HorizontalAlignment = HorizontalAlignment.Center,
+            HorizontalContentAlignment = HorizontalAlignment.Center
         };
 
         okBtn.Click += (_, __) => dialog.Close();

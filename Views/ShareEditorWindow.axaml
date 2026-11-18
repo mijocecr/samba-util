@@ -17,7 +17,7 @@
             <TextBlock Text="Path" Foreground="{StaticResource ForegroundBrush}"/>
             <StackPanel Orientation="Horizontal" Spacing="10">
                 <TextBox x:Name="TxtPath" Width="240" IsReadOnly="True" CornerRadius="6" Background="{StaticResource ControlBackgroundBrush}" BorderBrush="{StaticResource BorderBrush}" Foreground="{StaticResource ForegroundBrush}"/>
-                <Button Content="Browse..." Width="90" Click="OnBrowseFolder"/>
+                <Button Content="Browse..." Width="90" HorizontalContentAlignment="Center" Click="OnBrowseFolder"/>
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" Spacing="25">
