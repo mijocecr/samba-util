@@ -2,7 +2,10 @@
 
 All notable changes to SAMBA-Util are documented in this file.
 
-## [Unreleased]
+## [4.5.0] - 2026-11-18
+
+This release makes the Network and Status tabs reliable across distributions,
+checks at startup whether the user can use `sudo`, and centers button labels.
 
 ### Added
 
