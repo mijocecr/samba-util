@@ -1,0 +1,66 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="SAMBA_Util.Views.SambaMissingWindow"
+        Width="560" Height="430"
+        Title="Samba is not installed"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BackgroundBrush}"
+        Foreground="{StaticResource ForegroundBrush}">
+
+    <Border Margin="12"
+            Padding="18"
+            Background="{StaticResource ControlBackgroundBrush}"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="10">
+
+        <StackPanel Spacing="14">
+
+            <TextBlock Text="Samba is not installed"
+                       FontSize="20"
+                       FontWeight="Bold"
+                       Foreground="{StaticResource ForegroundBrush}"/>
+
+            <TextBlock TextWrapping="Wrap"
+                       Foreground="{StaticResource ForegroundBrush}"
+                       Text="SAMBA-Util manages Samba shares, users and services, but no Samba installation was detected on this system."/>
+
+            <TextBlock TextWrapping="Wrap"
+                       Foreground="{StaticResource ForegroundBrush}"
+                       Text="Install Samba with your distribution's package manager, then start SAMBA-Util again:"/>
+
+            <Border Padding="12"
+                    Background="{StaticResource BackgroundBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6">
+                <StackPanel Spacing="6">
+                    <TextBlock Foreground="{StaticResource ForegroundBrush}" Text="Debian / Ubuntu / Linux Mint:"/>
+                    <SelectableTextBlock Foreground="{StaticResource ForegroundBrush}" FontFamily="monospace"
+                                         Text="sudo apt install samba"/>
+                    <TextBlock Foreground="{StaticResource ForegroundBrush}" Text="Fedora / RHEL / CentOS:"/>
+                    <SelectableTextBlock Foreground="{StaticResource ForegroundBrush}" FontFamily="monospace"
+                                         Text="sudo dnf install samba"/>
+                    <TextBlock Foreground="{StaticResource ForegroundBrush}" Text="Arch / Manjaro / CachyOS:"/>
+                    <SelectableTextBlock Foreground="{StaticResource ForegroundBrush}" FontFamily="monospace"
+                                         Text="sudo pacman -S samba"/>
+                    <TextBlock Foreground="{StaticResource ForegroundBrush}" Text="openSUSE:"/>
+                    <SelectableTextBlock Foreground="{StaticResource ForegroundBrush}" FontFamily="monospace"
+                                         Text="sudo zypper install samba"/>
+                </StackPanel>
+            </Border>
+
+            <TextBlock TextWrapping="Wrap"
+                       Foreground="{StaticResource ForegroundBrush}"
+                       Text="After installing, make sure the smbd service is available (systemctl status smbd)."/>
+
+            <Button Content="Close"
+                    Width="100"
+                    HorizontalAlignment="Right"
+                    Classes="AccentButton"
+                    Click="OnClose"/>
+
+        </StackPanel>
+    </Border>
+</Window>

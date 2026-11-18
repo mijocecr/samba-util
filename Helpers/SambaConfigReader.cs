@@ -22,12 +22,12 @@ public static class SambaConfigReader
         var callId = ++_callCount;
 
         filePath ??= ConfigManager.Load().SmbConfPath;
-        Console.WriteLine($"[CONF] #{callId} → LoadShares('{filePath}') iniciado");
+        Console.WriteLine($"[CONF] #{callId} -> LoadShares('{filePath}') started");
 
         var shares = new List<Share>();
         if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
         {
-            Console.WriteLine($"[CONF] #{callId} Archivo no existe o ruta inválida. Tiempo: {sw.ElapsedMilliseconds} ms");
+            Console.WriteLine($"[CONF] #{callId} File does not exist or path is invalid. Time: {sw.ElapsedMilliseconds} ms");
             return shares;
         }
 
@@ -36,7 +36,7 @@ public static class SambaConfigReader
         ParseFile(Path.GetFullPath(filePath), shares, ref current, includeStack);
 
         sw.Stop();
-        Console.WriteLine($"[CONF] #{callId} ← LoadShares completado en {sw.ElapsedMilliseconds} ms. Shares: {shares.Count}");
+        Console.WriteLine($"[CONF] #{callId} <- LoadShares completed in {sw.ElapsedMilliseconds} ms. Shares: {shares.Count}");
         return shares;
     }
 
@@ -49,7 +49,7 @@ public static class SambaConfigReader
         var normalizedPath = Path.GetFullPath(filePath);
         if (!includeStack.Add(normalizedPath))
         {
-            throw new InvalidOperationException($"Se detectó una inclusión circular en la configuración Samba: {normalizedPath}");
+            throw new InvalidOperationException($"A circular include was detected in the Samba configuration: {normalizedPath}");
         }
 
         try
@@ -83,19 +83,19 @@ public static class SambaConfigReader
                 {
                     var includeValue = parts[1].Trim().Trim('"');
                     if (string.IsNullOrWhiteSpace(includeValue))
-                        throw new FormatException($"La directiva include no contiene una ruta en '{normalizedPath}'.");
+                        throw new FormatException($"The include directive has no path in '{normalizedPath}'.");
 
                     if (includeValue.Contains('%'))
-                        throw new NotSupportedException($"No se pueden resolver inclusiones Samba con variables (%): '{includeValue}'.");
+                        throw new NotSupportedException($"Samba includes with variables (%) cannot be resolved: '{includeValue}'.");
 
                     var includePath = Path.IsPathRooted(includeValue)
                         ? includeValue
                         : Path.Combine(Path.GetDirectoryName(normalizedPath)!, includeValue);
 
                     if (!File.Exists(includePath))
-                        throw new FileNotFoundException($"No se encontró el archivo incluido '{includePath}'.", includePath);
+                        throw new FileNotFoundException($"The included file '{includePath}' was not found.", includePath);
 
-                    Console.WriteLine($"[CONF] Procesando include: {includePath}");
+                    Console.WriteLine($"[CONF] Processing include: {includePath}");
                     var includeCurrent = current;
                     ParseFile(includePath, shares, ref includeCurrent, includeStack);
                     continue;

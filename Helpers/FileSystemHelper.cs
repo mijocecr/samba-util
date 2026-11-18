@@ -14,14 +14,14 @@ public static class FileSystemHelper
         var sw = Stopwatch.StartNew();
         var callId = ++_callCount;
 
-        Console.WriteLine($"[PERM] #{callId} → GetPermissions('{path}') iniciado");
+        Console.WriteLine($"[PERM] #{callId} -> GetPermissions('{path}') started");
 
         try
         {
             // Verificar existencia antes de ejecutar stat
             if (!File.Exists(path) && !Directory.Exists(path))
             {
-                Console.WriteLine($"[PERM] #{callId} NO EXISTE");
+                Console.WriteLine($"[PERM] #{callId} DOES NOT EXIST");
                 return ("", "", "");
             }
 
@@ -39,11 +39,11 @@ public static class FileSystemHelper
             var output = result.Stdout?.Trim() ?? "";
 
             sw.Stop();
-            Console.WriteLine($"[PERM] #{callId} ← stat completado en {sw.ElapsedMilliseconds} ms");
+            Console.WriteLine($"[PERM] #{callId} <- stat completed in {sw.ElapsedMilliseconds} ms");
 
             if (string.IsNullOrWhiteSpace(output))
             {
-                Console.WriteLine($"[PERM] #{callId} ERROR: salida vacía");
+                Console.WriteLine($"[PERM] #{callId} ERROR: empty output");
                 return ("?", "?", "?");
             }
 
@@ -52,7 +52,7 @@ public static class FileSystemHelper
 
             if (parts.Length < 3)
             {
-                Console.WriteLine($"[PERM] #{callId} SALIDA INVALIDA: '{output}'");
+                Console.WriteLine($"[PERM] #{callId} INVALID OUTPUT: '{output}'");
                 return ("?", "?", "?");
             }
 
@@ -72,11 +72,11 @@ public static class FileSystemHelper
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[PERM] #{callId} EXCEPCIÓN: {ex.Message}");
+            Console.WriteLine($"[PERM] #{callId} EXCEPTION: {ex.Message}");
         }
 
         sw.Stop();
-        Console.WriteLine($"[PERM] #{callId} FALLBACK en {sw.ElapsedMilliseconds} ms");
+        Console.WriteLine($"[PERM] #{callId} FALLBACK in {sw.ElapsedMilliseconds} ms");
 
         return ("?", "?", "?");
     }

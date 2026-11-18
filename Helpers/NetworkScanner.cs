@@ -223,7 +223,7 @@ namespace SAMBA_Util.Helpers
 
                 if (rpcOut.Contains("NT_STATUS") && !string.IsNullOrWhiteSpace(CredStore.User) && !CredStore.User.Equals("guest", StringComparison.OrdinalIgnoreCase))
                 {
-                    Console.WriteLine("[Scanner] Intento anónimo rechazado. Reintentando RPC con credenciales...");
+                    Console.WriteLine("[Scanner] Anonymous attempt rejected. Retrying RPC with credentials...");
                     var (retryArgs, retryFile) = BuildAuthArgs();
                     try
                     {

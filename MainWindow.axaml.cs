@@ -112,7 +112,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[INIT ERROR] No se pudo inicializar Samba: {ex}");
+            Console.WriteLine($"[INIT ERROR] Could not initialize Samba: {ex}");
             StatusText.Text = "Samba initialization failed.";
             await ShowErrorDialog("Samba initialization failed", ex.Message);
             return;

@@ -1,83 +1,81 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="SAMBA_Util.Views.ConfigWindow"
-        Width="450" Height="650"
+        Width="460" Height="545"
         Title="Samba-util Configuration"
         CanResize="False"
         Background="{StaticResource BackgroundBrush}"
         Foreground="{StaticResource ForegroundBrush}">
 
     <ScrollViewer Background="{StaticResource BackgroundBrush}">
-        <Border Margin="15"
-                Padding="10"
+        <Border Margin="12"
+                Padding="12"
                 Background="{StaticResource ControlBackgroundBrush}"
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"
                 CornerRadius="10">
 
-            <StackPanel Spacing="15">
+            <StackPanel Spacing="12">
 
                 <!-- Título -->
                 <TextBlock Text="Global Configuration"
-                           FontSize="20"
+                           FontSize="18"
                            FontWeight="Bold"
                            Foreground="{StaticResource ForegroundBrush}"/>
 
                 <!-- Samba config path -->
-                <StackPanel Spacing="6">
+                <StackPanel Spacing="4">
                     <TextBlock Text="Samba config path:"
                                Foreground="{StaticResource ForegroundBrush}"/>
-
-                    <DockPanel LastChildFill="False">
+                    <Grid ColumnDefinitions="*, Auto">
                         <TextBox x:Name="TxtSmbConf"
+                                 Grid.Column="0"
                                  Background="{StaticResource ControlBackgroundBrush}"
                                  BorderBrush="{StaticResource BorderBrush}"
                                  Foreground="{StaticResource ForegroundBrush}"
                                  CornerRadius="6"
                                  IsReadOnly="True"
-                                 Width="325"/>
-
+                                 VerticalAlignment="Center"/>
                         <Button x:Name="BtnBrowseSmbConf"
+                                Grid.Column="1"
                                 Content="..."
                                 Width="40"
                                 Margin="6,0,0,0"
                                 Classes="AccentButton"/>
-                    </DockPanel>
+                    </Grid>
                 </StackPanel>
 
-                <!-- Minimum SMB Protocol (NUEVO) -->
-                <StackPanel Spacing="6">
+                <!-- Minimum SMB Protocol -->
+                <StackPanel Spacing="4">
                     <TextBlock Text="Minimum SMB Protocol (client and server):"
                                Foreground="{StaticResource ForegroundBrush}"/>
-
                     <ComboBox x:Name="ProtocolCombo"
                               Background="{StaticResource ControlBackgroundBrush}"
                               BorderBrush="{StaticResource BorderBrush}"
                               Foreground="{StaticResource ForegroundBrush}"
                               CornerRadius="6"
-                              Width="365">
+                              HorizontalAlignment="Stretch">
                         <ComboBoxItem Content="SMB2 (Recommended)" Tag="SMB2"/>
                         <ComboBoxItem Content="SMB3" Tag="SMB3"/>
                         <ComboBoxItem Content="SMB1 / NT1 (Legacy)" Tag="NT1"/>
                     </ComboBox>
-
                     <TextBlock x:Name="TxtProtocolStatus"
                                Text=""
                                TextWrapping="Wrap"
+                               FontSize="11"
                                Foreground="{StaticResource ForegroundBrush}"/>
                 </StackPanel>
 
                 <!-- Default permissions -->
-                <StackPanel Spacing="6">
+                <StackPanel Spacing="4">
                     <TextBlock Text="Default permissions:"
                                Foreground="{StaticResource ForegroundBrush}"/>
-
                     <ComboBox x:Name="PermCombo"
                               Background="{StaticResource ControlBackgroundBrush}"
                               BorderBrush="{StaticResource BorderBrush}"
                               Foreground="{StaticResource ForegroundBrush}"
                               CornerRadius="6"
-                              Width="365">
+                              HorizontalAlignment="Stretch">
                         <ComboBoxItem Content="755 – Owner rwx, Group r-x, Others r-x" Tag="755"/>
                         <ComboBoxItem Content="775 – Owner rwx, Group rwx, Others r-x" Tag="775"/>
                         <ComboBoxItem Content="770 – Owner rwx, Group rwx, Others ---" Tag="770"/>
@@ -85,58 +83,92 @@
                     </ComboBox>
                 </StackPanel>
 
-                <!-- Samba printing -->
-                <StackPanel Spacing="6">
-                    <TextBlock Text="Samba printing (CUPS):"
-                               Foreground="{StaticResource ForegroundBrush}"/>
+                <!-- Samba printing (Toggle a la izquierda, textos a la par) -->
+                <Grid ColumnDefinitions="Auto, *" Margin="0,2">
                     <ToggleSwitch x:Name="PrintingToggle"
-                                  OnContent="Enabled"
-                                  OffContent="Disabled"/>
-                    <TextBlock x:Name="TxtPrintingStatus"
-                               Text="When enabled, adds CUPS settings and the [printers] and [print$] sections if they are missing."
-                               TextWrapping="Wrap"
-                               Foreground="{StaticResource ForegroundBrush}"/>
-                </StackPanel>
+                                 Grid.Column="0"
+                                 OnContent="On"
+                                 OffContent="Off"
+                                 VerticalAlignment="Center"
+                                 Margin="0,0,12,0"/>
+                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Text="Samba printing (CUPS)" FontWeight="SemiBold" Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBlock x:Name="TxtPrintingStatus"
+                                   Text="Adds CUPS settings and [printers]/[print$] sections if missing."
+                                   TextWrapping="Wrap"
+                                   FontSize="11"
+                                   Foreground="{StaticResource ForegroundBrush}"/>
+                    </StackPanel>
+                </Grid>
 
                 <!-- Guest mapping -->
-                <StackPanel Spacing="6">
-                    <TextBlock Text="Map unknown users to guest (map to guest = Bad User):"
-                               TextWrapping="Wrap"
-                               Foreground="{StaticResource ForegroundBrush}"/>
+                <Grid ColumnDefinitions="Auto, *" Margin="0,2">
                     <ToggleSwitch x:Name="GuestMapToggle"
-                                  OnContent="Enabled"
-                                  OffContent="Disabled"/>
-                    <TextBlock x:Name="TxtGuestMapStatus"
-                               Text="When enabled, unknown users are mapped to the guest account (map to guest = Bad User). Disable it to use map to guest = Never."
-                               TextWrapping="Wrap"
-                               Foreground="{StaticResource ForegroundBrush}"/>
-                </StackPanel>
+                                 Grid.Column="0"
+                                 OnContent="On"
+                                 OffContent="Off"
+                                 VerticalAlignment="Center"
+                                 Margin="0,0,12,0"/>
+                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Text="Map unknown users to guest" FontWeight="SemiBold" Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBlock x:Name="TxtGuestMapStatus"
+                                   Text="Uses map to guest = Bad User when enabled (otherwise Never)."
+                                   TextWrapping="Wrap"
+                                   FontSize="11"
+                                   Foreground="{StaticResource ForegroundBrush}"/>
+                    </StackPanel>
+                </Grid>
 
-                <StackPanel Spacing="6">
-                    <TextBlock Text="System firewall:"
-                               Foreground="{StaticResource ForegroundBrush}"/>
+                <!-- System firewall -->
+                <Grid ColumnDefinitions="Auto, *" Margin="0,2">
                     <ToggleSwitch x:Name="FirewallToggle"
-                                  OnContent="Enabled"
-                                  OffContent="Disabled"
-                                  IsEnabled="False"/>
-                    <TextBlock x:Name="TxtFirewallStatus"
-                               Text="Checking firewall..."
-                               TextWrapping="Wrap"
-                               Foreground="{StaticResource ForegroundBrush}"/>
-                    <TextBlock Text="Disabling the firewall can expose this computer to network traffic."
-                               TextWrapping="Wrap"
-                               Foreground="{StaticResource ForegroundBrush}"/>
-                </StackPanel>
+                                 Grid.Column="0"
+                                 OnContent="On"
+                                 OffContent="Off"
+                                 VerticalAlignment="Center"
+                                 IsEnabled="False"
+                                 Margin="0,0,12,0"/>
+                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Text="System firewall" FontWeight="SemiBold" Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBlock x:Name="TxtFirewallStatus"
+                                   Text="Checking firewall..."
+                                   TextWrapping="Wrap"
+                                   FontSize="11"
+                                   Foreground="{StaticResource ForegroundBrush}"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Samba firewall rule -->
+                <Grid ColumnDefinitions="Auto, *" Margin="0,2">
+                    <ToggleSwitch x:Name="ManageFirewallRuleToggle"
+                                 Grid.Column="0"
+                                 OnContent="On"
+                                 OffContent="Off"
+                                 VerticalAlignment="Center"
+                                 Margin="0,0,12,0"/>
+                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Text="Allow Samba in the firewall" FontWeight="SemiBold" Foreground="{StaticResource ForegroundBrush}"/>
+                        <TextBlock x:Name="TxtManageFirewallStatus"
+                                   Text="Adds the Samba rule to UFW/firewalld at startup."
+                                   TextWrapping="Wrap"
+                                   FontSize="11"
+                                   Foreground="{StaticResource ForegroundBrush}"/>
+                    </StackPanel>
+                </Grid>
 
                 <!-- Botones -->
-                <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,5,0,10"
-                            VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,5,0,0"
+                            HorizontalAlignment="Left">
                     <Button Content="Save"
+                            HorizontalContentAlignment="Center"
                             Classes="AccentButton"
-                            Click="OnSave"/>
+                            Click="OnSave"
+                            Width="80"/>
                     <Button Content="Close"
+                            HorizontalContentAlignment="Center"
                             Classes="NeutralButton"
-                            Click="OnClose"/>
+                            Click="OnClose"
+                            Width="80"/>
                 </StackPanel>
 
             </StackPanel>

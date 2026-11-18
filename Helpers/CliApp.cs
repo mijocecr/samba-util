@@ -28,6 +28,17 @@ public class CliApp
 
     public static async Task RunAsync()
     {
+        if (!SambaEnvironment.IsSambaInstalled())
+        {
+            Console.WriteLine("Samba is not installed on this system.");
+            Console.WriteLine("SAMBA-Util needs Samba to manage shares, users and services. Install it first, for example:");
+            Console.WriteLine("  Debian/Ubuntu:  sudo apt install samba");
+            Console.WriteLine("  Fedora/RHEL:    sudo dnf install samba");
+            Console.WriteLine("  Arch/Manjaro:   sudo pacman -S samba");
+            Console.WriteLine("  openSUSE:       sudo zypper install samba");
+            return;
+        }
+
         if (!AuthenticateAdmin())
             return;
 
@@ -501,19 +512,15 @@ public class CliApp
 
         var config = ConfigManager.Load();
         var mode = Regex.IsMatch(config.DefaultPermissions ?? "", @"^[0-7]{3,4}$")
-            ? config.DefaultPermissions
+            ? config.DefaultPermissions!
             : "0755";
-        Console.WriteLine($"Set permissions on {share.Path} to {mode} (configured default)?");
+        Console.WriteLine($"Set permissions on {share.Path} to {mode} (configured default) and fix SELinux, AppArmor and ownership?");
         if (AskYesNo("Proceed?", false) != true)
             return;
 
-        var result = ShellHelper.EjecutarComoRoot(
-            $"chmod -R {mode} -- {ShellQuote(share.Path)}", ShellHelper.LongTimeoutMs);
-        if (result.ExitCode != 0)
-        {
-            Console.WriteLine($"Could not change permissions: {result.Stderr}");
-            return;
-        }
+        var result = AccessControlHelper.FixPermissions(share, mode);
+        foreach (var step in result.Steps)
+            Console.WriteLine($"  [{(step.Success ? "OK" : "FAIL")}] {step.Name}: {step.Message}");
 
         var (owner, group, actualMode) = FileSystemHelper.GetPermissions(share.Path);
         var updated = ShareValidator.ValidateShare(share);

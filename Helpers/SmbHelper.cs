@@ -37,7 +37,7 @@ namespace SAMBA_Util.Helpers
             }
             catch (Exception ex)
             {
-                NotifyError($"Error al abrir el recurso SMB: {ex.Message}");
+                NotifyError($"Error opening the SMB share: {ex.Message}");
             }
         }
 
@@ -349,12 +349,12 @@ namespace SAMBA_Util.Helpers
                 }
                 else
                 {
-                    throw new PlatformNotSupportedException("Sistema operativo local no soportado.");
+                    throw new PlatformNotSupportedException("Local operating system not supported.");
                 }
             }
             catch (Exception ex)
             {
-                NotifyError($"Error al abrir el recurso SMB: {ex.Message}");
+                NotifyError($"Error opening the SMB share: {ex.Message}");
                 throw; // Relanzamos para que NetworkView pueda mostrar el ShowErrorDialog
             }
         }
@@ -446,7 +446,7 @@ namespace SAMBA_Util.Helpers
                 return;
             }
 
-            throw new Exception($"No se pudo abrir '{cleanUrl}' en el gestor de archivos.");
+            throw new Exception($"Could not open '{cleanUrl}' in the file manager.");
         }
 
         #endregion

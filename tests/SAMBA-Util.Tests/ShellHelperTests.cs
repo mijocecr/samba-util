@@ -44,7 +44,7 @@ public class ShellHelperTests
 
         Assert.Equal(ShellHelper.ExitTimeout, result.ExitCode);
         Assert.True(stopwatch.ElapsedMilliseconds < 4_000,
-            $"El timeout tardó demasiado: {stopwatch.ElapsedMilliseconds} ms");
+            $"The timeout took too long: {stopwatch.ElapsedMilliseconds} ms");
     }
 
     [Fact]

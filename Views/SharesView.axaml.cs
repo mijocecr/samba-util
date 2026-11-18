@@ -7,7 +7,9 @@ using SAMBA_Util.Helpers;
 using SAMBA_Util.Models;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace SAMBA_Util.Views;
 
@@ -188,15 +190,9 @@ public partial class SharesView : UserControl
 
             try
             {
-                // Ejecutar chmod recursivo (-R) como root para corregir el subárbol.
-                // La ruta va citada y tras `--` para que nunca se interprete como opción.
-                var result = ShellHelper.EjecutarComoRoot(
-                    $"chmod -R {perms} -- {ShellHelper.Quote(share.Path)}", ShellHelper.LongTimeoutMs);
-
-                if (result.ExitCode != 0)
-                {
-                    throw new InvalidOperationException(result.Stderr);
-                }
+                // Corrige permisos del sistema de archivos, el contexto SELinux,
+                // el perfil AppArmor de smbd y el propietario efectivo.
+                var result = await Task.Run(() => AccessControlHelper.FixPermissions(share, perms));
 
                 share.Warning = ShareValidator.ValidateShare(share);
 
@@ -207,7 +203,16 @@ public partial class SharesView : UserControl
                 }
 
                 if (TopLevel.GetTopLevel(this) is MainWindow main)
-                    main.UpdateStatus($"Recursive permissions fixed for '{share.Name}'");
+                {
+                    var failures = result.Steps
+                        .Where(step => !step.Success)
+                        .Select(step => $"{step.Name}: {step.Message}")
+                        .ToArray();
+
+                    main.UpdateStatus(result.Success
+                        ? $"Permissions fixed for '{share.Name}' (filesystem, SELinux, AppArmor, ownership)."
+                        : $"Permissions partially fixed for '{share.Name}': {string.Join(" ", failures)}");
+                }
             }
             catch (Exception ex)
             {

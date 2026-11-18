@@ -24,6 +24,10 @@ public static class ConfigManager
         // Indica si Samba mapea usuarios desconocidos a invitado
         // (map to guest = Bad User). Activado por defecto.
         public bool MapToGuestBadUser { get; set; } = true;
+
+        // Indica si SAMBA-Util debe asegurar la regla Samba en el cortafuegos
+        // (UFW/firewalld) al iniciar. Activado por defecto.
+        public bool ManageSambaFirewallRule { get; set; } = true;
     }
 
     public static AppConfig Load()

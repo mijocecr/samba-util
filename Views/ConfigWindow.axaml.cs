@@ -36,6 +36,9 @@ public partial class ConfigWindow : Window
         _initialGuestMapState = SambaConfigWriter.IsMapToGuestBadUser(_config.SmbConfPath);
         GuestMapToggle.IsChecked = _initialGuestMapState;
 
+        // Regla Samba en el cortafuegos (preferencia de la app, sin estado externo)
+        ManageFirewallRuleToggle.IsChecked = _config.ManageSambaFirewallRule;
+
         // Seleccionar protocolo SMB actual en el ComboBox
         foreach (var entry in ProtocolCombo.Items)
         {
@@ -256,6 +259,28 @@ public partial class ConfigWindow : Window
             }
         }
         _config.MapToGuestBadUser = _initialGuestMapState;
+
+        // Regla Samba en el cortafuegos: guardar la preferencia y, si se
+        // activa, asegurarla de inmediato.
+        var desiredManageFirewall = ManageFirewallRuleToggle.IsChecked == true;
+        _config.ManageSambaFirewallRule = desiredManageFirewall;
+        if (desiredManageFirewall)
+        {
+            TxtManageFirewallStatus.Text = "Ensuring the Samba rule in the firewall...";
+            try
+            {
+                var ensure = await Task.Run(() => FirewallHelper.EnsureSambaAllowed());
+                TxtManageFirewallStatus.Text = ensure.Message;
+            }
+            catch (Exception ex)
+            {
+                TxtManageFirewallStatus.Text = $"Could not update the firewall: {ex.Message}";
+            }
+        }
+        else
+        {
+            TxtManageFirewallStatus.Text = "SAMBA-Util will not modify firewall rules.";
+        }
 
         ConfigManager.Save(_config);
 

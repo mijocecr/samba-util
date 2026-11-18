@@ -135,12 +135,12 @@ public static class ShellHelper
 
         if (!TryGetPassword(out var password, out var failure))
         {
-            Console.WriteLine($"[SHELL] #{callId} Cancelado: {failure.Stderr}");
+            Console.WriteLine($"[SHELL] #{callId} Canceled: {failure.Stderr}");
             return failure;
         }
 
         var effectiveTimeout = timeoutMs <= 0 ? DefaultTimeoutMs : timeoutMs;
-        Console.WriteLine($"[SHELL] #{callId} → EjecutarComoRoot('{RedactSecrets(command)}')");
+        Console.WriteLine($"[SHELL] #{callId} -> EjecutarComoRoot('{RedactSecrets(command)}')");
 
         // 1-2) Autenticar/renovar la credencial de sudo de forma serializada.
         //      La contraseña nunca se mezcla con la entrada del comando.
@@ -156,10 +156,10 @@ public static class ShellHelper
             commandInput,
             effectiveTimeout,
             callId,
-            "comando root");
+            "root command");
 
         sw.Stop();
-        Console.WriteLine($"[SHELL] #{callId} ← Finalizado en {sw.ElapsedMilliseconds} ms (ExitCode={result.ExitCode})");
+        Console.WriteLine($"[SHELL] #{callId} <- Finished in {sw.ElapsedMilliseconds} ms (ExitCode={result.ExitCode})");
         return result;
     }
 
@@ -173,7 +173,7 @@ public static class ShellHelper
         var lockTimeout = Math.Min(authTimeout, 10_000);
         if (!AuthLock.Wait(lockTimeout))
         {
-            Console.WriteLine($"[SHELL] #{callId} TIMEOUT esperando el turno de autenticación sudo.");
+            Console.WriteLine($"[SHELL] #{callId} TIMEOUT waiting for the sudo authentication turn.");
             return (ExitTimeout, "", "TIMEOUT");
         }
 
@@ -185,7 +185,7 @@ public static class ShellHelper
                 password + "\n",
                 authTimeout,
                 callId,
-                "autenticación sudo");
+                "sudo authentication");
 
             if (auth.ExitCode != 0)
             {
@@ -195,7 +195,7 @@ public static class ShellHelper
 
                 // sudo devuelve un código distinto de cero si la autenticación falla,
                 // independientemente del idioma de sus mensajes.
-                Console.WriteLine($"[SHELL] #{callId} → AUTENTICACIÓN FALLIDA");
+                Console.WriteLine($"[SHELL] #{callId} -> AUTHENTICATION FAILED");
                 return (ExitPasswordIncorrect, auth.Stdout, FormatAuthError(auth.Stderr));
             }
 
@@ -206,14 +206,14 @@ public static class ShellHelper
                 null,
                 authTimeout,
                 callId,
-                "verificación de credencial sudo");
+                "sudo credential check");
 
             if (cacheCheck.ExitCode != 0)
             {
                 if (cacheCheck.ExitCode is ExitTimeout or ExitStartFailure)
                     return cacheCheck;
 
-                Console.WriteLine($"[SHELL] #{callId} → SUDO NO PUEDE USAR LA CREDENCIAL CACHEADA");
+                Console.WriteLine($"[SHELL] #{callId} -> SUDO CANNOT USE THE CACHED CREDENTIAL");
                 return (ExitPasswordIncorrect, cacheCheck.Stdout, FormatAuthError(cacheCheck.Stderr));
             }
 
@@ -278,7 +278,7 @@ public static class ShellHelper
             null,
             timeoutMs <= 0 ? DefaultTimeoutMs : timeoutMs,
             callId,
-            "comando");
+            "command");
     }
 
     public static Task<string> RunAsync(string command) =>
@@ -321,7 +321,7 @@ public static class ShellHelper
 
             if (!process.Start())
             {
-                Console.WriteLine($"[SHELL] #{callId} ERROR: no se pudo iniciar el proceso.");
+                Console.WriteLine($"[SHELL] #{callId} ERROR: could not start the process.");
                 return stdout.ToString() + stderr.ToString() + "\nPROCESS_START_FAILED";
             }
 
@@ -338,7 +338,7 @@ public static class ShellHelper
             }
             catch (OperationCanceledException)
             {
-                Console.WriteLine($"[SHELL] #{callId} TIMEOUT tras {timeoutMs} ms. Matando proceso…");
+                Console.WriteLine($"[SHELL] #{callId} TIMEOUT after {timeoutMs} ms. Killing process...");
                 KillProcess(process, callId);
                 return stdout.ToString() + stderr.ToString() + "\nTIMEOUT";
             }
@@ -404,10 +404,10 @@ public static class ShellHelper
                     stderr.AppendLine(e.Data);
             };
 
-            Console.WriteLine($"[SHELL] #{callId} Iniciando {phase}…");
+            Console.WriteLine($"[SHELL] #{callId} Starting {phase}...");
             if (!process.Start())
             {
-                Console.WriteLine($"[SHELL] #{callId} ERROR: no se pudo iniciar {phase}.");
+                Console.WriteLine($"[SHELL] #{callId} ERROR: could not start {phase}.");
                 return (ExitStartFailure, stdout.ToString(), "PROCESS_START_FAILED");
             }
 
@@ -422,18 +422,18 @@ public static class ShellHelper
                 }
                 catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidOperationException)
                 {
-                    Console.WriteLine($"[SHELL] #{callId} ADVERTENCIA: el proceso cerró la entrada antes de recibir todos los datos.");
+                    Console.WriteLine($"[SHELL] #{callId} WARNING: the process closed its input before receiving all the data.");
                 }
             }
 
             CloseInput(process, callId);
 
             var effectiveTimeout = timeoutMs <= 0 ? Timeout.Infinite : timeoutMs;
-            Console.WriteLine($"[SHELL] #{callId} Esperando hasta {DescribeTimeout(effectiveTimeout)}…");
+            Console.WriteLine($"[SHELL] #{callId} Waiting up to {DescribeTimeout(effectiveTimeout)}...");
 
             if (!process.WaitForExit(effectiveTimeout))
             {
-                Console.WriteLine($"[SHELL] #{callId} TIMEOUT. Matando proceso…");
+                Console.WriteLine($"[SHELL] #{callId} TIMEOUT. Killing process...");
                 KillProcess(process, callId);
                 return (ExitTimeout, stdout.ToString(), "TIMEOUT");
             }
@@ -446,7 +446,7 @@ public static class ShellHelper
         catch (Exception ex)
         {
             // Process.Start, WaitForExit, Kill… nunca deben propagarse al llamador.
-            Console.WriteLine($"[SHELL] #{callId} ERROR al ejecutar {phase}: {ex.Message}");
+            Console.WriteLine($"[SHELL] #{callId} ERROR running {phase}: {ex.Message}");
             if (process != null)
                 KillProcess(process, callId);
             return (ExitStartFailure, stdout.ToString(), $"PROCESS_START_FAILED: {ex.Message}");
@@ -465,7 +465,7 @@ public static class ShellHelper
         }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidOperationException)
         {
-            Console.WriteLine($"[SHELL] #{callId} ADVERTENCIA: no se pudo cerrar la entrada del proceso.");
+            Console.WriteLine($"[SHELL] #{callId} WARNING: could not close the process input.");
         }
     }
 
@@ -482,10 +482,10 @@ public static class ShellHelper
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SHELL] #{callId} ADVERTENCIA: no se pudo matar el proceso: {ex.Message}");
+            Console.WriteLine($"[SHELL] #{callId} WARNING: could not kill the process: {ex.Message}");
         }
     }
 
     private static string DescribeTimeout(int timeoutMs) =>
-        timeoutMs == Timeout.Infinite ? "siempre" : $"{timeoutMs} ms";
+        timeoutMs == Timeout.Infinite ? "always" : $"{timeoutMs} ms";
 }

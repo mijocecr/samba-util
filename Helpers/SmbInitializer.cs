@@ -37,16 +37,16 @@ public static class SmbInitializer
         {
             var configuredPath = ConfigManager.Load().SmbConfPath;
             if (string.IsNullOrWhiteSpace(configuredPath))
-                throw new InvalidOperationException("La ruta de smb.conf no está configurada.");
+                throw new InvalidOperationException("The smb.conf path is not configured.");
 
             var confPath = Path.GetFullPath(configuredPath);
             var sambaDir = Path.GetDirectoryName(confPath);
             if (string.IsNullOrWhiteSpace(sambaDir))
-                throw new InvalidOperationException($"La ruta de smb.conf no es válida: '{configuredPath}'.");
+                throw new InvalidOperationException($"The smb.conf path is not valid: '{configuredPath}'.");
 
             var createDirectory = ShellHelper.EjecutarComoRoot(
                 $"mkdir -p {ShellQuote(sambaDir)}");
-            EnsureSuccess(createDirectory, "No se pudo crear el directorio de configuración de Samba");
+            EnsureSuccess(createDirectory, "Could not create the Samba configuration directory");
 
             EnsureRootFile(confPath, DefaultSmbConf, "smb.conf");
 
@@ -59,6 +59,14 @@ public static class SmbInitializer
                 "usershares.conf");
 
             StartSambaServices();
+
+            // Asegura la regla Samba en el cortafuegos salvo que el usuario lo
+            // haya desactivado en la configuración.
+            if (ConfigManager.Load().ManageSambaFirewallRule)
+            {
+                var firewall = FirewallHelper.EnsureSambaAllowed();
+                Console.WriteLine($"[SMB INIT] Firewall: {firewall.Message}");
+            }
         });
     }
 
@@ -73,11 +81,11 @@ public static class SmbInitializer
 
             var create = ShellHelper.EjecutarComoRoot(
                 $"if [ ! -e {ShellQuote(path)} ]; then install -m 644 {ShellQuote(temp)} {ShellQuote(path)}; fi");
-            EnsureSuccess(create, $"No se pudo crear {label}");
+            EnsureSuccess(create, $"Could not create {label}");
 
             var verify = ShellHelper.EjecutarComoRoot(
                 $"test -f {ShellQuote(path)}");
-            EnsureSuccess(verify, $"No se encontró {label} después de la inicialización");
+            EnsureSuccess(verify, $"Could not find {label} after initialization");
         }
         finally
         {
@@ -103,7 +111,7 @@ public static class SmbInitializer
             if (smbd.ExitCode != 0)
                 smbd = ShellHelper.EjecutarComoRoot(
                     "systemctl enable --now smb.service", ShellHelper.LongTimeoutMs);
-            EnsureSuccess(smbd, "No se pudo habilitar ni iniciar el servicio smbd/smb");
+            EnsureSuccess(smbd, "Could not enable or start the smbd/smb service");
 
             var nmbd = ShellHelper.EjecutarComoRoot(
                 "systemctl enable --now nmbd.service", ShellHelper.LongTimeoutMs);
@@ -111,7 +119,7 @@ public static class SmbInitializer
                 nmbd = ShellHelper.EjecutarComoRoot(
                     "systemctl enable --now nmb.service", ShellHelper.LongTimeoutMs);
             if (nmbd.ExitCode != 0)
-                Console.WriteLine($"[SMB INIT] NetBIOS nmbd no está disponible; SMB por IP sigue dependiendo de smbd. {nmbd.Stderr}");
+                Console.WriteLine($"[SMB INIT] NetBIOS nmbd is not available; IP-based SMB still depends on smbd. {nmbd.Stderr}");
 
             return;
         }
@@ -123,7 +131,7 @@ public static class SmbInitializer
             if (smbd.ExitCode != 0)
                 smbd = ShellHelper.EjecutarComoRoot(
                     "service smb start", ShellHelper.LongTimeoutMs);
-            EnsureSuccess(smbd, "No se pudo iniciar el servicio smbd/smb");
+            EnsureSuccess(smbd, "Could not start the smbd/smb service");
 
             var nmbd = ShellHelper.EjecutarComoRoot(
                 "service nmbd start", ShellHelper.LongTimeoutMs);
@@ -131,7 +139,7 @@ public static class SmbInitializer
                 nmbd = ShellHelper.EjecutarComoRoot(
                     "service nmb start", ShellHelper.LongTimeoutMs);
             if (nmbd.ExitCode != 0)
-                Console.WriteLine($"[SMB INIT] NetBIOS nmbd no está disponible; SMB por IP sigue dependiendo de smbd. {nmbd.Stderr}");
+                Console.WriteLine($"[SMB INIT] NetBIOS nmbd is not available; IP-based SMB still depends on smbd. {nmbd.Stderr}");
 
             return;
         }
@@ -140,10 +148,10 @@ public static class SmbInitializer
         {
             var samba = ShellHelper.EjecutarComoRoot(
                 "rc-update add samba default && rc-service samba start", ShellHelper.LongTimeoutMs);
-            EnsureSuccess(samba, "No se pudo habilitar ni iniciar Samba");
+            EnsureSuccess(samba, "Could not enable or start Samba");
             return;
         }
 
-        throw new InvalidOperationException("No se detectó un gestor de servicios compatible para iniciar Samba.");
+        throw new InvalidOperationException("No compatible service manager was found to start Samba.");
     }
 }

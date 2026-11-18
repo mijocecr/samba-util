@@ -15,8 +15,12 @@ public static class ShareValidator
         return p.PadLeft(3, '0');
     }
 
+    // Marcador para shares que requieren autenticación sin un usuario concreto:
+    // no hay un destino real al que cambiar el propietario.
+    public const string GenericSmbUser = "smbuser";
+
     // Determina el usuario efectivo que Samba usará
-    private static string GetEffectiveUser(Share s)
+    public static string GetEffectiveUser(Share s)
     {
         // 1) Si hay force user → Samba siempre usa ese usuario
         if (!string.IsNullOrWhiteSpace(s.ForceUser))
@@ -28,7 +32,7 @@ public static class ShareValidator
 
         // 3) Si requiere autenticación → usa el usuario SMB introducido
         // (si en el futuro guardas el usuario SMB, cámbialo aquí)
-        return "smbuser";
+        return GenericSmbUser;
     }
 
     public static string? ValidateShare(Share s)

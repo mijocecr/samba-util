@@ -57,13 +57,13 @@ public static class SambaConfigWriter
             .GroupBy(share => share.Name, StringComparer.OrdinalIgnoreCase)
             .Any(group => group.Count() > 1))
         {
-            throw new InvalidOperationException("La lista contiene nombres de recursos compartidos duplicados.");
+            throw new InvalidOperationException("The list contains duplicate share names.");
         }
 
         var config = ConfigManager.Load();
         string smbConf = config.SmbConfPath;
         if (string.IsNullOrWhiteSpace(smbConf))
-            throw new InvalidOperationException("La ruta del archivo smb.conf no está configurada.");
+            throw new InvalidOperationException("The smb.conf file path is not configured.");
 
         string smbConfFull = Path.GetFullPath(smbConf);
 
@@ -79,7 +79,7 @@ public static class SambaConfigWriter
         if (skipped.Count > 0)
         {
             Console.WriteLine(
-                $"[WRITE] #{callId} Omitiendo {skipped.Count} share(s) definidos en includes: " +
+                $"[WRITE] #{callId} Skipping {skipped.Count} share(s) defined in includes: " +
                 string.Join(", ", skipped.Select(s => $"{s.Name} ({s.SourceFile})")));
         }
 
@@ -95,7 +95,7 @@ public static class SambaConfigWriter
         WriteConfig(output, smbConfFull, callId);
 
         sw.Stop();
-        Console.WriteLine($"[WRITE] #{callId} ← SaveAllShares completado en {sw.ElapsedMilliseconds} ms");
+        Console.WriteLine($"[WRITE] #{callId} <- SaveAllShares completed in {sw.ElapsedMilliseconds} ms");
     }
 
     // Valida con testparm, hace backup, copia el archivo y reinicia Samba.
@@ -118,10 +118,10 @@ public static class SambaConfigWriter
                 $"testparm -s {ShellQuote(temp)}", ShellHelper.LongTimeoutMs);
             if (test.ExitCode != 0)
             {
-                Console.WriteLine($"[WRITE] #{callId} ERROR: testparm falló. smb.conf inválido.");
+                Console.WriteLine($"[WRITE] #{callId} ERROR: testparm failed. Invalid smb.conf.");
                 Console.WriteLine(test.Stderr);
                 throw new InvalidOperationException(
-                    $"La configuración de Samba generada no es válida: {test.Stderr}{test.Stdout}");
+                    $"The generated Samba configuration is not valid: {test.Stderr}{test.Stdout}");
             }
 
             if (File.Exists(smbConfFull))
@@ -131,7 +131,7 @@ public static class SambaConfigWriter
                 if (backupResult.ExitCode != 0)
                 {
                     throw new InvalidOperationException(
-                        $"No se pudo crear el backup de smb.conf: {backupResult.Stderr}");
+                        $"Could not create the smb.conf backup: {backupResult.Stderr}");
                 }
             }
 
@@ -139,9 +139,9 @@ public static class SambaConfigWriter
                 $"cp {ShellQuote(temp)} {ShellQuote(smbConfFull)}");
             if (copyResult.ExitCode != 0)
             {
-                Console.WriteLine($"[WRITE] #{callId} ERROR al copiar smb.conf");
+                Console.WriteLine($"[WRITE] #{callId} ERROR copying smb.conf");
                 throw new InvalidOperationException(
-                    $"No se pudo escribir el archivo smb.conf: {copyResult.Stderr}");
+                    $"Could not write the smb.conf file: {copyResult.Stderr}");
             }
 
             try
@@ -159,12 +159,12 @@ public static class SambaConfigWriter
                         ShellHelper.LongTimeoutMs);
 
                     Console.WriteLine(restore.ExitCode == 0
-                        ? $"[WRITE] #{callId} Rollback: smb.conf restaurado desde el backup."
-                        : $"[WRITE] #{callId} Rollback falló: {restore.Stderr}{restore.Stdout}");
+                        ? $"[WRITE] #{callId} Rollback: smb.conf restored from the backup."
+                        : $"[WRITE] #{callId} Rollback failed: {restore.Stderr}{restore.Stdout}");
                 }
                 else
                 {
-                    Console.WriteLine($"[WRITE] #{callId} No hay backup de smb.conf para restaurar.");
+                    Console.WriteLine($"[WRITE] #{callId} No smb.conf backup is available to restore.");
                 }
 
                 throw;
@@ -188,7 +188,7 @@ public static class SambaConfigWriter
         var config = ConfigManager.Load();
         string smbConf = config.SmbConfPath;
         if (string.IsNullOrWhiteSpace(smbConf))
-            throw new InvalidOperationException("La ruta del archivo smb.conf no está configurada.");
+            throw new InvalidOperationException("The smb.conf file path is not configured.");
 
         string smbConfFull = Path.GetFullPath(smbConf);
         var originalLines = File.Exists(smbConfFull)
@@ -199,7 +199,7 @@ public static class SambaConfigWriter
 
         if (originalLines.SequenceEqual(output))
         {
-            Console.WriteLine($"[WRITE] #{callId} server min protocol ya es {normalized}; no se reescribe smb.conf.");
+            Console.WriteLine($"[WRITE] #{callId} server min protocol is already {normalized}; smb.conf is not rewritten.");
             return false;
         }
 
@@ -210,8 +210,8 @@ public static class SambaConfigWriter
             !string.Equals(effective, normalized, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                $"smb.conf se escribió, pero testparm sigue reportando " +
-                $"'{effective}' como server min protocol (esperado '{normalized}').");
+                $"smb.conf was written, but testparm still reports " +
+                $"'{effective}' as server min protocol (expected '{normalized}').");
         }
 
         Console.WriteLine($"[WRITE] #{callId} server min protocol = {normalized} aplicado y verificado.");
@@ -346,7 +346,7 @@ public static class SambaConfigWriter
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GUEST] No se pudo leer {path}: {ex.Message}");
+            Console.WriteLine($"[GUEST] Could not read {path}: {ex.Message}");
             return false;
         }
     }
@@ -359,7 +359,7 @@ public static class SambaConfigWriter
         var config = ConfigManager.Load();
         string smbConf = config.SmbConfPath;
         if (string.IsNullOrWhiteSpace(smbConf))
-            throw new InvalidOperationException("La ruta del archivo smb.conf no está configurada.");
+            throw new InvalidOperationException("The smb.conf file path is not configured.");
 
         string smbConfFull = Path.GetFullPath(smbConf);
         var originalLines = File.Exists(smbConfFull)
@@ -371,14 +371,14 @@ public static class SambaConfigWriter
         if (originalLines.SequenceEqual(output))
         {
             Console.WriteLine(
-                $"[WRITE] #{callId} map to guest ya está {(enabled ? "Bad User" : "Never")}; " +
-                "no se reescribe smb.conf.");
+                $"[WRITE] #{callId} map to guest is already {(enabled ? "Bad User" : "Never")}; " +
+                "smb.conf is not rewritten.");
             return false;
         }
 
         WriteConfig(output, smbConfFull, callId);
         Console.WriteLine(
-            $"[WRITE] #{callId} map to guest = {(enabled ? "Bad User" : "Never")} aplicado en smb.conf.");
+            $"[WRITE] #{callId} map to guest = {(enabled ? "Bad User" : "Never")} applied to smb.conf.");
         return true;
     }
 
@@ -486,7 +486,7 @@ public static class SambaConfigWriter
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[PRINT] No se pudo leer {path}: {ex.Message}");
+            Console.WriteLine($"[PRINT] Could not read {path}: {ex.Message}");
             return false;
         }
     }
@@ -499,7 +499,7 @@ public static class SambaConfigWriter
         var config = ConfigManager.Load();
         string smbConf = config.SmbConfPath;
         if (string.IsNullOrWhiteSpace(smbConf))
-            throw new InvalidOperationException("La ruta del archivo smb.conf no está configurada.");
+            throw new InvalidOperationException("The smb.conf file path is not configured.");
 
         string smbConfFull = Path.GetFullPath(smbConf);
         var originalLines = File.Exists(smbConfFull)
@@ -511,14 +511,14 @@ public static class SambaConfigWriter
         if (originalLines.SequenceEqual(output))
         {
             Console.WriteLine(
-                $"[WRITE] #{callId} impresión ya está {(enabled ? "activada" : "desactivada")}; " +
-                "no se reescribe smb.conf.");
+                $"[WRITE] #{callId} printing is already {(enabled ? "enabled" : "disabled")}; " +
+                "smb.conf is not rewritten.");
             return false;
         }
 
         WriteConfig(output, smbConfFull, callId);
         Console.WriteLine(
-            $"[WRITE] #{callId} impresión {(enabled ? "activada" : "desactivada")} en smb.conf.");
+            $"[WRITE] #{callId} printing {(enabled ? "enabled" : "disabled")} in smb.conf.");
         return true;
     }
 
@@ -747,7 +747,7 @@ public static class SambaConfigWriter
         var shares = SambaConfigReader.LoadShares();
 
         if (shares.Any(s => s.Name.Equals(newShare.Name, StringComparison.OrdinalIgnoreCase)))
-            throw new InvalidOperationException($"Ya existe un recurso compartido llamado '{newShare.Name}'.");
+            throw new InvalidOperationException($"A share named '{newShare.Name}' already exists.");
 
         shares.Add(newShare);
         SaveAllShares(shares);
@@ -802,9 +802,9 @@ public static class SambaConfigWriter
 
         string smbConfFull = Path.GetFullPath(ConfigManager.Load().SmbConfPath);
         throw new InvalidOperationException(
-            $"El recurso compartido '{share.Name}' está definido en '{share.SourceFile}' " +
-            $"(incluido desde {smbConfFull}). Edita ese archivo directamente o elimina la " +
-            "directiva include antes de modificarlo desde SAMBA-Util.");
+            $"The share '{share.Name}' is defined in '{share.SourceFile}' " +
+            $"(included from {smbConfFull}). Edit that file directly or remove the " +
+            "include directive before modifying it from SAMBA-Util.");
     }
 
     private sealed class SectionBlock
@@ -993,7 +993,7 @@ public static class SambaConfigWriter
             }
 
             if (res.ExitCode != 0)
-                throw new InvalidOperationException($"No se pudo reiniciar Samba: {res.Stderr}");
+                throw new InvalidOperationException($"Could not restart Samba: {res.Stderr}");
 
             return;
         }
@@ -1007,7 +1007,7 @@ public static class SambaConfigWriter
             }
 
             if (res.ExitCode != 0)
-                throw new InvalidOperationException($"No se pudo reiniciar Samba: {res.Stderr}");
+                throw new InvalidOperationException($"Could not restart Samba: {res.Stderr}");
 
             return;
         }
@@ -1016,11 +1016,11 @@ public static class SambaConfigWriter
         {
             var res = ShellHelper.EjecutarComoRoot("rc-service samba restart", ShellHelper.LongTimeoutMs);
             if (res.ExitCode != 0)
-                throw new InvalidOperationException($"No se pudo reiniciar Samba: {res.Stderr}");
+                throw new InvalidOperationException($"Could not restart Samba: {res.Stderr}");
 
             return;
         }
 
-        throw new InvalidOperationException("No se pudo detectar el gestor de servicios para reiniciar Samba.");
+        throw new InvalidOperationException("Could not detect a service manager to restart Samba.");
     }
 }

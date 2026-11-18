@@ -45,7 +45,7 @@ public partial class EditUserWindow : Window
             $"id -u -- {quotedUser} 2>/dev/null"
         );
 
-        UnixUidText.Text = exitUnix == 0 ? unixUid.Trim() : "No existe";
+        UnixUidText.Text = exitUnix == 0 ? unixUid.Trim() : "Does not exist";
     }
 
     private string ExtraerUidSamba(string info)
