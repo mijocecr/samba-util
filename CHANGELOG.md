@@ -29,9 +29,9 @@ All notable changes to SAMBA-Util are documented in this file.
   Samba presence check no longer depends on `which`; and the TCP 445/139 check
   no longer mistakes another port (for example 4450) for SMB. The shares check
   reports missing SMB client tools instead of "no shares detected".
-- Button labels are now centered in every dialog (`HorizontalContentAlignment`),
-  so text no longer sits off-center in windows such as the firewall
-  confirmation, the share editor and the error dialogs.
+- Button labels are now centered everywhere (`HorizontalContentAlignment`), so
+  text no longer sits off-center in dialogs such as the firewall confirmation,
+  the share editor and the error dialogs, nor in the Logs and Status views.
 
 ## [4.4.0] - 2026-11-18
 

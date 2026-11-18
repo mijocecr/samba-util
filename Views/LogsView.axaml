@@ -18,10 +18,12 @@
                     Spacing="10"
                     Margin="0,18,0,0">
             <Button Content="Refresh"
+                    HorizontalContentAlignment="Center"
                     Classes="NeutralButton"
                     Click="OnRefresh"/>
 
             <Button Content="Open File"
+                    HorizontalContentAlignment="Center"
                     Classes="AccentButton"
                     Click="OnOpenFull"/>
         </StackPanel>
