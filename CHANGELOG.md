@@ -2,10 +2,27 @@
 
 All notable changes to SAMBA-Util are documented in this file.
 
-## [Unreleased]
+## [4.4.0] - 2026-11-18
+
+This release adds full permission repair (SELinux, AppArmor and ownership), a
+default Samba firewall rule and a Samba presence check at startup, and switches
+every user-facing message to English.
 
 ### Added
 
+- "Fix permissions" now repairs more than the POSIX mode. On SELinux systems it
+  labels the share with the `samba_share_t` context (`semanage fcontext` then
+  `restorecon`, falling back to `chcon`); on AppArmor systems it adds a local
+  rule to the `smbd` profile and reloads it; and it always adjusts ownership
+  (`chown`) to the effective Samba user (the share's `force user`, or `nobody`
+  when there is no concrete target).
+- A new "Allow Samba in the firewall" option in the configuration window,
+  enabled by default. On startup the app ensures the Samba rule exists in `ufw`
+  or `firewalld`. Plain `nftables`/`iptables` setups are only reported, never
+  modified.
+- SAMBA-Util now checks at startup whether Samba is installed. If it is not, it
+  shows a dialog with the install command for the detected distribution and
+  exits cleanly, both in the GUI and the CLI.
 - The configuration window now includes a "Map unknown users to guest"
   toggle (`map to guest = Bad User`). It is enabled by default and, when
   disabled, writes `map to guest = Never` to `smb.conf`.
@@ -23,8 +40,17 @@ All notable changes to SAMBA-Util are documented in this file.
   appimagetool finds the AppStream file and appstreamcli validates it without
   warnings; the AUR tarball keeps the plain `samba-util.desktop` name.
 
+### Changed
+
+- Every user-facing dialog and message is now in English.
+
 ### Fixed
 
+- The Close button in the "Samba is not installed" window was clipped: the
+  dialog used a fixed height smaller than its content. The window now sizes to
+  its content, with a scroll fallback for large fonts or DPI.
+- The text of the "Samba is not installed" window was shortened and no longer
+  refers to `systemctl`.
 - SAMBA-Util now ensures `usershares.conf` exists in the Samba configuration
   directory, creating a sensible default when it is missing. Previously, if
   `smb.conf` included a non-existent `usershares.conf` (for example
