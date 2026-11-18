@@ -2,6 +2,34 @@
 
 All notable changes to SAMBA-Util are documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- SAMBA-Util now checks at startup whether the session user is allowed to use
+  `sudo`. Without administrator privileges it cannot manage Samba, so it shows
+  a clear message with the command to add the user to the `sudo`/`wheel` group
+  instead of asking for a password that would never work. The check is
+  distribution- and language-independent (group membership plus `sudo -n -l`
+  classified using English messages). The CLI warns the same way.
+
+### Fixed
+
+- The Network tab no longer asks for share credentials when the problem is not
+  authentication. If the SMB client tools are missing, it now says so and shows
+  the install command for the main distributions instead of the "Credentials
+  Required" dialog (on several distributions `smbclient`/`rpcclient` live in a
+  separate package from the `samba` server). Network errors are reported the
+  same way. The credentials dialog only appears when the server actually
+  rejects anonymous access (`NT_STATUS_ACCESS_DENIED`, `NT_STATUS_LOGON_FAILURE`
+  and similar). The CLI makes the same distinction.
+- The Status tab is now reliable across distributions and languages. Service
+  state is read from `systemctl show` (machine-readable and not translated)
+  instead of parsing `systemctl status` labels, which systemd translates; the
+  Samba presence check no longer depends on `which`; and the TCP 445/139 check
+  no longer mistakes another port (for example 4450) for SMB. The shares check
+  reports missing SMB client tools instead of "no shares detected".
+
 ## [4.4.0] - 2026-11-18
 
 This release adds full permission repair (SELinux, AppArmor and ownership), a

@@ -74,4 +74,48 @@ public static class SambaEnvironment
                 line.StartsWith("smbd.service", StringComparison.OrdinalIgnoreCase) ||
                 line.StartsWith("smb.service", StringComparison.OrdinalIgnoreCase));
     }
+
+    // ---------------------------------------------------------
+    // HERRAMIENTAS DE CLIENTE SMB (smbclient / rpcclient)
+    // ---------------------------------------------------------
+    // En varias distribuciones (por ejemplo Debian/Ubuntu) el cliente SMB vive
+    // en un paquete aparte (`smbclient`) del servidor (`samba`). Sin él la
+    // aplicación no puede enumerar recursos compartidos, así que conviene
+    // detectarlo para mostrar un mensaje claro en lugar de pedir credenciales
+    // cuando en realidad falta el programa.
+
+    // Hechos recogidos del sistema, separados de la decisión para poder
+    // probarlos sin tocar el sistema real.
+    public readonly record struct SmbClientProbe(
+        bool SmbclientOnPath,
+        bool RpcclientOnPath);
+
+    // smbclient enumera recursos en equipos que no son Windows.
+    public static bool IsSmbClientAvailable(in SmbClientProbe probe) => probe.SmbclientOnPath;
+
+    // rpcclient enumera recursos en equipos Windows.
+    public static bool IsRpcClientAvailable(in SmbClientProbe probe) => probe.RpcclientOnPath;
+
+    // Recoge los hechos del sistema actual. Es la única parte que ejecuta
+    // comandos; la decisión vive en las funciones puras de arriba.
+    public static SmbClientProbe InspectSmbClient()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            // En plataformas no Linux no bloqueamos: el programa está pensado
+            // para Linux, pero no debe impedir su ejecución.
+            return new SmbClientProbe(true, true);
+        }
+
+        var smbclient = ShellHelper.Ejecutar("command -v smbclient 2>/dev/null");
+        var rpcclient = ShellHelper.Ejecutar("command -v rpcclient 2>/dev/null");
+
+        return new SmbClientProbe(
+            SmbclientOnPath: smbclient.ExitCode == 0 && !string.IsNullOrWhiteSpace(smbclient.Stdout),
+            RpcclientOnPath: rpcclient.ExitCode == 0 && !string.IsNullOrWhiteSpace(rpcclient.Stdout));
+    }
+
+    public static bool HasSmbClient() => IsSmbClientAvailable(InspectSmbClient());
+
+    public static bool HasRpcClient() => IsRpcClientAvailable(InspectSmbClient());
 }

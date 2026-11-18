@@ -21,14 +21,22 @@ public partial class App : Application
             // Antes de abrir la ventana principal comprobamos que Samba esté
             // instalado. Si no lo está, mostramos un aviso con instrucciones y
             // cerramos la aplicación de forma limpia al cerrar esa ventana.
-            if (SambaEnvironment.IsSambaInstalled())
-            {
-                desktop.MainWindow = new MainWindow();
-            }
-            else
+            if (!SambaEnvironment.IsSambaInstalled())
             {
                 desktop.MainWindow = new SambaMissingWindow();
                 desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
+            }
+            // Después comprobamos que el usuario pueda usar sudo: sin privilegios
+            // de administrador SAMBA-Util no puede gestionar Samba. Se avisa en
+            // lugar de pedir una contraseña que nunca funcionaría.
+            else if (!SudoEnvironment.CurrentUserHasSudo())
+            {
+                desktop.ShutdownMode = ShutdownMode.OnLastWindowClose;
+                desktop.MainWindow = new SudoRequiredWindow(() => new MainWindow().Show());
+            }
+            else
+            {
+                desktop.MainWindow = new MainWindow();
             }
         }
 

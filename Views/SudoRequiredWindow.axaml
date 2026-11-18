@@ -1,0 +1,75 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="SAMBA_Util.Views.SudoRequiredWindow"
+        Width="560"
+        SizeToContent="Height"
+        Title="Administrator privileges required"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BackgroundBrush}"
+        Foreground="{StaticResource ForegroundBrush}">
+
+    <ScrollViewer Background="{StaticResource BackgroundBrush}"
+                  VerticalScrollBarVisibility="Auto">
+    <Border Margin="12"
+            Padding="18"
+            Background="{StaticResource ControlBackgroundBrush}"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="10">
+
+        <StackPanel Spacing="14">
+
+            <TextBlock Text="Administrator privileges required"
+                       FontSize="20"
+                       FontWeight="Bold"
+                       Foreground="{StaticResource ForegroundBrush}"/>
+
+            <TextBlock TextWrapping="Wrap"
+                       Foreground="{StaticResource ForegroundBrush}"
+                       Text="SAMBA-Util needs administrator (sudo) privileges to manage Samba, but the current user is not allowed to run sudo."/>
+
+            <TextBlock TextWrapping="Wrap"
+                       Foreground="{StaticResource ForegroundBrush}"
+                       Text="Add your user to the sudo group and try again. Replace &lt;your-user&gt; with your username:"/>
+
+            <Border Padding="12"
+                    Background="{StaticResource BackgroundBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6">
+                <StackPanel Spacing="6">
+                    <TextBlock Foreground="{StaticResource ForegroundBrush}" Text="Debian / Ubuntu / Linux Mint:"/>
+                    <SelectableTextBlock Foreground="{StaticResource ForegroundBrush}" FontFamily="monospace"
+                                         Text="sudo usermod -aG sudo &lt;your-user&gt;"/>
+                    <TextBlock Foreground="{StaticResource ForegroundBrush}" Text="Fedora / RHEL / CentOS:"/>
+                    <SelectableTextBlock Foreground="{StaticResource ForegroundBrush}" FontFamily="monospace"
+                                         Text="sudo usermod -aG wheel &lt;your-user&gt;"/>
+                    <TextBlock Foreground="{StaticResource ForegroundBrush}" Text="Arch / Manjaro / CachyOS:"/>
+                    <SelectableTextBlock Foreground="{StaticResource ForegroundBrush}" FontFamily="monospace"
+                                         Text="sudo usermod -aG wheel &lt;your-user&gt;"/>
+                    <TextBlock Foreground="{StaticResource ForegroundBrush}" Text="openSUSE:"/>
+                    <SelectableTextBlock Foreground="{StaticResource ForegroundBrush}" FontFamily="monospace"
+                                         Text="sudo usermod -aG wheel &lt;your-user&gt;"/>
+                </StackPanel>
+            </Border>
+
+            <TextBlock TextWrapping="Wrap"
+                       Foreground="{StaticResource ForegroundBrush}"
+                       Text="Log out and back in (or reboot) for the change to take effect."/>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+                <Button Content="Continue anyway"
+                        HorizontalContentAlignment="Center"
+                        Click="OnContinue"/>
+                <Button Content="Close"
+                        Width="100"
+                        HorizontalContentAlignment="Center"
+                        Classes="AccentButton"
+                        Click="OnClose"/>
+            </StackPanel>
+
+        </StackPanel>
+    </Border>
+    </ScrollViewer>
+</Window>

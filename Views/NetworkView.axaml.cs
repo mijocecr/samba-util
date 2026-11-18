@@ -331,16 +331,29 @@ public partial class NetworkView : UserControl
             loading = ShowLoading($"Connecting to {targetName} ({targetIp})...");
 
             List<NetworkShare> shares = new();
+            ShareEnumerationOutcome outcome = ShareEnumerationOutcome.Failed;
             try
             {
-                shares = await NetworkScanner.GetSharesAsync(targetIp, token);
+                var enumeration = await NetworkScanner.GetSharesResultAsync(targetIp, token);
+                shares = enumeration.Shares;
+                outcome = enumeration.Outcome;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[DIAGNOSTIC ERROR] GetSharesAsync exception: {ex.Message}");
+                Console.WriteLine($"[DIAGNOSTIC ERROR] GetSharesResultAsync exception: {ex.Message}");
             }
 
             if (_activeSessionId != sessionGuid || token.IsCancellationRequested) return;
+
+            // Sin las herramientas SMB o ante un error de red, pedir credenciales
+            // solo confunde: se explica el motivo real.
+            if (outcome != ShareEnumerationOutcome.Success &&
+                outcome != ShareEnumerationOutcome.RequiresCredentials)
+            {
+                ShowSharesMessage(DescribeEnumerationFailure(outcome, $"{targetName} ({targetIp})"), new SolidColorBrush(fgColor, 0.7));
+                Log($"Could not list shares for {targetName}: {outcome}.");
+                return;
+            }
 
             if (shares.Count == 0)
             {
@@ -361,17 +374,7 @@ public partial class NetworkView : UserControl
                     Console.WriteLine("[DIAGNOSTIC] Dialog was canceled or credentials were left empty. Aborting.");
                     mainWindow.ShowToast("Canceled");
                     Log("Shares loading canceled.");
-                    SharesPanel.DataContext = null;
-                    SharesPanel.Children.Clear();
-                    SharesPanel.Children.Add(new TextBlock
-                    {
-                        Text = "Operation canceled or credentials required.",
-                        Foreground = Brushes.Gray,
-                        FontStyle = FontStyle.Italic,
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        TextWrapping = TextWrapping.Wrap,
-                        Margin = new Thickness(15)
-                    });
+                    ShowSharesMessage("Operation canceled or credentials required.", Brushes.Gray);
                     return;
                 }
 
@@ -389,31 +392,32 @@ public partial class NetworkView : UserControl
 
                 try
                 {
-                    shares = await NetworkScanner.GetSharesAsync(targetIp, token);
+                    var enumeration = await NetworkScanner.GetSharesResultAsync(targetIp, token);
+                    shares = enumeration.Shares;
+                    outcome = enumeration.Outcome;
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[DIAGNOSTIC ERROR] GetSharesAsync with credentials error: {ex.Message}");
+                    Console.WriteLine($"[DIAGNOSTIC ERROR] GetSharesResultAsync with credentials error: {ex.Message}");
                 }
             }
 
             if (_activeSessionId != sessionGuid || token.IsCancellationRequested) return;
+
+            if (outcome == ShareEnumerationOutcome.ClientMissing ||
+                outcome == ShareEnumerationOutcome.Failed)
+            {
+                ShowSharesMessage(DescribeEnumerationFailure(outcome, $"{targetName} ({targetIp})"), new SolidColorBrush(fgColor, 0.7));
+                Log($"Could not list shares for {targetName}: {outcome}.");
+                return;
+            }
 
             SharesPanel.DataContext = null;
             SharesPanel.Children.Clear();
 
             if (shares.Count == 0)
             {
-                SharesPanel.Children.Add(new TextBlock
-                {
-                    Text = "Unable to enumerate SMB shares (credentials required or access denied).",
-                    Foreground = new SolidColorBrush(fgColor, 0.7),
-                    FontSize = 13,
-                    FontStyle = FontStyle.Italic,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    TextWrapping = TextWrapping.Wrap,
-                    Margin = new Thickness(15)
-                });
+                ShowSharesMessage("Unable to enumerate SMB shares (credentials required or access denied).", new SolidColorBrush(fgColor, 0.7));
                 Log($"No shares visible for {targetName}.");
                 return;
             }
@@ -676,18 +680,31 @@ public partial class NetworkView : UserControl
             loading = ShowLoading($"Connecting to {ip}...");
 
             List<NetworkShare> shares = new();
+            ShareEnumerationOutcome outcome = ShareEnumerationOutcome.Failed;
             try
             {
-                Console.WriteLine($"[DIAGNOSTIC] QuickConnect GetSharesAsync for IP: {ip} (Attempt 1)");
-                shares = await NetworkScanner.GetSharesAsync(ip, token);
-                Console.WriteLine($"[DIAGNOSTIC] QuickConnect GetSharesAsync returned {shares.Count} shares for IP: {ip}");
+                Console.WriteLine($"[DIAGNOSTIC] QuickConnect GetSharesResultAsync for IP: {ip} (Attempt 1)");
+                var enumeration = await NetworkScanner.GetSharesResultAsync(ip, token);
+                shares = enumeration.Shares;
+                outcome = enumeration.Outcome;
+                Console.WriteLine($"[DIAGNOSTIC] QuickConnect attempt 1 returned {shares.Count} shares ({outcome}) for IP: {ip}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[DIAGNOSTIC ERROR] QuickConnect GetSharesAsync exception for IP {ip}: {ex.Message}");
+                Console.WriteLine($"[DIAGNOSTIC ERROR] QuickConnect GetSharesResultAsync exception for IP {ip}: {ex.Message}");
             }
 
             if (_activeSessionId != sessionGuid || token.IsCancellationRequested) return;
+
+            // Sin las herramientas SMB o ante un error de red, pedir credenciales
+            // solo confunde: se explica el motivo real.
+            if (outcome != ShareEnumerationOutcome.Success &&
+                outcome != ShareEnumerationOutcome.RequiresCredentials)
+            {
+                ShowSharesMessage(DescribeEnumerationFailure(outcome, ip), Brushes.Gray);
+                Log($"Could not list shares for {ip}: {outcome}.");
+                return;
+            }
 
             if (shares.Count == 0)
             {
@@ -708,15 +725,7 @@ public partial class NetworkView : UserControl
                         Console.WriteLine("[DIAGNOSTIC] QuickConnect credentials dialog canceled or superseded.");
                         mainWindow.ShowToast("Connection canceled");
                         Log("Connection canceled.");
-                        SharesPanel.Children.Add(new TextBlock
-                        {
-                            Text = "Connection canceled or credentials required.",
-                            Foreground = Brushes.Gray,
-                            FontStyle = FontStyle.Italic,
-                            HorizontalAlignment = HorizontalAlignment.Center,
-                            TextWrapping = TextWrapping.Wrap,
-                            Margin = new Thickness(15)
-                        });
+                        ShowSharesMessage("Connection canceled or credentials required.", Brushes.Gray);
                         return;
                     }
 
@@ -727,9 +736,11 @@ public partial class NetworkView : UserControl
 
                     try
                     {
-                        Console.WriteLine($"[DIAGNOSTIC] QuickConnect GetSharesAsync for IP: {ip} (Attempt 2 with credentials)");
-                        shares = await NetworkScanner.GetSharesAsync(ip, token);
-                        Console.WriteLine($"[DIAGNOSTIC] QuickConnect Attempt 2 returned {shares.Count} shares for IP: {ip}");
+                        Console.WriteLine($"[DIAGNOSTIC] QuickConnect GetSharesResultAsync for IP: {ip} (Attempt 2 with credentials)");
+                        var enumeration = await NetworkScanner.GetSharesResultAsync(ip, token);
+                        shares = enumeration.Shares;
+                        outcome = enumeration.Outcome;
+                        Console.WriteLine($"[DIAGNOSTIC] QuickConnect attempt 2 returned {shares.Count} shares ({outcome}) for IP: {ip}");
                     }
                     catch (Exception ex)
                     {
@@ -740,20 +751,20 @@ public partial class NetworkView : UserControl
 
             if (_activeSessionId != sessionGuid || token.IsCancellationRequested) return;
 
+            if (outcome == ShareEnumerationOutcome.ClientMissing ||
+                outcome == ShareEnumerationOutcome.Failed)
+            {
+                ShowSharesMessage(DescribeEnumerationFailure(outcome, ip), Brushes.Gray);
+                Log($"Could not list shares for {ip}: {outcome}.");
+                return;
+            }
+
             SharesPanel.DataContext = null;
             SharesPanel.Children.Clear();
 
             if (shares.Count == 0)
             {
-                SharesPanel.Children.Add(new TextBlock
-                {
-                    Text = $"No shares found for {ip}.",
-                    Foreground = Brushes.Gray,
-                    FontStyle = FontStyle.Italic,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    TextWrapping = TextWrapping.Wrap,
-                    Margin = new Thickness(15)
-                });
+                ShowSharesMessage($"No shares found for {ip}.", Brushes.Gray);
                 Log($"No shares found for {ip}.");
                 return;
             }
@@ -834,5 +845,41 @@ public partial class NetworkView : UserControl
             }
             catch { }
         }
+    }
+
+    // Muestra un mensaje en el panel de recursos, reemplazando su contenido.
+    private void ShowSharesMessage(string message, IBrush brush)
+    {
+        SharesPanel.DataContext = null;
+        SharesPanel.Children.Clear();
+        SharesPanel.Children.Add(new TextBlock
+        {
+            Text = message,
+            Foreground = brush,
+            FontSize = 13,
+            FontStyle = FontStyle.Italic,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(15)
+        });
+    }
+
+    // Texto que explica por qué no se pudieron listar recursos cuando el motivo
+    // no es la falta de credenciales.
+    private static string DescribeEnumerationFailure(ShareEnumerationOutcome outcome, string target)
+    {
+        return outcome switch
+        {
+            ShareEnumerationOutcome.ClientMissing =>
+                "The SMB client tools are not installed, so shares cannot be listed.\n\n" +
+                "Install them with your distribution's package manager:\n" +
+                "  Debian / Ubuntu / Mint:  sudo apt install smbclient\n" +
+                "  Fedora / RHEL / CentOS:  sudo dnf install samba-client\n" +
+                "  Arch / Manjaro / CachyOS: sudo pacman -S samba\n" +
+                "  openSUSE:                sudo zypper install samba-client",
+            _ =>
+                $"Could not connect to {target}. " +
+                "The host may be unreachable or not running an SMB service."
+        };
     }
 }

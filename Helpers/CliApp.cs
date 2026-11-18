@@ -39,6 +39,23 @@ public class CliApp
             return;
         }
 
+        // Sin privilegios de administrador no se puede gestionar Samba. Se avisa
+        // antes de pedir una contraseña que nunca funcionaría.
+        if (!SudoEnvironment.CurrentUserHasSudo())
+        {
+            Console.WriteLine("Administrator (sudo) privileges are required, but the current user is not allowed to run sudo.");
+            Console.WriteLine("SAMBA-Util needs root to manage Samba. Add your user to the sudo group:");
+            Console.WriteLine("  Debian/Ubuntu/Mint:  sudo usermod -aG sudo <your-user>");
+            Console.WriteLine("  Fedora/RHEL/CentOS:  sudo usermod -aG wheel <your-user>");
+            Console.WriteLine("  Arch/Manjaro/CachyOS: sudo usermod -aG wheel <your-user>");
+            Console.WriteLine("  openSUSE:            sudo usermod -aG wheel <your-user>");
+            Console.WriteLine("Then log out and back in for the change to take effect.");
+            Console.Write("Continue anyway? (y/N): ");
+            var answer = Console.ReadLine();
+            if (!string.Equals(answer?.Trim(), "y", StringComparison.OrdinalIgnoreCase))
+                return;
+        }
+
         if (!AuthenticateAdmin())
             return;
 
@@ -1036,7 +1053,26 @@ public class CliApp
         CredStore.User = "guest";
         CredStore.Password = "";
 
-        var shares = await NetworkScanner.GetSharesAsync(device.IP);
+        var enumeration = await NetworkScanner.GetSharesResultAsync(device.IP);
+        var shares = enumeration.Shares;
+
+        if (enumeration.Outcome == ShareEnumerationOutcome.ClientMissing)
+        {
+            Console.WriteLine("The SMB client tools are not installed, so shares cannot be listed.");
+            Console.WriteLine("Install them with your distribution's package manager:");
+            Console.WriteLine("  Debian / Ubuntu / Mint:  sudo apt install smbclient");
+            Console.WriteLine("  Fedora / RHEL / CentOS:  sudo dnf install samba-client");
+            Console.WriteLine("  Arch / Manjaro / CachyOS: sudo pacman -S samba");
+            Console.WriteLine("  openSUSE:                sudo zypper install samba-client");
+            return;
+        }
+
+        if (enumeration.Outcome == ShareEnumerationOutcome.Failed)
+        {
+            Console.WriteLine($"Could not connect to {device.IP}. The host may be unreachable or not running an SMB service.");
+            return;
+        }
+
         if (shares.Count == 0)
         {
             var retry = Choose("No shares were listed anonymously. Try again with SMB credentials?", new[] { "Yes, enter credentials", "No, go back" });
@@ -1049,7 +1085,8 @@ public class CliApp
                     CredStore.User = username;
                     Console.Write("SMB password (input hidden): ");
                     CredStore.Password = ReadPassword();
-                    shares = await NetworkScanner.GetSharesAsync(device.IP);
+                    enumeration = await NetworkScanner.GetSharesResultAsync(device.IP);
+                    shares = enumeration.Shares;
                 }
                 else
                 {

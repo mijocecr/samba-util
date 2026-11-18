@@ -30,4 +30,28 @@ public class SambaEnvironmentTests
     {
         Assert.Equal(expected, SambaEnvironment.HasSambaUnit(output));
     }
+
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, false)]
+    public void IsSmbClientAvailable_RequiereSmbclient(bool smbclient, bool rpcclient, bool expected)
+    {
+        var probe = new SambaEnvironment.SmbClientProbe(smbclient, rpcclient);
+
+        Assert.Equal(expected, SambaEnvironment.IsSmbClientAvailable(probe));
+    }
+
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, false, false)]
+    public void IsRpcClientAvailable_RequiereRpcclient(bool smbclient, bool rpcclient, bool expected)
+    {
+        var probe = new SambaEnvironment.SmbClientProbe(smbclient, rpcclient);
+
+        Assert.Equal(expected, SambaEnvironment.IsRpcClientAvailable(probe));
+    }
 }

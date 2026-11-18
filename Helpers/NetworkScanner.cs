@@ -93,6 +93,33 @@ namespace SAMBA_Util.Helpers
     }
 
     // ---------------------------------------------------------
+    // SHARE ENUMERATION RESULT
+    // ---------------------------------------------------------
+    // Distingue el motivo por el que una enumeración no devolvió recursos, para
+    // que la interfaz solo pida credenciales cuando el servidor las exige de
+    // verdad y explique el problema en cualquier otro caso.
+    public enum ShareEnumerationOutcome
+    {
+        // El comando se ejecutó y su salida se pudo interpretar (con o sin recursos).
+        Success,
+
+        // El servidor rechazó el acceso anónimo: tiene sentido pedir credenciales.
+        RequiresCredentials,
+
+        // Faltan las herramientas de cliente SMB (smbclient/rpcclient).
+        ClientMissing,
+
+        // Error de red u otro error ajeno a la autenticación.
+        Failed
+    }
+
+    public sealed class ShareEnumerationResult
+    {
+        public ShareEnumerationOutcome Outcome { get; init; }
+        public List<NetworkShare> Shares { get; init; } = new();
+    }
+
+    // ---------------------------------------------------------
     // NETWORK SCANNER
     // ---------------------------------------------------------
     public static class NetworkScanner
@@ -189,83 +216,109 @@ namespace SAMBA_Util.Helpers
         // ---------------------------------------------------------
         // SHARE ENUMERATION (RPC for Windows, SMBCLIENT for others)
         // ---------------------------------------------------------
+        // Envoltorio que solo devuelve los recursos, para los llamadores que no
+        // necesitan saber el motivo de un fallo.
         public static async Task<List<NetworkShare>> GetSharesAsync(string ip, CancellationToken cancellationToken = default)
+        {
+            var result = await GetSharesResultAsync(ip, cancellationToken);
+            return result.Shares;
+        }
+
+        // Enumeración con el motivo del fallo incluido. La interfaz usa esto
+        // para pedir credenciales solo cuando el servidor las exige.
+        public static async Task<ShareEnumerationResult> GetSharesResultAsync(string ip, CancellationToken cancellationToken = default)
         {
             Console.WriteLine($"[Scanner] === GET SHARES FOR {ip} ===");
 
-            var shares = new List<NetworkShare>();
             string os = await DetectOSAsync(ip, ip);
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            // ---------------------------------------------------------
-            // WINDOWS → RPC netshareenumall
-            // ---------------------------------------------------------
             if (os == "Windows")
+                return await EnumerateWindowsAsync(ip, cancellationToken);
+
+            return await EnumerateSmbClientAsync(ip, cancellationToken);
+        }
+
+        // ---------------------------------------------------------
+        // WINDOWS → RPC netshareenumall
+        // ---------------------------------------------------------
+        private static async Task<ShareEnumerationResult> EnumerateWindowsAsync(string ip, CancellationToken cancellationToken)
+        {
+            if (!await Task.Run(SambaEnvironment.HasRpcClient))
+                return ClientMissing();
+
+            string rpcOut;
+            var (authArgs, authFile) = BuildAuthArgs();
+            try
             {
-                string rpcOut;
-                var (authArgs, authFile) = BuildAuthArgs();
+                rpcOut = await ShellHelper.RunAsync(
+                    $"rpcclient {authArgs} {ShellHelper.Quote(ip)} -c \"netshareenumall\""
+                );
+            }
+            finally
+            {
+                ShellHelper.DeleteCredentialFile(authFile);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            Console.WriteLine("[Scanner] RPC output:");
+            Console.WriteLine(rpcOut);
+
+            if (rpcOut.Contains("NT_STATUS") && HasCredentials())
+            {
+                Console.WriteLine("[Scanner] Anonymous attempt rejected. Retrying RPC with credentials...");
+                var (retryArgs, retryFile) = BuildAuthArgs();
                 try
                 {
                     rpcOut = await ShellHelper.RunAsync(
-                        $"rpcclient {authArgs} {ShellHelper.Quote(ip)} -c \"netshareenumall\""
+                        $"rpcclient {retryArgs} {ShellHelper.Quote(ip)} -c \"netshareenumall\""
                     );
                 }
                 finally
                 {
-                    ShellHelper.DeleteCredentialFile(authFile);
+                    ShellHelper.DeleteCredentialFile(retryFile);
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
 
-                Console.WriteLine("[Scanner] RPC output:");
+                Console.WriteLine("[Scanner] RPC Credential output:");
                 Console.WriteLine(rpcOut);
-
-                if (rpcOut.Contains("NT_STATUS") && !string.IsNullOrWhiteSpace(CredStore.User) && !CredStore.User.Equals("guest", StringComparison.OrdinalIgnoreCase))
-                {
-                    Console.WriteLine("[Scanner] Anonymous attempt rejected. Retrying RPC with credentials...");
-                    var (retryArgs, retryFile) = BuildAuthArgs();
-                    try
-                    {
-                        rpcOut = await ShellHelper.RunAsync(
-                            $"rpcclient {retryArgs} {ShellHelper.Quote(ip)} -c \"netshareenumall\""
-                        );
-                    }
-                    finally
-                    {
-                        ShellHelper.DeleteCredentialFile(retryFile);
-                    }
-
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    Console.WriteLine("[Scanner] RPC Credential output:");
-                    Console.WriteLine(rpcOut);
-                }
-
-                if (!rpcOut.Contains("NT_STATUS"))
-                {
-                    foreach (var line in rpcOut.Split('\n'))
-                    {
-                        if (!line.Contains("netname:")) continue;
-
-                        string name = line.Replace("netname:", "").Trim();
-                        if (string.IsNullOrWhiteSpace(name) || name.EndsWith("$")) continue;
-
-                        shares.Add(new NetworkShare(name)
-                        {
-                            IP = ip,
-                            Access = "Authenticated",
-                            Comment = "Windows RPC"
-                        });
-                    }
-                }
-
-                return shares;
             }
 
-            // ---------------------------------------------------------
-            // NON-WINDOWS → SMBCLIENT
-            // ---------------------------------------------------------
+            if (rpcOut.Contains("NT_STATUS"))
+                return ClassifyFailure(rpcOut);
+
+            var shares = new List<NetworkShare>();
+            foreach (var line in rpcOut.Split('\n'))
+            {
+                if (!line.Contains("netname:")) continue;
+
+                string name = line.Replace("netname:", "").Trim();
+                if (string.IsNullOrWhiteSpace(name) || name.EndsWith("$")) continue;
+
+                shares.Add(new NetworkShare(name)
+                {
+                    IP = ip,
+                    Access = "Authenticated",
+                    Comment = "Windows RPC"
+                });
+            }
+
+            return Success(shares);
+        }
+
+        // ---------------------------------------------------------
+        // NON-WINDOWS → SMBCLIENT
+        // ---------------------------------------------------------
+        private static async Task<ShareEnumerationResult> EnumerateSmbClientAsync(string ip, CancellationToken cancellationToken)
+        {
+            if (!await Task.Run(SambaEnvironment.HasSmbClient))
+                return ClientMissing();
+
+            // `-U %` es ya un intento anónimo (usuario y contraseña vacíos):
+            // antes de pedir credenciales se prueba sin ellas.
             string outGuest = await ShellHelper.RunAsync(
                 $"smbclient -gL {ShellQuote("//" + ip)} -U % {ConfigManager.ClientMinProtocolOption()}"
             );
@@ -285,11 +338,10 @@ namespace SAMBA_Util.Helpers
                     share.Access = await DetectShareAccess(ip, share.Name);
                 }
 
-                return parsed;
+                return Success(parsed);
             }
 
-            if (!string.IsNullOrWhiteSpace(CredStore.User) &&
-                !CredStore.User.Equals("guest", StringComparison.OrdinalIgnoreCase))
+            if (HasCredentials())
             {
                 var (authArgs, authFile) = BuildAuthArgs();
                 string outCred;
@@ -316,13 +368,54 @@ namespace SAMBA_Util.Helpers
                     foreach (var share in parsed)
                         share.Access = "Authenticated";
 
-                    return parsed;
+                    return Success(parsed);
                 }
+
+                return ClassifyFailure(outCred);
             }
 
             Console.WriteLine("[Scanner] Enumeration failed.");
-            return shares;
+            return ClassifyFailure(outGuest);
         }
+
+        private static bool HasCredentials() =>
+            !string.IsNullOrWhiteSpace(CredStore.User) &&
+            !CredStore.User.Equals("guest", StringComparison.OrdinalIgnoreCase);
+
+        // Traduce la salida de smbclient/rpcclient a un motivo. Solo se piden
+        // credenciales cuando el servidor las rechaza explícitamente; un error
+        // de red u otro fallo no debe abrir el diálogo de credenciales.
+        internal static ShareEnumerationOutcome ClassifyEnumerationFailure(string output)
+        {
+            if (string.IsNullOrEmpty(output))
+                return ShareEnumerationOutcome.Failed;
+
+            string upper = output.ToUpperInvariant();
+
+            if (upper.Contains("NT_STATUS_ACCESS_DENIED") ||
+                upper.Contains("NT_STATUS_LOGON_FAILURE") ||
+                upper.Contains("NT_STATUS_ACCOUNT_DISABLED") ||
+                upper.Contains("NT_STATUS_ACCOUNT_EXPIRED") ||
+                upper.Contains("NT_STATUS_ACCOUNT_LOCKED_OUT") ||
+                upper.Contains("NT_STATUS_PASSWORD_MUST_CHANGE") ||
+                upper.Contains("NT_STATUS_PASSWORD_EXPIRED") ||
+                upper.Contains("NT_STATUS_NO_LOGON_SERVERS") ||
+                upper.Contains("NT_STATUS_MORE_PROCESSING_REQUIRED"))
+            {
+                return ShareEnumerationOutcome.RequiresCredentials;
+            }
+
+            return ShareEnumerationOutcome.Failed;
+        }
+
+        private static ShareEnumerationResult ClassifyFailure(string output) =>
+            new() { Outcome = ClassifyEnumerationFailure(output) };
+
+        private static ShareEnumerationResult Success(List<NetworkShare> shares) =>
+            new() { Outcome = ShareEnumerationOutcome.Success, Shares = shares };
+
+        private static ShareEnumerationResult ClientMissing() =>
+            new() { Outcome = ShareEnumerationOutcome.ClientMissing };
 
         // ---------------------------------------------------------
         // SHARE PARSING (SMBCLIENT)

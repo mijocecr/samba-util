@@ -65,9 +65,11 @@ public partial class StatusView : UserControl
     // Recoge el estado sin tocar controles: se ejecuta en segundo plano.
     private StatusSnapshot CollectStatus()
     {
-        // Validar si el stack está instalado globalmente en el host
-        var checkSmbdBinary = ShellHelper.EjecutarComoRoot("which smbd");
-        bool isStackInstalled = checkSmbdBinary.ExitCode == 0 && !string.IsNullOrWhiteSpace(checkSmbdBinary.Stdout);
+        // Validar si el stack está instalado globalmente en el host. Se reutiliza
+        // la misma detección que en el arranque (binario en el PATH, rutas
+        // conocidas, unidad systemd y testparm) para no depender de `which`,
+        // que no está instalado en todas las distribuciones.
+        bool isStackInstalled = SambaEnvironment.IsSambaInstalled();
 
         if (!isStackInstalled)
         {
@@ -86,10 +88,12 @@ public partial class StatusView : UserControl
                 Ips: new List<(string iface, string ip)>());
         }
 
-        // Servicios
-        var smbd = DetectAndCheckService(SmbServices);
-        var nmbd = DetectAndCheckService(NmbServices);
-        var winbind = DetectAndCheckService(WinbindServices);
+        // Servicios. `systemctl show` es legible por máquina y no se traduce,
+        // a diferencia de las etiquetas de `systemctl status`.
+        bool hasSystemctl = ServiceInspector.HasSystemctl();
+        var smbd = DetectAndCheckService(SmbServices, hasSystemctl);
+        var nmbd = DetectAndCheckService(NmbServices, hasSystemctl);
+        var winbind = DetectAndCheckService(WinbindServices, hasSystemctl);
 
         // testparm (Validación estricta anti-falsos positivos)
         var testparm = RunTestparm();
@@ -147,10 +151,10 @@ public partial class StatusView : UserControl
         UpdateTestparmStyle(snapshot.TestparmText);
 
         TxtPort445.Text = snapshot.Port445Text;
-        IconPort445.Fill = snapshot.Port445Text == "Open" ? Brushes.LimeGreen : Brushes.Red;
+        IconPort445.Fill = PortBrush(snapshot.Port445Text);
 
         TxtPort139.Text = snapshot.Port139Text;
-        IconPort139.Fill = snapshot.Port139Text == "Open" ? Brushes.LimeGreen : Brushes.Red;
+        IconPort139.Fill = PortBrush(snapshot.Port139Text);
 
         TxtFirewall.Text = snapshot.FirewallText;
         IconFirewall.Fill = snapshot.FirewallColor;
@@ -183,7 +187,8 @@ public partial class StatusView : UserControl
     {
         if (status.StartsWith("Active"))
             icon.Fill = Brushes.LimeGreen;
-        else if (status.StartsWith("Inactive") || status.StartsWith("Not installed"))
+        else if (status.StartsWith("Inactive") || status.StartsWith("Not installed") ||
+                 status.StartsWith("Failed") || status.StartsWith("Masked"))
             icon.Fill = Brushes.Red;
         else
             icon.Fill = Brushes.Gray;
@@ -192,26 +197,24 @@ public partial class StatusView : UserControl
     // ---------------------------------------------------------
     // DETECCIÓN DE SERVICIOS
     // ---------------------------------------------------------
-    private string DetectAndCheckService(List<string> candidates)
+    private string DetectAndCheckService(List<string> candidates, bool hasSystemctl)
     {
+        if (!hasSystemctl)
+            return "Unknown (systemd not available)";
+
         foreach (var svc in candidates)
         {
-            var check = ShellHelper.EjecutarComoRoot($"systemctl status {svc}.service");
+            // `systemctl show` es legible por máquina y no se traduce; una unidad
+            // inexistente responde LoadState=not-found.
+            var show = ShellHelper.EjecutarComoRoot(
+                $"systemctl show -p LoadState,ActiveState,UnitFileState {svc}.service 2>/dev/null");
 
-            if (check.ExitCode == 0 || check.Stdout.Contains("Loaded:", StringComparison.OrdinalIgnoreCase))
-                return GetServiceStatus(svc);
+            var state = ServiceInspector.ParseShow(show.Stdout);
+            if (state.HasValue)
+                return ServiceInspector.Describe(state.Value);
         }
 
         return "Not installed";
-    }
-
-    private string GetServiceStatus(string service)
-    {
-        var result = ShellHelper.EjecutarComoRoot($"systemctl is-active {service}.service");
-
-        return result.Stdout.Trim() == "active"
-            ? "Active (running)"
-            : "Inactive";
     }
 
     // ---------------------------------------------------------
@@ -254,16 +257,32 @@ public partial class StatusView : UserControl
     // ---------------------------------------------------------
     private string CheckPortText(string port)
     {
+        // El patrón exige que el puerto no vaya seguido de otro dígito para no
+        // confundir, por ejemplo, :445 con :4450 (falso positivo). Se usa `ss`
+        // y, si no está disponible, `netstat`.
         var (_, outp, _) = ShellHelper.EjecutarComoRoot(
-            $"bash -c \"ss -tulpn | grep :{port} || true\""
+            "bash -c \"" +
+            $"if command -v ss >/dev/null 2>&1; then ss -H -tuln | grep -E ':{port}([^0-9]|$)' || true; " +
+            $"elif command -v netstat >/dev/null 2>&1; then netstat -tuln | grep -E ':{port}([^0-9]|$)' || true; " +
+            "else echo __NO_TOOL__; fi\""
         );
+
+        if (outp.Contains("__NO_TOOL__", StringComparison.Ordinal))
+            return "Unknown";
 
         return string.IsNullOrWhiteSpace(outp) ? "Closed" : "Open";
     }
 
+    private static IBrush PortBrush(string text) => text switch
+    {
+        "Open" => Brushes.LimeGreen,
+        "Closed" => Brushes.Red,
+        _ => Brushes.Gray
+    };
+
     private (string Text, IBrush Color) CheckFirewallStatus(string port445Text)
     {
-        if (port445Text != "Open")
+        if (port445Text == "Closed")
         {
             return ("TCP 445 is not listening; remote SMB access will fail regardless of firewall.", Brushes.Red);
         }
@@ -363,6 +382,11 @@ public partial class StatusView : UserControl
     // ---------------------------------------------------------
     private string CheckSharesText()
     {
+        // Sin las herramientas de cliente SMB el fallo no es de Samba: se avisa
+        // de la causa real en lugar de decir que no hay recursos.
+        if (!SambaEnvironment.HasSmbClient())
+            return "⚠ SMB client tools not installed (install smbclient/samba-client to verify shares)";
+
         var (_, outp, _) = ShellHelper.EjecutarComoRoot(
             $"bash -c \"smbclient -L localhost -N {ConfigManager.ClientMinProtocolOption()} 2>&1 || true\"",
             ShellHelper.NetworkTimeoutMs
