@@ -2,6 +2,20 @@
 
 All notable changes to SAMBA-Util are documented in this file.
 
+## [4.6.0] - 2026-11-19
+
+### Changed
+
+- The Status tab now has a single dynamic action button: **Start Samba** when
+  `smbd` is inactive, failed or masked, and **Reload Samba** otherwise. This
+  replaces the separate **Start Samba**, **Reload Samba** and **Refresh**
+  buttons. Starting reuses the cross-distribution service-manager detection
+  (systemd, `service` or OpenRC); reloading applies the Samba configuration and
+  then re-reads the status, so the standalone **Refresh** button is no longer
+  needed.
+- **Restart Samba** remains a separate button because it can interrupt active
+  connections.
+
 ## [4.5.0] - 2026-11-18
 
 This release makes the Network and Status tabs reliable across distributions,

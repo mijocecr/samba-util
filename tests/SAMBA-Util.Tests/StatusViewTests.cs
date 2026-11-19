@@ -49,4 +49,30 @@ public class StatusViewTests
         Assert.NotNull(hint);
         Assert.Contains("not found", hint);
     }
+
+    [Theory]
+    [InlineData("Inactive")]
+    [InlineData("Failed")]
+    [InlineData("Masked")]
+    [InlineData("  Inactive  ")]
+    public void NeedsStart_PideArrancarCuandoElServicioEstaParado(string smbdText)
+    {
+        Assert.True(StatusView.NeedsStart(smbdText));
+    }
+
+    [Theory]
+    [InlineData("Active (running)")]
+    [InlineData("Active (reloading)")]
+    [InlineData("Activating")]
+    [InlineData("Deactivating")]
+    [InlineData("Reloading")]
+    [InlineData("Unknown (systemd not available)")]
+    [InlineData("Not installed")]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void NeedsStart_SoloRecargaCuandoElServicioNoEstaParado(string? smbdText)
+    {
+        Assert.False(StatusView.NeedsStart(smbdText));
+    }
 }

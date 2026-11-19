@@ -137,6 +137,7 @@ public partial class StatusView : UserControl
             TxtTestparm.Text = snapshot.TestparmText;
             UpdateTestparmStyle(snapshot.TestparmText);
             TxtServiceHint.IsVisible = false;
+            ApplyServiceAction(snapshot.SmbdText);
             return;
         }
 
@@ -151,6 +152,7 @@ public partial class StatusView : UserControl
         var serviceHint = ServiceHintFor(snapshot.SmbdText);
         TxtServiceHint.Text = serviceHint ?? "";
         TxtServiceHint.IsVisible = serviceHint != null;
+        ApplyServiceAction(snapshot.SmbdText);
 
         TxtTestparm.Text = snapshot.TestparmText;
         UpdateTestparmStyle(snapshot.TestparmText);
@@ -227,6 +229,27 @@ public partial class StatusView : UserControl
 
         return "The smbd service is not running. Use \"Start Samba\" below, or run: " +
                "sudo systemctl enable --now smbd (smb on Fedora/RHEL/Arch/openSUSE).";
+    }
+
+    // El botón de acción se convierte en "Start Samba" cuando el servicio está
+    // parado o fallido. En cualquier otro estado solo recarga la configuración.
+    // Es puro para poder probarlo.
+    internal static bool NeedsStart(string? smbdText)
+    {
+        var text = smbdText?.Trim();
+        if (string.IsNullOrEmpty(text))
+            return false;
+
+        return text.StartsWith("Inactive", StringComparison.OrdinalIgnoreCase) ||
+               text.StartsWith("Failed", StringComparison.OrdinalIgnoreCase) ||
+               text.StartsWith("Masked", StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Solo cambia la etiqueta; el tooltip es fijo y describe las dos acciones
+    // del botón para que nunca quede desincronizado de ella.
+    private void ApplyServiceAction(string? smbdText)
+    {
+        BtnServiceAction.Content = NeedsStart(smbdText) ? "Start Samba" : "Reload Samba";
     }
 
     private string DetectAndCheckService(List<string> candidates, bool hasSystemctl)
@@ -464,11 +487,18 @@ public partial class StatusView : UserControl
     // ---------------------------------------------------------
     // BOTONES
     // ---------------------------------------------------------
-    public async void OnRefresh(object? sender, RoutedEventArgs e)
+    // Un único botón: si smbd está parado o fallido lo arranca; en cualquier
+    // otro estado recarga la configuración. La etiqueta la actualiza
+    // ApplyServiceAction() según TxtSmbd.Text.
+    private async void OnServiceAction(object? sender, RoutedEventArgs e)
     {
         try
         {
-            await RefreshStatusAsync();
+            if (NeedsStart(TxtSmbd.Text))
+                await StartSambaAsync();
+            else
+                await RunServiceActionAsync(
+                    "systemctl reload smb.service smbd.service nmb.service nmbd.service winbind.service || true");
         }
         catch (Exception ex)
         {
@@ -476,54 +506,34 @@ public partial class StatusView : UserControl
         }
     }
 
-    private async void OnStart(object? sender, RoutedEventArgs e)
+    private async Task StartSambaAsync()
     {
+        if (string.IsNullOrWhiteSpace(Credenciales.AdminPassword) || _isBusy)
+            return;
+
+        _isBusy = true;
         try
         {
-            if (string.IsNullOrWhiteSpace(Credenciales.AdminPassword) || _isBusy)
-                return;
-
-            _isBusy = true;
-            try
+            // Reutiliza el arranque robusto (systemd/`service`/OpenRC) que la
+            // aplicación ya usa al iniciarse, en lugar de un systemctl fijo.
+            await Task.Run(() =>
             {
-                // Reutiliza el arranque robusto (systemd/`service`/OpenRC) que la
-                // aplicación ya usa al iniciarse, en lugar de un systemctl fijo.
-                await Task.Run(() =>
+                try
                 {
-                    try
-                    {
-                        SmbInitializer.StartSambaServices();
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[STATUS ERROR] Start Samba: {ex.Message}");
-                    }
-                });
-            }
-            finally
-            {
-                _isBusy = false;
-            }
+                    SmbInitializer.StartSambaServices();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[STATUS ERROR] Start Samba: {ex.Message}");
+                }
+            });
+        }
+        finally
+        {
+            _isBusy = false;
+        }
 
-            await RefreshStatusAsync();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[STATUS ERROR] {ex}");
-        }
-    }
-
-    private async void OnReload(object? sender, RoutedEventArgs e)
-    {
-        try
-        {
-            await RunServiceActionAsync(
-                "systemctl reload smb.service smbd.service nmb.service nmbd.service winbind.service || true");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[STATUS ERROR] {ex}");
-        }
+        await RefreshStatusAsync();
     }
 
     private async void OnRestart(object? sender, RoutedEventArgs e)
