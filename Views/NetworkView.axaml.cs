@@ -355,7 +355,9 @@ public partial class NetworkView : UserControl
                 return;
             }
 
-            if (shares.Count == 0)
+            // Solo se piden credenciales cuando el servidor las rechaza.
+            // Un equipo sin recursos visibles no debe abrir el diálogo.
+            if (outcome == ShareEnumerationOutcome.RequiresCredentials && shares.Count == 0)
             {
                 SharesPanel.DataContext = null;
                 SharesPanel.Children.Clear();
@@ -405,7 +407,8 @@ public partial class NetworkView : UserControl
             if (_activeSessionId != sessionGuid || token.IsCancellationRequested) return;
 
             if (outcome == ShareEnumerationOutcome.ClientMissing ||
-                outcome == ShareEnumerationOutcome.Failed)
+                outcome == ShareEnumerationOutcome.Failed ||
+                outcome == ShareEnumerationOutcome.AccountLockedOut)
             {
                 ShowSharesMessage(DescribeEnumerationFailure(outcome, $"{targetName} ({targetIp})"), new SolidColorBrush(fgColor, 0.7));
                 Log($"Could not list shares for {targetName}: {outcome}.");
@@ -417,8 +420,12 @@ public partial class NetworkView : UserControl
 
             if (shares.Count == 0)
             {
-                ShowSharesMessage("Unable to enumerate SMB shares (credentials required or access denied).", new SolidColorBrush(fgColor, 0.7));
-                Log($"No shares visible for {targetName}.");
+                string message = outcome == ShareEnumerationOutcome.RequiresCredentials
+                    ? "Authentication was rejected. Check the user name (use DOMAIN\\user for a Windows account) and the password, then try again." + AuthHelp.PlatformNotice
+                    : $"No SMB shares were found on {targetName} ({targetIp}).";
+
+                ShowSharesMessage(message, new SolidColorBrush(fgColor, 0.7));
+                Log($"No shares visible for {targetName} ({outcome}).");
                 return;
             }
 
@@ -541,6 +548,32 @@ public partial class NetworkView : UserControl
                 }
 
                 loading = ShowLoading($"Opening {share.Name}...");
+
+                // Evitamos que el gestor de archivos entre en un bucle de
+                // contraseñas cuando el problema real son los permisos.
+                var access = await Task.Run(() => SmbHelper.CheckShareAccess(
+                    share.IP,
+                    share.Name,
+                    isAnonymous ? null : CredStore.User,
+                    isAnonymous ? null : CredStore.Password));
+
+                if (!access.Allowed)
+                {
+                    string detail = access.Reason switch
+                    {
+                        "AccessDenied" =>
+                            "The SMB account authenticated correctly but has no permission on this share. " +
+                            "Grant it read access in the share permissions and in the Windows security (NTFS) permissions.",
+                        "AuthenticationRejected" =>
+                            "The SMB credentials were rejected. Check the user name and password.",
+                        _ =>
+                            "The share is not reachable or does not allow listing its contents."
+                    };
+
+                    Console.WriteLine($"[DIAGNOSTIC] Share access denied for '{share.Name}': {access.Reason}");
+                    _ = main.ShowErrorDialog("Open failed", detail);
+                    return;
+                }
 
                 // OpenShare puede bloquear varios segundos en Linux; lo ejecutamos fuera del hilo de UI.
                 await Task.Run(() => SmbHelper.OpenShare(
@@ -706,7 +739,9 @@ public partial class NetworkView : UserControl
                 return;
             }
 
-            if (shares.Count == 0)
+            // Solo se piden credenciales si el servidor las rechazó; un equipo
+            // sin shares visibles no debe abrir el diálogo.
+            if (outcome == ShareEnumerationOutcome.RequiresCredentials && shares.Count == 0)
             {
                 var mainWindow = TopLevel.GetTopLevel(this) as MainWindow;
                 if (mainWindow != null)
@@ -752,7 +787,8 @@ public partial class NetworkView : UserControl
             if (_activeSessionId != sessionGuid || token.IsCancellationRequested) return;
 
             if (outcome == ShareEnumerationOutcome.ClientMissing ||
-                outcome == ShareEnumerationOutcome.Failed)
+                outcome == ShareEnumerationOutcome.Failed ||
+                outcome == ShareEnumerationOutcome.AccountLockedOut)
             {
                 ShowSharesMessage(DescribeEnumerationFailure(outcome, ip), Brushes.Gray);
                 Log($"Could not list shares for {ip}: {outcome}.");
@@ -764,8 +800,12 @@ public partial class NetworkView : UserControl
 
             if (shares.Count == 0)
             {
-                ShowSharesMessage($"No shares found for {ip}.", Brushes.Gray);
-                Log($"No shares found for {ip}.");
+                string message = outcome == ShareEnumerationOutcome.RequiresCredentials
+                    ? "Authentication was rejected. Check the user name (use DOMAIN\\user for a Windows account) and the password, then try again." + AuthHelp.PlatformNotice
+                    : $"No shares found for {ip}.";
+
+                ShowSharesMessage(message, Brushes.Gray);
+                Log($"No shares found for {ip} ({outcome}).");
                 return;
             }
 
@@ -877,6 +917,9 @@ public partial class NetworkView : UserControl
                 "  Fedora / RHEL / CentOS:  sudo dnf install samba-client\n" +
                 "  Arch / Manjaro / CachyOS: sudo pacman -S samba\n" +
                 "  openSUSE:                sudo zypper install samba-client",
+            ShareEnumerationOutcome.AccountLockedOut =>
+                $"The account on {target} is locked out. Unlock it on the Windows machine " +
+                "and wait for the lockout period to expire before trying again.",
             _ =>
                 $"Could not connect to {target}. " +
                 "The host may be unreachable or not running an SMB service."

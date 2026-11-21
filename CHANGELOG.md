@@ -2,6 +2,43 @@
 
 All notable changes to SAMBA-Util are documented in this file.
 
+## [4.6.1] - 2026-11-22
+
+### Fixed
+
+- Share enumeration no longer discards resources when the SMB client prints an
+  isolated `NT_STATUS` message for a secondary probe (for example an IPC$
+  connection attempt). Shares are parsed first and returned whenever they are
+  present, both for `smbclient` and Windows RPC enumeration.
+- The credentials dialog is now shown only when the server actually rejects
+  authentication. Hosts with no visible shares no longer trigger it.
+- A locked Windows account (`NT_STATUS_ACCOUNT_LOCKED_OUT`) is reported with a
+  clear message instead of prompting for credentials again, which could extend
+  the lockout.
+- Authentication failures and empty share lists now show specific messages in
+  the Network tab and in the CLI instead of the generic "Unable to enumerate"
+  text.
+- Opening a share now checks real access with the supplied credentials before
+  launching the file manager. A share without permissions shows a clear error
+  instead of making GNOME/KDE ask for the password repeatedly.
+- SMB URLs are now properly encoded, so share names containing spaces work. On
+  KDE the URL uses the `user:password@host` form expected by KIO; GVfs is only
+  used for anonymous mounts because it cannot read a password from standard
+  input.
+- Guest access to macOS SMB servers now falls back to `-U guest%` when the
+  usual anonymous form (`-U %`) is rejected. macOS only exposes real shares to
+  the explicitly named `guest` user; Windows and Samba hosts keep the previous
+  behaviour.
+- Enumeration with explicitly supplied credentials now takes priority over the
+  guest probes. On macOS, guest can expose a `nobody` share that previously hid
+  the shares accessible to the authenticated user.
+- The macOS guest pseudo-share `nobody` is no longer listed. It now triggers the
+  credentials prompt, so the GUI asks for credentials before showing shares
+  instead of asking only when that unusable share is opened.
+- Authentication-rejected messages now include conditional platform hints: use
+  a local account with suitable permissions on Windows, and enable SMB-NT or
+  Apple's `ProtocolVersionMap=2` workaround on macOS.
+
 ## [4.6.0] - 2026-11-19
 
 ### Changed

@@ -260,19 +260,41 @@ namespace SAMBA_Util.Helpers
 
         private static string BuildSmbUrl(string ip, string shareName, string? user, string? pass, string domain, bool includePassword)
         {
+            string encodedShare = Uri.EscapeDataString(shareName.Split('|')[0].Trim());
+
             if (string.IsNullOrWhiteSpace(user))
             {
-                return $"smb://{ip}/{shareName}";
+                return $"smb://{ip}/{encodedShare}";
             }
 
             string userWithDomain = string.IsNullOrWhiteSpace(domain) ? user : $"{domain};{user}";
 
             if (string.IsNullOrEmpty(pass) || !includePassword)
             {
-                return $"smb://{userWithDomain}@{ip}/{shareName}";
+                return $"smb://{Uri.EscapeDataString(userWithDomain)}@{ip}/{encodedShare}";
             }
 
-            return $"smb://{userWithDomain}:{pass}@{ip}/{shareName}";
+            return $"smb://{Uri.EscapeDataString(userWithDomain)}:{Uri.EscapeDataString(pass)}@{ip}/{encodedShare}";
+        }
+
+        // KIO (KDE) usa `usuario:contraseña@servidor` y no entiende el prefijo
+        // `dominio;usuario` de GVfs. Codificamos también el nombre del recurso:
+        // shares con espacios ("Solicitud Ciudadania") rompían la URL.
+        private static string BuildKdeSmbUrl(string ip, string shareName, string? user, string? pass)
+        {
+            string encodedShare = Uri.EscapeDataString(shareName.Split('|')[0].Trim());
+
+            if (string.IsNullOrWhiteSpace(user))
+                return $"smb://{ip}/{encodedShare}";
+
+            string plainUser = user.Contains('\\', StringComparison.Ordinal)
+                ? user[(user.LastIndexOf('\\') + 1)..]
+                : user;
+
+            if (string.IsNullOrEmpty(pass))
+                return $"smb://{Uri.EscapeDataString(plainUser)}@{ip}/{encodedShare}";
+
+            return $"smb://{Uri.EscapeDataString(plainUser)}:{Uri.EscapeDataString(pass)}@{ip}/{encodedShare}";
         }
 
         private static bool TryExecuteProcess(string command, string arguments)
@@ -359,6 +381,71 @@ namespace SAMBA_Util.Helpers
             }
         }
 
+        // Comprueba el acceso real al recurso antes de abrir el gestor de
+        // archivos. Sin esta comprobación, un share sin permisos provoca que
+        // GNOME/KDE vuelvan a pedir la contraseña una y otra vez.
+        public static (bool Allowed, string? Reason) CheckShareAccess(
+            string ip, string shareName, string? user, string? pass)
+        {
+            string cleanShareName = shareName.Split('|')[0].Trim();
+            string shareUrl = ShellHelper.Quote("//" + ip + "/" + cleanShareName);
+            string protocol = ConfigManager.ClientMinProtocolOption();
+            string? authFile = null;
+
+            bool isGuest = string.IsNullOrWhiteSpace(user) ||
+                           user.Equals("guest", StringComparison.OrdinalIgnoreCase);
+            string effectiveUser = user ?? "";
+            string effectivePass = pass ?? "";
+
+            string authArgs;
+            if (isGuest)
+                authArgs = "-U %";
+            else if (string.IsNullOrEmpty(effectivePass))
+                authArgs = $"-U {ShellHelper.Quote(effectiveUser)}%";
+            else
+            {
+                authFile = ShellHelper.CreateCredentialFile(effectiveUser, effectivePass);
+                authArgs = $"-A {ShellHelper.Quote(authFile)}";
+            }
+
+            string Run(string args)
+            {
+                var result = ShellHelper.Ejecutar(
+                    $"smbclient {shareUrl} {args} {protocol} -c \"ls\"",
+                    ShellHelper.NetworkTimeoutMs);
+
+                return result.Stdout + "\n" + result.Stderr;
+            }
+
+            try
+            {
+                string output = Run(authArgs);
+
+                // macOS solo acepta el acceso invitado con el usuario explícito
+                // `guest`; `-U %` le devuelve LOGON_FAILURE.
+                if (isGuest && output.Contains("NT_STATUS_LOGON_FAILURE", StringComparison.Ordinal))
+                    output = Run("-U guest%");
+
+                if (output.Contains("blocks of size", StringComparison.Ordinal) ||
+                    output.Contains("NT_STATUS_OK", StringComparison.Ordinal))
+                    return (true, null);
+
+                if (output.Contains("NT_STATUS_ACCESS_DENIED", StringComparison.Ordinal) ||
+                    output.Contains("NT_STATUS_OBJECT_NAME_NOT_FOUND", StringComparison.Ordinal))
+                    return (false, "AccessDenied");
+
+                if (output.Contains("NT_STATUS_LOGON_FAILURE", StringComparison.Ordinal) ||
+                    output.Contains("NT_STATUS_ACCOUNT_LOCKED_OUT", StringComparison.Ordinal))
+                    return (false, "AuthenticationRejected");
+
+                return (false, "Unavailable");
+            }
+            finally
+            {
+                ShellHelper.DeleteCredentialFile(authFile);
+            }
+        }
+
         #region Implementaciones por Plataforma
 
         private static void OpenInWindows(string ip, string shareName, string? user, string? pass, string domain)
@@ -404,10 +491,15 @@ namespace SAMBA_Util.Helpers
         private static void OpenInLinux(string ip, string shareName, string? user, string? pass, string domain)
         {
             string cleanUrl = BuildSmbUrl(ip, shareName, user, pass, domain, includePassword: false);
-            string fullUrl = BuildSmbUrl(ip, shareName, user, pass, domain, includePassword: true);
+            string kdeUrl = BuildKdeSmbUrl(ip, shareName, user, pass);
 
-            // 1. Intentar montar mediante GVfs (útil en GNOME/XFCE/Cinnamon)
-            MountGvfsInteractive(cleanUrl, user, pass, domain);
+            // 1. GVfs solo monta sin prompting en compartidos anónimos: `gio
+            //    mount` no lee la contraseña de stdin, así que intentarlo con
+            //    credenciales solo abría un diálogo que no podíamos responder.
+            bool isAnonymous = string.IsNullOrWhiteSpace(user) ||
+                               user.Equals("guest", StringComparison.OrdinalIgnoreCase);
+            if (isAnonymous)
+                MountGvfsInteractive(cleanUrl, user, pass, domain);
 
             // Dar un margen breve para que gvfsd-fuse cree el directorio en /run/user/<uid>/gvfs
             string? localGvfsPath = null;
@@ -431,10 +523,11 @@ namespace SAMBA_Util.Helpers
                 }
             }
 
-            // 3. Fallback KDE (Dolphin / KIO)
-            if (LaunchDetached("kioclient6", $"exec \"{fullUrl}\"") ||
-                LaunchDetached("kioclient5", $"exec \"{fullUrl}\"") ||
-                LaunchDetached("kioclient", $"exec \"{fullUrl}\""))
+            // 3. Fallback KDE (Dolphin / KIO): KIO acepta usuario:contraseña
+            //    en la URL, a diferencia de GVfs.
+            if (LaunchDetached("kioclient6", $"exec \"{kdeUrl}\"") ||
+                LaunchDetached("kioclient5", $"exec \"{kdeUrl}\"") ||
+                LaunchDetached("kioclient", $"exec \"{kdeUrl}\""))
             {
                 return;
             }
@@ -460,30 +553,20 @@ namespace SAMBA_Util.Helpers
                 bool isAnonymous = string.IsNullOrWhiteSpace(user) ||
                                    user.Equals("guest", StringComparison.OrdinalIgnoreCase);
 
-                // Si es anónimo/guest, usamos -a (--anonymous) para montar directo sin prompts interactivos
-                string args = isAnonymous ? $"mount -a \"{url}\"" : $"mount \"{url}\"";
+                // `gio mount` no acepta la contraseña por stdin: con
+                // credenciales solo abre un prompt interactivo que nadie
+                // responde. Solo se usa en modo anónimo (-a).
+                if (!isAnonymous)
+                    return false;
+
+                string args = $"mount -a \"{url}\"";
 
                 var psi = CreateCleanProcessStartInfo("gio", args);
                 psi.RedirectStandardOutput = true;
                 psi.RedirectStandardError = true;
 
-                if (!isAnonymous)
-                {
-                    psi.RedirectStandardInput = true;
-                }
-
                 using var process = Process.Start(psi);
                 if (process == null) return false;
-
-                if (!isAnonymous)
-                {
-                    using StreamWriter writer = process.StandardInput;
-                    if (!string.IsNullOrEmpty(pass))
-                    {
-                        writer.WriteLine(pass);
-                    }
-                    writer.Flush();
-                }
 
                 if (!process.WaitForExit(4000))
                 {
@@ -634,19 +717,41 @@ namespace SAMBA_Util.Helpers
 
         private static string BuildSmbUrl(string ip, string shareName, string? user, string? pass, string domain, bool includePassword)
         {
+            string encodedShare = Uri.EscapeDataString(shareName.Split('|')[0].Trim());
+
             if (string.IsNullOrWhiteSpace(user))
             {
-                return $"smb://{ip}/{shareName}";
+                return $"smb://{ip}/{encodedShare}";
             }
 
             string userWithDomain = string.IsNullOrWhiteSpace(domain) ? user : $"{domain};{user}";
 
             if (string.IsNullOrEmpty(pass) || !includePassword)
             {
-                return $"smb://{userWithDomain}@{ip}/{shareName}";
+                return $"smb://{Uri.EscapeDataString(userWithDomain)}@{ip}/{encodedShare}";
             }
 
-            return $"smb://{userWithDomain}:{pass}@{ip}/{shareName}";
+            return $"smb://{Uri.EscapeDataString(userWithDomain)}:{Uri.EscapeDataString(pass)}@{ip}/{encodedShare}";
+        }
+
+        // KIO (KDE) usa `usuario:contraseña@servidor` y no entiende el prefijo
+        // `dominio;usuario` de GVfs. Codificamos también el nombre del recurso:
+        // shares con espacios ("Solicitud Ciudadania") rompían la URL.
+        private static string BuildKdeSmbUrl(string ip, string shareName, string? user, string? pass)
+        {
+            string encodedShare = Uri.EscapeDataString(shareName.Split('|')[0].Trim());
+
+            if (string.IsNullOrWhiteSpace(user))
+                return $"smb://{ip}/{encodedShare}";
+
+            string plainUser = user.Contains('\\', StringComparison.Ordinal)
+                ? user[(user.LastIndexOf('\\') + 1)..]
+                : user;
+
+            if (string.IsNullOrEmpty(pass))
+                return $"smb://{Uri.EscapeDataString(plainUser)}@{ip}/{encodedShare}";
+
+            return $"smb://{Uri.EscapeDataString(plainUser)}:{Uri.EscapeDataString(pass)}@{ip}/{encodedShare}";
         }
 
         private static void NotifyError(string message)

@@ -1069,13 +1069,19 @@ public class CliApp
             return;
         }
 
+        if (enumeration.Outcome == ShareEnumerationOutcome.AccountLockedOut)
+        {
+            Console.WriteLine($"The account on {device.IP} is locked out. Unlock it on the Windows machine and wait for the lockout period to expire before trying again.");
+            return;
+        }
+
         if (enumeration.Outcome == ShareEnumerationOutcome.Failed)
         {
             Console.WriteLine($"Could not connect to {device.IP}. The host may be unreachable or not running an SMB service.");
             return;
         }
 
-        if (shares.Count == 0)
+        if (shares.Count == 0 && enumeration.Outcome == ShareEnumerationOutcome.RequiresCredentials)
         {
             var retry = Choose("No shares were listed anonymously. Try again with SMB credentials?", new[] { "Yes, enter credentials", "No, go back" });
             if (retry == 1)
@@ -1099,7 +1105,12 @@ public class CliApp
 
         if (shares.Count == 0)
         {
-            Console.WriteLine("Unable to enumerate shares. The server may require credentials or deny access.");
+            if (enumeration.Outcome == ShareEnumerationOutcome.AccountLockedOut)
+                Console.WriteLine($"The account on {device.IP} is locked out. Unlock it on the Windows machine before trying again.");
+            else if (enumeration.Outcome == ShareEnumerationOutcome.RequiresCredentials)
+                Console.WriteLine("Authentication was rejected. Check the user name (use DOMAIN\\user) and the password." + AuthHelp.PlatformNotice);
+            else
+                Console.WriteLine($"No SMB shares were found on {device.IP}.");
             return;
         }
 

@@ -109,6 +109,10 @@ namespace SAMBA_Util.Helpers
         // Faltan las herramientas de cliente SMB (smbclient/rpcclient).
         ClientMissing,
 
+        // La cuenta está bloqueada: volver a pedir credenciales solo agrava
+        // el bloqueo, así que se trata como un error con explicación propia.
+        AccountLockedOut,
+
         // Error de red u otro error ajeno a la autenticación.
         Failed
     }
@@ -266,47 +270,17 @@ namespace SAMBA_Util.Helpers
             Console.WriteLine("[Scanner] RPC output:");
             Console.WriteLine(rpcOut);
 
-            if (rpcOut.Contains("NT_STATUS") && HasCredentials())
-            {
-                Console.WriteLine("[Scanner] Anonymous attempt rejected. Retrying RPC with credentials...");
-                var (retryArgs, retryFile) = BuildAuthArgs();
-                try
-                {
-                    rpcOut = await ShellHelper.RunAsync(
-                        $"rpcclient {retryArgs} {ShellHelper.Quote(ip)} -c \"netshareenumall\""
-                    );
-                }
-                finally
-                {
-                    ShellHelper.DeleteCredentialFile(retryFile);
-                }
+            // `authArgs` ya incluye las credenciales disponibles, así que no
+            // tiene sentido repetir la llamada: solo generaría intentos de
+            // acceso extra (y podría agravar un bloqueo de cuenta).
 
-                cancellationToken.ThrowIfCancellationRequested();
+            // Un mensaje NT_STATUS aislado (por ejemplo al sondear IPC$) no
+            // significa que fallara la enumeración: si hay recursos, se usan.
+            var shares = ParseRpcShares(ip, rpcOut);
+            if (shares.Count > 0)
+                return Success(shares);
 
-                Console.WriteLine("[Scanner] RPC Credential output:");
-                Console.WriteLine(rpcOut);
-            }
-
-            if (rpcOut.Contains("NT_STATUS"))
-                return ClassifyFailure(rpcOut);
-
-            var shares = new List<NetworkShare>();
-            foreach (var line in rpcOut.Split('\n'))
-            {
-                if (!line.Contains("netname:")) continue;
-
-                string name = line.Replace("netname:", "").Trim();
-                if (string.IsNullOrWhiteSpace(name) || name.EndsWith("$")) continue;
-
-                shares.Add(new NetworkShare(name)
-                {
-                    IP = ip,
-                    Access = "Authenticated",
-                    Comment = "Windows RPC"
-                });
-            }
-
-            return Success(shares);
+            return ClassifyFailure(rpcOut);
         }
 
         // ---------------------------------------------------------
@@ -317,65 +291,115 @@ namespace SAMBA_Util.Helpers
             if (!await Task.Run(SambaEnvironment.HasSmbClient))
                 return ClientMissing();
 
-            // `-U %` es ya un intento anónimo (usuario y contraseña vacíos):
-            // antes de pedir credenciales se prueba sin ellas.
-            string outGuest = await ShellHelper.RunAsync(
-                $"smbclient -gL {ShellQuote("//" + ip)} -U % {ConfigManager.ClientMinProtocolOption()}"
-            );
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            Console.WriteLine("[Scanner] Guest output:");
-            Console.WriteLine(outGuest);
-
-            if (!outGuest.Contains("NT_STATUS"))
+            // Si el usuario ya dio credenciales, tienen prioridad sobre el
+            // acceso invitado. macOS con guest activado puede exponer un share
+            // `nobody` que no debe ocultar los recursos reales de esa cuenta.
+            if (HasCredentials())
             {
-                var parsed = ParseShares(ip, outGuest);
+                var authResult = await RunAuthenticatedEnumerationAsync(ip, cancellationToken);
+                if (ShouldReturnAuthenticatedResult(authResult))
+                    return authResult;
+            }
 
-                foreach (var share in parsed)
+            // `-U %` es ya un intento anónimo (usuario y contraseña vacíos):
+            // antes de pedir credenciales se prueba sin ellas. En macOS ese
+            // formulario solo sirve para IPC$, así que si el servidor rechaza
+            // el intento se repite con el usuario `guest`, que es como Finder
+            // identifica el acceso invitado.
+            string outGuest = await RunAnonymousEnumerationAsync(ip, cancellationToken);
+
+            var guestResult = EvaluateSmbClientOutput(ip, outGuest, authenticated: false);
+            if (guestResult.Outcome == ShareEnumerationOutcome.Success &&
+                guestResult.Shares.Count > 0)
+            {
+                foreach (var share in guestResult.Shares)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     share.Access = await DetectShareAccess(ip, share.Name);
                 }
 
-                return Success(parsed);
+                return guestResult;
             }
 
-            if (HasCredentials())
+            Console.WriteLine("[Scanner] Enumeration failed.");
+            return guestResult.Outcome == ShareEnumerationOutcome.Success
+                ? guestResult
+                : ClassifyFailure(outGuest);
+        }
+
+        // Un rechazo explícito (o una cuenta bloqueada) debe propagarse: caer
+        // al invitado en ese caso ocultaría el motivo real del fallo.
+        internal static bool ShouldReturnAuthenticatedResult(ShareEnumerationResult result) =>
+            result.Outcome == ShareEnumerationOutcome.AccountLockedOut ||
+            result.Outcome == ShareEnumerationOutcome.RequiresCredentials ||
+            (result.Outcome == ShareEnumerationOutcome.Success && result.Shares.Count > 0);
+
+        private static async Task<ShareEnumerationResult> RunAuthenticatedEnumerationAsync(
+            string ip, CancellationToken cancellationToken)
+        {
+            var (authArgs, authFile) = BuildAuthArgs();
+            try
             {
-                var (authArgs, authFile) = BuildAuthArgs();
-                string outCred;
-                try
-                {
-                    outCred = await ShellHelper.RunAsync(
-                        $"smbclient -gL {ShellQuote("//" + ip)} {authArgs} {ConfigManager.ClientMinProtocolOption()}"
-                    );
-                }
-                finally
-                {
-                    ShellHelper.DeleteCredentialFile(authFile);
-                }
+                string output = await ShellHelper.RunAsync(
+                    $"smbclient -gL {ShellQuote("//" + ip)} {authArgs} {ConfigManager.ClientMinProtocolOption()}");
 
                 cancellationToken.ThrowIfCancellationRequested();
 
                 Console.WriteLine("[Scanner] Credential output:");
-                Console.WriteLine(outCred);
+                Console.WriteLine(output);
 
-                if (!outCred.Contains("NT_STATUS"))
-                {
-                    var parsed = ParseShares(ip, outCred);
-
-                    foreach (var share in parsed)
-                        share.Access = "Authenticated";
-
-                    return Success(parsed);
-                }
-
-                return ClassifyFailure(outCred);
+                return EvaluateSmbClientOutput(ip, output, authenticated: true);
             }
+            finally
+            {
+                ShellHelper.DeleteCredentialFile(authFile);
+            }
+        }
 
-            Console.WriteLine("[Scanner] Enumeration failed.");
-            return ClassifyFailure(outGuest);
+        // macOS no acepta `-U %` para el acceso invitado: solo devuelve IPC$
+        // o LOGON_FAILURE. Solo repetimos con `guest` ante un rechazo claro de
+        // credenciales; no reintentamos otros errores para no agravar bloqueos.
+        internal static bool ShouldRetryAnonymousAsGuest(string output) =>
+            output.Contains("NT_STATUS_LOGON_FAILURE", StringComparison.Ordinal);
+
+        private static async Task<string> RunAnonymousEnumerationAsync(
+            string ip, CancellationToken cancellationToken)
+        {
+            string commandPrefix = $"smbclient -gL {ShellQuote("//" + ip)}";
+            string protocol = ConfigManager.ClientMinProtocolOption();
+
+            string emptyUserOutput = await ShellHelper.RunAsync(
+                $"{commandPrefix} -U % {protocol}");
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            Console.WriteLine("[Scanner] Guest output (-U %):");
+            Console.WriteLine(emptyUserOutput);
+
+            if (!ShouldRetryAnonymousAsGuest(emptyUserOutput))
+                return emptyUserOutput;
+
+            string guestUserOutput = await ShellHelper.RunAsync(
+                $"{commandPrefix} -U guest% {protocol}");
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            Console.WriteLine("[Scanner] Guest output (-U guest%):");
+            Console.WriteLine(guestUserOutput);
+
+            var emptyResult = EvaluateSmbClientOutput(ip, emptyUserOutput, authenticated: false);
+            var guestResult = EvaluateSmbClientOutput(ip, guestUserOutput, authenticated: false);
+
+            if (guestResult.Shares.Count > emptyResult.Shares.Count)
+                return guestUserOutput;
+
+            // macOS puede responder solo con el pseudo-share `nobody`. No es
+            // un recurso real, pero sí indica que hizo falta autenticarse.
+            if (guestResult.Outcome == ShareEnumerationOutcome.RequiresCredentials &&
+                emptyResult.Shares.Count == 0)
+                return guestUserOutput;
+
+            return emptyUserOutput;
         }
 
         private static bool HasCredentials() =>
@@ -392,11 +416,13 @@ namespace SAMBA_Util.Helpers
 
             string upper = output.ToUpperInvariant();
 
+            if (upper.Contains("NT_STATUS_ACCOUNT_LOCKED_OUT"))
+                return ShareEnumerationOutcome.AccountLockedOut;
+
             if (upper.Contains("NT_STATUS_ACCESS_DENIED") ||
                 upper.Contains("NT_STATUS_LOGON_FAILURE") ||
                 upper.Contains("NT_STATUS_ACCOUNT_DISABLED") ||
                 upper.Contains("NT_STATUS_ACCOUNT_EXPIRED") ||
-                upper.Contains("NT_STATUS_ACCOUNT_LOCKED_OUT") ||
                 upper.Contains("NT_STATUS_PASSWORD_MUST_CHANGE") ||
                 upper.Contains("NT_STATUS_PASSWORD_EXPIRED") ||
                 upper.Contains("NT_STATUS_NO_LOGON_SERVERS") ||
@@ -418,8 +444,66 @@ namespace SAMBA_Util.Helpers
             new() { Outcome = ShareEnumerationOutcome.ClientMissing };
 
         // ---------------------------------------------------------
-        // SHARE PARSING (SMBCLIENT)
+        // SHARE PARSING (RPC / SMBCLIENT)
         // ---------------------------------------------------------
+        internal static List<NetworkShare> ParseRpcShares(string ip, string output)
+        {
+            var shares = new List<NetworkShare>();
+
+            foreach (var line in output.Split('\n'))
+            {
+                if (!line.Contains("netname:", StringComparison.Ordinal)) continue;
+
+                string name = line.Replace("netname:", "", StringComparison.Ordinal).Trim();
+                if (string.IsNullOrWhiteSpace(name) || name.EndsWith("$", StringComparison.Ordinal)) continue;
+
+                shares.Add(new NetworkShare(name)
+                {
+                    IP = ip,
+                    Access = "Authenticated",
+                    Comment = "Windows RPC"
+                });
+            }
+
+            return shares;
+        }
+
+        // Evalúa la salida de smbclient dando prioridad a los recursos que se
+        // hayan enumerado. Algunos servidores (Windows incluido) imprimen un
+        // NT_STATUS por un sondeo secundario aunque la lista de shares sea
+        // válida; en ese caso no se deben descartar los recursos obtenidos.
+        internal static ShareEnumerationResult EvaluateSmbClientOutput(string ip, string output, bool authenticated)
+        {
+            var shares = ParseShares(ip, output);
+            bool onlyMacGuestPseudoShare = false;
+
+            if (!authenticated)
+            {
+                // Con SMB guest activado, macOS anuncia un share `nobody` que
+                // no es accesible. No debe mostrarse como recurso de la red.
+                onlyMacGuestPseudoShare = shares.Count > 0 &&
+                    shares.All(s => s.Name.Equals("nobody", StringComparison.OrdinalIgnoreCase));
+                shares.RemoveAll(s => s.Name.Equals("nobody", StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (shares.Count > 0)
+            {
+                if (authenticated)
+                    foreach (var share in shares)
+                        share.Access = "Authenticated";
+
+                return Success(shares);
+            }
+
+            if (onlyMacGuestPseudoShare)
+                return new() { Outcome = ShareEnumerationOutcome.RequiresCredentials };
+
+            if (string.IsNullOrWhiteSpace(output))
+                return Success(shares);
+
+            return ClassifyFailure(output);
+        }
+
         private static List<NetworkShare> ParseShares(string ip, string output)
         {
             var shares = new List<NetworkShare>();
@@ -447,6 +531,10 @@ namespace SAMBA_Util.Helpers
         private static string ShellQuote(string value) =>
             "'" + value.Replace("'", "'\\''", StringComparison.Ordinal) + "'";
 
+        private static bool IsSuccessfulListing(string output) =>
+            output.Contains("blocks", StringComparison.Ordinal) ||
+            output.Contains("NT_STATUS_OK", StringComparison.Ordinal);
+
         // ---------------------------------------------------------
         // ACCESS DETECTION (SMBCLIENT)
         // ---------------------------------------------------------
@@ -454,20 +542,30 @@ namespace SAMBA_Util.Helpers
         {
             Console.WriteLine($"[Scanner] Testing access for share '{share}'...");
 
-            string guestCmd =
-                $"smbclient {ShellQuote("//" + ip + "/" + share)} -U % {ConfigManager.ClientMinProtocolOption()} -c \"ls\"";
+            string shareUrl = ShellQuote("//" + ip + "/" + share);
+            string protocol = ConfigManager.ClientMinProtocolOption();
 
-            string guestOut = await ShellHelper.RunAsync(guestCmd);
+            string guestOut = await ShellHelper.RunAsync(
+                $"smbclient {shareUrl} -U % {protocol} -c \"ls\"");
 
-            if (guestOut.Contains("blocks") || guestOut.Contains("NT_STATUS_OK"))
+            if (IsSuccessfulListing(guestOut))
                 return "Anonymous";
 
-            string anonCmd =
-                $"smbclient {ShellQuote("//" + ip + "/" + share)} -N {ConfigManager.ClientMinProtocolOption()} -c \"ls\"";
+            // Igual que en el listado: macOS solo entra como invitado si el
+            // usuario se llama explícitamente `guest`.
+            if (ShouldRetryAnonymousAsGuest(guestOut))
+            {
+                guestOut = await ShellHelper.RunAsync(
+                    $"smbclient {shareUrl} -U guest% {protocol} -c \"ls\"");
 
-            string anonOut = await ShellHelper.RunAsync(anonCmd);
+                if (IsSuccessfulListing(guestOut))
+                    return "Anonymous";
+            }
 
-            if (anonOut.Contains("blocks") || anonOut.Contains("NT_STATUS_OK"))
+            string anonOut = await ShellHelper.RunAsync(
+                $"smbclient {shareUrl} -N {protocol} -c \"ls\"");
+
+            if (IsSuccessfulListing(anonOut))
                 return "Anonymous";
 
             var (authArgs, authFile) = BuildAuthArgs();
@@ -475,14 +573,14 @@ namespace SAMBA_Util.Helpers
             try
             {
                 credOut = await ShellHelper.RunAsync(
-                    $"smbclient {ShellQuote("//" + ip + "/" + share)} {authArgs} {ConfigManager.ClientMinProtocolOption()} -c \"ls\"");
+                    $"smbclient {shareUrl} {authArgs} {protocol} -c \"ls\"");
             }
             finally
             {
                 ShellHelper.DeleteCredentialFile(authFile);
             }
 
-            if (credOut.Contains("blocks") || credOut.Contains("NT_STATUS_OK"))
+            if (IsSuccessfulListing(credOut))
                 return "Authenticated";
 
             if (credOut.Contains("NT_STATUS_ACCESS_DENIED") ||
