@@ -537,7 +537,6 @@ public partial class MainWindow : Window
     public Window ShowLoadingDialog(string message)
     {
         var foreground = Application.Current?.FindResource("ForegroundBrush") as IBrush;
-        var background = Application.Current?.FindResource("BackgroundBrush") as IBrush;
         var controlBackground = Application.Current?.FindResource("ControlBackgroundBrush") as IBrush;
         var borderBrush = Application.Current?.FindResource("BorderBrush") as IBrush;
 
@@ -545,7 +544,7 @@ public partial class MainWindow : Window
         {
             IsIndeterminate = true,
             Width = 250,
-            Height = 20,
+            Height = 8,
             Margin = new Thickness(0, 10, 0, 0)
         };
 
@@ -570,28 +569,44 @@ public partial class MainWindow : Window
             }
         };
 
-        var border = new Border
+        // Misma tarjeta sutil que RAID-Util: sin marco de ventana, overlay
+        // oscuro y borde de acento de 2 px.
+        var card = new Border
         {
-            Margin = new Thickness(12),
-            Padding = new Thickness(18),
-            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(22),
+            CornerRadius = new CornerRadius(12),
             Background = controlBackground,
             BorderBrush = borderBrush,
-            BorderThickness = new Thickness(1),
+            BorderThickness = new Thickness(2),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
             Child = panel
+        };
+
+        var overlay = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(0xAA, 0x00, 0x00, 0x00)),
+            Child = card
         };
 
         var win = new Window
         {
-            Width = 350,
-            Height = 150,
-            Title = "Loading",
+            Width = 380,
+            Height = 170,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = false,
             ShowInTaskbar = false,
-            Background = background,
+            Topmost = true,
+            SystemDecorations = SystemDecorations.None,
+            Background = Brushes.Transparent,
+            TransparencyLevelHint = new[]
+            {
+                WindowTransparencyLevel.AcrylicBlur,
+                WindowTransparencyLevel.Blur,
+                WindowTransparencyLevel.Transparent
+            },
             Foreground = foreground,
-            Content = border
+            Content = overlay
         };
 
         win.Show(this);
