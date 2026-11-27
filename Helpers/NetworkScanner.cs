@@ -232,7 +232,7 @@ namespace SAMBA_Util.Helpers
         // para pedir credenciales solo cuando el servidor las exige.
         public static async Task<ShareEnumerationResult> GetSharesResultAsync(string ip, CancellationToken cancellationToken = default)
         {
-            Console.WriteLine($"[Scanner] === GET SHARES FOR {ip} ===");
+            DebugConsole.WriteLine($"[Scanner] === GET SHARES FOR {ip} ===");
 
             string os = await DetectOSAsync(ip, ip);
 
@@ -267,8 +267,8 @@ namespace SAMBA_Util.Helpers
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            Console.WriteLine("[Scanner] RPC output:");
-            Console.WriteLine(rpcOut);
+            DebugConsole.WriteLine("[Scanner] RPC output:");
+            DebugConsole.WriteLine(rpcOut);
 
             // `authArgs` ya incluye las credenciales disponibles, así que no
             // tiene sentido repetir la llamada: solo generaría intentos de
@@ -321,7 +321,7 @@ namespace SAMBA_Util.Helpers
                 return guestResult;
             }
 
-            Console.WriteLine("[Scanner] Enumeration failed.");
+            DebugConsole.WriteLine("[Scanner] Enumeration failed.");
             return guestResult.Outcome == ShareEnumerationOutcome.Success
                 ? guestResult
                 : ClassifyFailure(outGuest);
@@ -345,8 +345,8 @@ namespace SAMBA_Util.Helpers
 
                 cancellationToken.ThrowIfCancellationRequested();
 
-                Console.WriteLine("[Scanner] Credential output:");
-                Console.WriteLine(output);
+                DebugConsole.WriteLine("[Scanner] Credential output:");
+                DebugConsole.WriteLine(output);
 
                 return EvaluateSmbClientOutput(ip, output, authenticated: true);
             }
@@ -373,8 +373,8 @@ namespace SAMBA_Util.Helpers
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            Console.WriteLine("[Scanner] Guest output (-U %):");
-            Console.WriteLine(emptyUserOutput);
+            DebugConsole.WriteLine("[Scanner] Guest output (-U %):");
+            DebugConsole.WriteLine(emptyUserOutput);
 
             if (!ShouldRetryAnonymousAsGuest(emptyUserOutput))
                 return emptyUserOutput;
@@ -384,8 +384,8 @@ namespace SAMBA_Util.Helpers
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            Console.WriteLine("[Scanner] Guest output (-U guest%):");
-            Console.WriteLine(guestUserOutput);
+            DebugConsole.WriteLine("[Scanner] Guest output (-U guest%):");
+            DebugConsole.WriteLine(guestUserOutput);
 
             var emptyResult = EvaluateSmbClientOutput(ip, emptyUserOutput, authenticated: false);
             var guestResult = EvaluateSmbClientOutput(ip, guestUserOutput, authenticated: false);
@@ -540,7 +540,7 @@ namespace SAMBA_Util.Helpers
         // ---------------------------------------------------------
         private static async Task<string> DetectShareAccess(string ip, string share)
         {
-            Console.WriteLine($"[Scanner] Testing access for share '{share}'...");
+            DebugConsole.WriteLine($"[Scanner] Testing access for share '{share}'...");
 
             string shareUrl = ShellQuote("//" + ip + "/" + share);
             string protocol = ConfigManager.ClientMinProtocolOption();

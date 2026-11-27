@@ -101,7 +101,7 @@ public partial class SharesView : UserControl
 
             if (TopLevel.GetTopLevel(this) is not Window owner)
             {
-                Console.WriteLine("ERROR: Could not get parent window.");
+                DebugConsole.WriteLine("ERROR: Could not get parent window.");
                 return;
             }
 
@@ -148,7 +148,7 @@ public partial class SharesView : UserControl
 
         if (TopLevel.GetTopLevel(this) is not Window owner)
         {
-            Console.WriteLine("ERROR: Could not get parent window.");
+            DebugConsole.WriteLine("ERROR: Could not get parent window.");
             return;
         }
 
@@ -167,7 +167,7 @@ public partial class SharesView : UserControl
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error adding share: {ex.Message}");
+                DebugConsole.WriteLine($"Error adding share: {ex.Message}");
             }
         }
     }

@@ -502,7 +502,7 @@ public partial class StatusView : UserControl
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[STATUS ERROR] {ex}");
+            DebugConsole.WriteLine($"[STATUS ERROR] {ex}");
         }
     }
 
@@ -524,7 +524,7 @@ public partial class StatusView : UserControl
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[STATUS ERROR] Start Samba: {ex.Message}");
+                    DebugConsole.WriteLine($"[STATUS ERROR] Start Samba: {ex.Message}");
                 }
             });
         }
@@ -545,7 +545,7 @@ public partial class StatusView : UserControl
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[STATUS ERROR] {ex}");
+            DebugConsole.WriteLine($"[STATUS ERROR] {ex}");
         }
     }
 

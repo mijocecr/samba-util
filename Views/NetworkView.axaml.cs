@@ -30,12 +30,12 @@ public partial class NetworkView : UserControl
         ScanButton.Click += OnScanClicked;
 
         SetTwoColumnLayout(false);
-        Console.WriteLine("[DIAGNOSTIC] NetworkView initialized.");
+        DebugConsole.WriteLine("[DIAGNOSTIC] NetworkView initialized.");
     }
 
     private void SetTwoColumnLayout(bool showDevices)
     {
-        Console.WriteLine($"[DIAGNOSTIC] SetTwoColumnLayout -> showDevices: {showDevices}");
+        DebugConsole.WriteLine($"[DIAGNOSTIC] SetTwoColumnLayout -> showDevices: {showDevices}");
         if (showDevices)
         {
             DevicesColumn.IsVisible = true;
@@ -68,16 +68,16 @@ public partial class NetworkView : UserControl
         if (InterfaceSelector.Items.Count > 0)
             InterfaceSelector.SelectedIndex = 0;
 
-        Console.WriteLine($"[DIAGNOSTIC] Loaded {InterfaceSelector.Items.Count} network interfaces.");
+        DebugConsole.WriteLine($"[DIAGNOSTIC] Loaded {InterfaceSelector.Items.Count} network interfaces.");
     }
 
     private async void OnScanClicked(object? sender, RoutedEventArgs e)
     {
-        Console.WriteLine("[DIAGNOSTIC] === Scan Network Clicked ===");
+        DebugConsole.WriteLine("[DIAGNOSTIC] === Scan Network Clicked ===");
 
         if (_isLoadingShares)
         {
-            Console.WriteLine("[DIAGNOSTIC] Scan blocked: _isLoadingShares is true.");
+            DebugConsole.WriteLine("[DIAGNOSTIC] Scan blocked: _isLoadingShares is true.");
             return;
         }
 
@@ -95,7 +95,7 @@ public partial class NetworkView : UserControl
             var main = TopLevel.GetTopLevel(this) as MainWindow;
             if (main == null)
             {
-                Console.WriteLine("[DIAGNOSTIC] ERROR: MainWindow not found.");
+                DebugConsole.WriteLine("[DIAGNOSTIC] ERROR: MainWindow not found.");
                 Log("Main window not found.");
                 return;
             }
@@ -109,32 +109,32 @@ public partial class NetworkView : UserControl
             SharesPanel.Children.Clear();
 
             var iface = InterfaceSelector.SelectedItem?.ToString();
-            Console.WriteLine($"[DIAGNOSTIC] Selected interface for scan: '{iface}'");
+            DebugConsole.WriteLine($"[DIAGNOSTIC] Selected interface for scan: '{iface}'");
 
             if (string.IsNullOrWhiteSpace(iface))
             {
                 Log("No interface selected.");
-                Console.WriteLine("[DIAGNOSTIC] Scan aborted: No interface selected.");
+                DebugConsole.WriteLine("[DIAGNOSTIC] Scan aborted: No interface selected.");
                 return;
             }
 
             var devices = await NetworkScanner.DiscoverAsync(iface, token);
             if (token.IsCancellationRequested)
             {
-                Console.WriteLine("[DIAGNOSTIC] Scan task cancelled during DiscoverAsync.");
+                DebugConsole.WriteLine("[DIAGNOSTIC] Scan task cancelled during DiscoverAsync.");
                 return;
             }
 
             CloseLoading(loading);
             loading = null;
 
-            Console.WriteLine($"[DIAGNOSTIC] Scan finished. Devices found: {devices?.Count ?? 0}");
+            DebugConsole.WriteLine($"[DIAGNOSTIC] Scan finished. Devices found: {devices?.Count ?? 0}");
 
             if (devices != null && devices.Count > 0)
             {
                 foreach (var dev in devices)
                 {
-                    Console.WriteLine($"[DIAGNOSTIC] Adding card for Device -> Name: '{dev.Name}', IP: '{dev.IP}', OS: '{dev.OS}'");
+                    DebugConsole.WriteLine($"[DIAGNOSTIC] Adding card for Device -> Name: '{dev.Name}', IP: '{dev.IP}', OS: '{dev.OS}'");
                     DevicesPanel.Children.Add(CreateDeviceCard(dev));
                 }
 
@@ -156,7 +156,7 @@ public partial class NetworkView : UserControl
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[DIAGNOSTIC ERROR] OnScanClicked Exception: {ex.Message}\n{ex.StackTrace}");
+            DebugConsole.WriteLine($"[DIAGNOSTIC ERROR] OnScanClicked Exception: {ex.Message}\n{ex.StackTrace}");
 
             CloseLoading(loading);
             loading = null;
@@ -287,11 +287,11 @@ public partial class NetworkView : UserControl
         Guid sessionGuid = Guid.NewGuid();
         _activeSessionId = sessionGuid;
 
-        Console.WriteLine($"[DIAGNOSTIC] === NEW SESSION [{sessionGuid}] -> Target: {targetName} ({targetIp}) ===");
+        DebugConsole.WriteLine($"[DIAGNOSTIC] === NEW SESSION [{sessionGuid}] -> Target: {targetName} ({targetIp}) ===");
 
         if (_currentOperationCts != null)
         {
-            Console.WriteLine("[DIAGNOSTIC] Cancelling previous ongoing network/share operation.");
+            DebugConsole.WriteLine("[DIAGNOSTIC] Cancelling previous ongoing network/share operation.");
             _currentOperationCts.Cancel();
         }
         
@@ -310,7 +310,7 @@ public partial class NetworkView : UserControl
             // Valores por defecto: equivalen a limpiar credenciales (guest / sin contraseña).
             CredStore.User = "guest";
             CredStore.Password = "";
-            Console.WriteLine("[DIAGNOSTIC] CredStore reset (User=guest, Password empty).");
+            DebugConsole.WriteLine("[DIAGNOSTIC] CredStore reset (User=guest, Password empty).");
 
             SharesPanel.DataContext = null;
             SharesPanel.Children.Clear();
@@ -340,7 +340,7 @@ public partial class NetworkView : UserControl
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[DIAGNOSTIC ERROR] GetSharesResultAsync exception: {ex.Message}");
+                DebugConsole.WriteLine($"[DIAGNOSTIC ERROR] GetSharesResultAsync exception: {ex.Message}");
             }
 
             if (_activeSessionId != sessionGuid || token.IsCancellationRequested) return;
@@ -373,7 +373,7 @@ public partial class NetworkView : UserControl
 
                 if (_activeSessionId != sessionGuid || token.IsCancellationRequested || isCanceledOrEmpty)
                 {
-                    Console.WriteLine("[DIAGNOSTIC] Dialog was canceled or credentials were left empty. Aborting.");
+                    DebugConsole.WriteLine("[DIAGNOSTIC] Dialog was canceled or credentials were left empty. Aborting.");
                     mainWindow.ShowToast("Canceled");
                     Log("Shares loading canceled.");
                     ShowSharesMessage("Operation canceled or credentials required.", Brushes.Gray);
@@ -388,7 +388,7 @@ public partial class NetworkView : UserControl
                 var credentials = cred.Value;
                 CredStore.User = credentials.user;
                 CredStore.Password = credentials.pass;
-                Console.WriteLine($"[DIAGNOSTIC] CredStore updated with user: '{CredStore.User}'");
+                DebugConsole.WriteLine($"[DIAGNOSTIC] CredStore updated with user: '{CredStore.User}'");
 
                 loading = ShowLoading($"Connecting to {targetName} ({targetIp})...");
 
@@ -400,7 +400,7 @@ public partial class NetworkView : UserControl
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[DIAGNOSTIC ERROR] GetSharesResultAsync with credentials error: {ex.Message}");
+                    DebugConsole.WriteLine($"[DIAGNOSTIC ERROR] GetSharesResultAsync with credentials error: {ex.Message}");
                 }
             }
 
@@ -436,7 +436,7 @@ public partial class NetworkView : UserControl
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[DIAGNOSTIC ERROR] LoadDeviceSharesAsync Exception: {ex.Message}");
+            DebugConsole.WriteLine($"[DIAGNOSTIC ERROR] LoadDeviceSharesAsync Exception: {ex.Message}");
         }
         finally
         {
@@ -462,7 +462,7 @@ public partial class NetworkView : UserControl
             var item = new MenuItem { Header = label };
             item.Click += (_, __) =>
             {
-                Console.WriteLine($"[DIAGNOSTIC] ContextMenu OS override selected for IP {dev.IP} -> {label}");
+                DebugConsole.WriteLine($"[DIAGNOSTIC] ContextMenu OS override selected for IP {dev.IP} -> {label}");
                 OsOverrideManager.SetOverride(dev.IP, label);
                 dev.OS = label;
 
@@ -519,7 +519,7 @@ public partial class NetworkView : UserControl
 
         openBtn.Click += async (_, __) =>
         {
-            Console.WriteLine($"[DIAGNOSTIC] Share Open Clicked -> Share Name: '{share.Name}', IP: '{share.IP}', Access: '{share.Access}'");
+            DebugConsole.WriteLine($"[DIAGNOSTIC] Share Open Clicked -> Share Name: '{share.Name}', IP: '{share.IP}', Access: '{share.Access}'");
             Window? loading = null;
             try
             {
@@ -533,11 +533,11 @@ public partial class NetworkView : UserControl
 
                     if (!haveStoredCreds)
                     {
-                        Console.WriteLine("[DIAGNOSTIC] Share requires credentials and none stored. Showing credentials dialog...");
+                        DebugConsole.WriteLine("[DIAGNOSTIC] Share requires credentials and none stored. Showing credentials dialog...");
                         var cred = await main.ShowCredentialsDialog();
                         if (cred == null)
                         {
-                            Console.WriteLine("[DIAGNOSTIC] Share open credentials dialog canceled.");
+                            DebugConsole.WriteLine("[DIAGNOSTIC] Share open credentials dialog canceled.");
                             main.ShowToast("Opening canceled");
                             return;
                         }
@@ -570,7 +570,7 @@ public partial class NetworkView : UserControl
                             "The share is not reachable or does not allow listing its contents."
                     };
 
-                    Console.WriteLine($"[DIAGNOSTIC] Share access denied for '{share.Name}': {access.Reason}");
+                    DebugConsole.WriteLine($"[DIAGNOSTIC] Share access denied for '{share.Name}': {access.Reason}");
                     _ = main.ShowErrorDialog("Open failed", detail);
                     return;
                 }
@@ -587,7 +587,7 @@ public partial class NetworkView : UserControl
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[DIAGNOSTIC ERROR] OpenShare Exception: {ex.Message}");
+                DebugConsole.WriteLine($"[DIAGNOSTIC ERROR] OpenShare Exception: {ex.Message}");
                 CloseLoading(loading);
                 loading = null;
                 _ = main.ShowErrorDialog("Open failed", ex.Message);
@@ -676,7 +676,7 @@ public partial class NetworkView : UserControl
 
     private async void OnQuickConnectClicked(object? sender, RoutedEventArgs e)
     {
-        Console.WriteLine("[DIAGNOSTIC] === Quick Connect Clicked ===");
+        DebugConsole.WriteLine("[DIAGNOSTIC] === Quick Connect Clicked ===");
 
         if (_isLoadingShares) return;
 
@@ -684,7 +684,7 @@ public partial class NetworkView : UserControl
         if (string.IsNullOrWhiteSpace(ip))
         {
             Log("Please enter a valid IP or hostname.");
-            Console.WriteLine("[DIAGNOSTIC] Quick connect aborted: Empty IP/hostname.");
+            DebugConsole.WriteLine("[DIAGNOSTIC] Quick connect aborted: Empty IP/hostname.");
             return;
         }
 
@@ -716,15 +716,15 @@ public partial class NetworkView : UserControl
             ShareEnumerationOutcome outcome = ShareEnumerationOutcome.Failed;
             try
             {
-                Console.WriteLine($"[DIAGNOSTIC] QuickConnect GetSharesResultAsync for IP: {ip} (Attempt 1)");
+                DebugConsole.WriteLine($"[DIAGNOSTIC] QuickConnect GetSharesResultAsync for IP: {ip} (Attempt 1)");
                 var enumeration = await NetworkScanner.GetSharesResultAsync(ip, token);
                 shares = enumeration.Shares;
                 outcome = enumeration.Outcome;
-                Console.WriteLine($"[DIAGNOSTIC] QuickConnect attempt 1 returned {shares.Count} shares ({outcome}) for IP: {ip}");
+                DebugConsole.WriteLine($"[DIAGNOSTIC] QuickConnect attempt 1 returned {shares.Count} shares ({outcome}) for IP: {ip}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[DIAGNOSTIC ERROR] QuickConnect GetSharesResultAsync exception for IP {ip}: {ex.Message}");
+                DebugConsole.WriteLine($"[DIAGNOSTIC ERROR] QuickConnect GetSharesResultAsync exception for IP {ip}: {ex.Message}");
             }
 
             if (_activeSessionId != sessionGuid || token.IsCancellationRequested) return;
@@ -750,14 +750,14 @@ public partial class NetworkView : UserControl
                     CloseLoading(loading);
                     loading = null;
 
-                    Console.WriteLine("[DIAGNOSTIC] QuickConnect showing credentials dialog...");
+                    DebugConsole.WriteLine("[DIAGNOSTIC] QuickConnect showing credentials dialog...");
                     SharesPanel.DataContext = null;
                     SharesPanel.Children.Clear();
                     var cred = await mainWindow.ShowCredentialsDialog();
                     
                     if (_activeSessionId != sessionGuid || token.IsCancellationRequested || cred == null)
                     {
-                        Console.WriteLine("[DIAGNOSTIC] QuickConnect credentials dialog canceled or superseded.");
+                        DebugConsole.WriteLine("[DIAGNOSTIC] QuickConnect credentials dialog canceled or superseded.");
                         mainWindow.ShowToast("Connection canceled");
                         Log("Connection canceled.");
                         ShowSharesMessage("Connection canceled or credentials required.", Brushes.Gray);
@@ -771,15 +771,15 @@ public partial class NetworkView : UserControl
 
                     try
                     {
-                        Console.WriteLine($"[DIAGNOSTIC] QuickConnect GetSharesResultAsync for IP: {ip} (Attempt 2 with credentials)");
+                        DebugConsole.WriteLine($"[DIAGNOSTIC] QuickConnect GetSharesResultAsync for IP: {ip} (Attempt 2 with credentials)");
                         var enumeration = await NetworkScanner.GetSharesResultAsync(ip, token);
                         shares = enumeration.Shares;
                         outcome = enumeration.Outcome;
-                        Console.WriteLine($"[DIAGNOSTIC] QuickConnect attempt 2 returned {shares.Count} shares ({outcome}) for IP: {ip}");
+                        DebugConsole.WriteLine($"[DIAGNOSTIC] QuickConnect attempt 2 returned {shares.Count} shares ({outcome}) for IP: {ip}");
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[DIAGNOSTIC ERROR] QuickConnect Attempt 2 exception: {ex.Message}");
+                        DebugConsole.WriteLine($"[DIAGNOSTIC ERROR] QuickConnect Attempt 2 exception: {ex.Message}");
                     }
                 }
             }
@@ -818,7 +818,7 @@ public partial class NetworkView : UserControl
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[DIAGNOSTIC ERROR] OnQuickConnectClicked Exception: {ex.Message}\n{ex.StackTrace}");
+            DebugConsole.WriteLine($"[DIAGNOSTIC ERROR] OnQuickConnectClicked Exception: {ex.Message}\n{ex.StackTrace}");
 
             CloseLoading(loading);
             loading = null;
@@ -875,7 +875,7 @@ public partial class NetworkView : UserControl
 
     private void Log(string msg)
     {
-        Console.WriteLine($"[NetworkView] {msg}");
+        DebugConsole.WriteLine($"[NetworkView] {msg}");
 
         if (TopLevel.GetTopLevel(this) is MainWindow main)
         {

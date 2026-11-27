@@ -75,7 +75,7 @@ public partial class ConfigWindow : Window
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[CONFIG ERROR] {ex}");
+            DebugConsole.WriteLine($"[CONFIG ERROR] {ex}");
             TxtFirewallStatus.Text = $"Could not initialize configuration: {ex.Message}";
         }
     }
@@ -114,7 +114,7 @@ public partial class ConfigWindow : Window
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[CONFIG ERROR] {ex}");
+            DebugConsole.WriteLine($"[CONFIG ERROR] {ex}");
             TxtFirewallStatus.Text = $"Could not select smb.conf: {ex.Message}";
         }
     }
@@ -155,7 +155,7 @@ public partial class ConfigWindow : Window
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[CONFIG ERROR] {ex}");
+            DebugConsole.WriteLine($"[CONFIG ERROR] {ex}");
             TxtFirewallStatus.Text = $"Could not save configuration: {ex.Message}";
         }
     }

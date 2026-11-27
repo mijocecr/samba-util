@@ -48,7 +48,7 @@ public static class SambaConfigWriter
         var callId = ++_callCountSave;
         var sw = Stopwatch.StartNew();
 
-        Console.WriteLine($"[WRITE] #{callId} → SaveAllShares iniciado. Shares: {sharesToSave.Count}");
+        DebugConsole.WriteLine($"[WRITE] #{callId} → SaveAllShares iniciado. Shares: {sharesToSave.Count}");
 
         foreach (var share in sharesToSave)
             ValidateShareName(share.Name);
@@ -78,7 +78,7 @@ public static class SambaConfigWriter
         var skipped = sharesToSave.Except(managedShares).ToList();
         if (skipped.Count > 0)
         {
-            Console.WriteLine(
+            DebugConsole.WriteLine(
                 $"[WRITE] #{callId} Skipping {skipped.Count} share(s) defined in includes: " +
                 string.Join(", ", skipped.Select(s => $"{s.Name} ({s.SourceFile})")));
         }
@@ -95,7 +95,7 @@ public static class SambaConfigWriter
         WriteConfig(output, smbConfFull, callId);
 
         sw.Stop();
-        Console.WriteLine($"[WRITE] #{callId} <- SaveAllShares completed in {sw.ElapsedMilliseconds} ms");
+        DebugConsole.WriteLine($"[WRITE] #{callId} <- SaveAllShares completed in {sw.ElapsedMilliseconds} ms");
     }
 
     // Valida con testparm, hace backup, copia el archivo y reinicia Samba.
@@ -118,8 +118,8 @@ public static class SambaConfigWriter
                 $"testparm -s {ShellQuote(temp)}", ShellHelper.LongTimeoutMs);
             if (test.ExitCode != 0)
             {
-                Console.WriteLine($"[WRITE] #{callId} ERROR: testparm failed. Invalid smb.conf.");
-                Console.WriteLine(test.Stderr);
+                DebugConsole.WriteLine($"[WRITE] #{callId} ERROR: testparm failed. Invalid smb.conf.");
+                DebugConsole.WriteLine(test.Stderr);
                 throw new InvalidOperationException(
                     $"The generated Samba configuration is not valid: {test.Stderr}{test.Stdout}");
             }
@@ -139,7 +139,7 @@ public static class SambaConfigWriter
                 $"cp {ShellQuote(temp)} {ShellQuote(smbConfFull)}");
             if (copyResult.ExitCode != 0)
             {
-                Console.WriteLine($"[WRITE] #{callId} ERROR copying smb.conf");
+                DebugConsole.WriteLine($"[WRITE] #{callId} ERROR copying smb.conf");
                 throw new InvalidOperationException(
                     $"Could not write the smb.conf file: {copyResult.Stderr}");
             }
@@ -158,13 +158,13 @@ public static class SambaConfigWriter
                         $"cp -p {ShellQuote(backup)} {ShellQuote(smbConfFull)}",
                         ShellHelper.LongTimeoutMs);
 
-                    Console.WriteLine(restore.ExitCode == 0
+                    DebugConsole.WriteLine(restore.ExitCode == 0
                         ? $"[WRITE] #{callId} Rollback: smb.conf restored from the backup."
                         : $"[WRITE] #{callId} Rollback failed: {restore.Stderr}{restore.Stdout}");
                 }
                 else
                 {
-                    Console.WriteLine($"[WRITE] #{callId} No smb.conf backup is available to restore.");
+                    DebugConsole.WriteLine($"[WRITE] #{callId} No smb.conf backup is available to restore.");
                 }
 
                 throw;
@@ -199,7 +199,7 @@ public static class SambaConfigWriter
 
         if (originalLines.SequenceEqual(output))
         {
-            Console.WriteLine($"[WRITE] #{callId} server min protocol is already {normalized}; smb.conf is not rewritten.");
+            DebugConsole.WriteLine($"[WRITE] #{callId} server min protocol is already {normalized}; smb.conf is not rewritten.");
             return false;
         }
 
@@ -214,7 +214,7 @@ public static class SambaConfigWriter
                 $"'{effective}' as server min protocol (expected '{normalized}').");
         }
 
-        Console.WriteLine($"[WRITE] #{callId} server min protocol = {normalized} aplicado y verificado.");
+        DebugConsole.WriteLine($"[WRITE] #{callId} server min protocol = {normalized} aplicado y verificado.");
         return true;
     }
 
@@ -346,7 +346,7 @@ public static class SambaConfigWriter
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GUEST] Could not read {path}: {ex.Message}");
+            DebugConsole.WriteLine($"[GUEST] Could not read {path}: {ex.Message}");
             return false;
         }
     }
@@ -370,14 +370,14 @@ public static class SambaConfigWriter
 
         if (originalLines.SequenceEqual(output))
         {
-            Console.WriteLine(
+            DebugConsole.WriteLine(
                 $"[WRITE] #{callId} map to guest is already {(enabled ? "Bad User" : "Never")}; " +
                 "smb.conf is not rewritten.");
             return false;
         }
 
         WriteConfig(output, smbConfFull, callId);
-        Console.WriteLine(
+        DebugConsole.WriteLine(
             $"[WRITE] #{callId} map to guest = {(enabled ? "Bad User" : "Never")} applied to smb.conf.");
         return true;
     }
@@ -486,7 +486,7 @@ public static class SambaConfigWriter
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[PRINT] Could not read {path}: {ex.Message}");
+            DebugConsole.WriteLine($"[PRINT] Could not read {path}: {ex.Message}");
             return false;
         }
     }
@@ -510,14 +510,14 @@ public static class SambaConfigWriter
 
         if (originalLines.SequenceEqual(output))
         {
-            Console.WriteLine(
+            DebugConsole.WriteLine(
                 $"[WRITE] #{callId} printing is already {(enabled ? "enabled" : "disabled")}; " +
                 "smb.conf is not rewritten.");
             return false;
         }
 
         WriteConfig(output, smbConfFull, callId);
-        Console.WriteLine(
+        DebugConsole.WriteLine(
             $"[WRITE] #{callId} printing {(enabled ? "enabled" : "disabled")} in smb.conf.");
         return true;
     }

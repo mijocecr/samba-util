@@ -56,7 +56,7 @@ public partial class UsersView : UserControl
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[USERS ERROR] {ex}");
+            DebugConsole.WriteLine($"[USERS ERROR] {ex}");
             return (_lastCount, ex.Message);
         }
         finally
@@ -135,7 +135,7 @@ public partial class UsersView : UserControl
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[USERS ERROR] {ex}");
+            DebugConsole.WriteLine($"[USERS ERROR] {ex}");
         }
     }
     
@@ -180,7 +180,7 @@ public partial class UsersView : UserControl
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[USERS ERROR] {ex}");
+            DebugConsole.WriteLine($"[USERS ERROR] {ex}");
         }
     }
 
@@ -205,7 +205,7 @@ public partial class UsersView : UserControl
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[USERS ERROR] {ex}");
+            DebugConsole.WriteLine($"[USERS ERROR] {ex}");
         }
     }
 }

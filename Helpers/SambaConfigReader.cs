@@ -22,12 +22,12 @@ public static class SambaConfigReader
         var callId = ++_callCount;
 
         filePath ??= ConfigManager.Load().SmbConfPath;
-        Console.WriteLine($"[CONF] #{callId} -> LoadShares('{filePath}') started");
+        DebugConsole.WriteLine($"[CONF] #{callId} -> LoadShares('{filePath}') started");
 
         var shares = new List<Share>();
         if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
         {
-            Console.WriteLine($"[CONF] #{callId} File does not exist or path is invalid. Time: {sw.ElapsedMilliseconds} ms");
+            DebugConsole.WriteLine($"[CONF] #{callId} File does not exist or path is invalid. Time: {sw.ElapsedMilliseconds} ms");
             return shares;
         }
 
@@ -36,7 +36,7 @@ public static class SambaConfigReader
         ParseFile(Path.GetFullPath(filePath), shares, ref current, includeStack);
 
         sw.Stop();
-        Console.WriteLine($"[CONF] #{callId} <- LoadShares completed in {sw.ElapsedMilliseconds} ms. Shares: {shares.Count}");
+        DebugConsole.WriteLine($"[CONF] #{callId} <- LoadShares completed in {sw.ElapsedMilliseconds} ms. Shares: {shares.Count}");
         return shares;
     }
 
@@ -95,7 +95,7 @@ public static class SambaConfigReader
                     if (!File.Exists(includePath))
                         throw new FileNotFoundException($"The included file '{includePath}' was not found.", includePath);
 
-                    Console.WriteLine($"[CONF] Processing include: {includePath}");
+                    DebugConsole.WriteLine($"[CONF] Processing include: {includePath}");
                     var includeCurrent = current;
                     ParseFile(includePath, shares, ref includeCurrent, includeStack);
                     continue;

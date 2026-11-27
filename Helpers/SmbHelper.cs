@@ -329,7 +329,7 @@ namespace SAMBA_Util.Helpers
         private static void NotifyError(string message)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[SmbHelper ERROR] {message}");
+            DebugConsole.WriteLine($"[SmbHelper ERROR] {message}");
             Console.ResetColor();
         }
 
@@ -757,7 +757,7 @@ namespace SAMBA_Util.Helpers
         private static void NotifyError(string message)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[SmbHelper ERROR] {message}");
+            DebugConsole.WriteLine($"[SmbHelper ERROR] {message}");
             Console.ResetColor();
         }
 

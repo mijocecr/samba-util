@@ -14,14 +14,14 @@ public static class FileSystemHelper
         var sw = Stopwatch.StartNew();
         var callId = ++_callCount;
 
-        Console.WriteLine($"[PERM] #{callId} -> GetPermissions('{path}') started");
+        DebugConsole.WriteLine($"[PERM] #{callId} -> GetPermissions('{path}') started");
 
         try
         {
             // Verificar existencia antes de ejecutar stat
             if (!File.Exists(path) && !Directory.Exists(path))
             {
-                Console.WriteLine($"[PERM] #{callId} DOES NOT EXIST");
+                DebugConsole.WriteLine($"[PERM] #{callId} DOES NOT EXIST");
                 return ("", "", "");
             }
 
@@ -39,11 +39,11 @@ public static class FileSystemHelper
             var output = result.Stdout?.Trim() ?? "";
 
             sw.Stop();
-            Console.WriteLine($"[PERM] #{callId} <- stat completed in {sw.ElapsedMilliseconds} ms");
+            DebugConsole.WriteLine($"[PERM] #{callId} <- stat completed in {sw.ElapsedMilliseconds} ms");
 
             if (string.IsNullOrWhiteSpace(output))
             {
-                Console.WriteLine($"[PERM] #{callId} ERROR: empty output");
+                DebugConsole.WriteLine($"[PERM] #{callId} ERROR: empty output");
                 return ("?", "?", "?");
             }
 
@@ -52,7 +52,7 @@ public static class FileSystemHelper
 
             if (parts.Length < 3)
             {
-                Console.WriteLine($"[PERM] #{callId} INVALID OUTPUT: '{output}'");
+                DebugConsole.WriteLine($"[PERM] #{callId} INVALID OUTPUT: '{output}'");
                 return ("?", "?", "?");
             }
 
@@ -67,16 +67,16 @@ public static class FileSystemHelper
             if (mode.Length > 3)
                 mode = mode[^3..];
 
-            Console.WriteLine($"[PERM] #{callId} OK → Owner={owner}, Group={group}, Mode={mode}");
+            DebugConsole.WriteLine($"[PERM] #{callId} OK → Owner={owner}, Group={group}, Mode={mode}");
             return (owner, group, mode);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[PERM] #{callId} EXCEPTION: {ex.Message}");
+            DebugConsole.WriteLine($"[PERM] #{callId} EXCEPTION: {ex.Message}");
         }
 
         sw.Stop();
-        Console.WriteLine($"[PERM] #{callId} FALLBACK in {sw.ElapsedMilliseconds} ms");
+        DebugConsole.WriteLine($"[PERM] #{callId} FALLBACK in {sw.ElapsedMilliseconds} ms");
 
         return ("?", "?", "?");
     }

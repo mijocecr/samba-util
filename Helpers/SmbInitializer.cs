@@ -65,7 +65,7 @@ public static class SmbInitializer
             if (ConfigManager.Load().ManageSambaFirewallRule)
             {
                 var firewall = FirewallHelper.EnsureSambaAllowed();
-                Console.WriteLine($"[SMB INIT] Firewall: {firewall.Message}");
+                DebugConsole.WriteLine($"[SMB INIT] Firewall: {firewall.Message}");
             }
         });
     }
@@ -122,7 +122,7 @@ public static class SmbInitializer
                 nmbd = ShellHelper.EjecutarComoRoot(
                     "systemctl enable --now nmb.service", ShellHelper.LongTimeoutMs);
             if (nmbd.ExitCode != 0)
-                Console.WriteLine($"[SMB INIT] NetBIOS nmbd is not available; IP-based SMB still depends on smbd. {nmbd.Stderr}");
+                DebugConsole.WriteLine($"[SMB INIT] NetBIOS nmbd is not available; IP-based SMB still depends on smbd. {nmbd.Stderr}");
 
             return;
         }
@@ -142,7 +142,7 @@ public static class SmbInitializer
                 nmbd = ShellHelper.EjecutarComoRoot(
                     "service nmb start", ShellHelper.LongTimeoutMs);
             if (nmbd.ExitCode != 0)
-                Console.WriteLine($"[SMB INIT] NetBIOS nmbd is not available; IP-based SMB still depends on smbd. {nmbd.Stderr}");
+                DebugConsole.WriteLine($"[SMB INIT] NetBIOS nmbd is not available; IP-based SMB still depends on smbd. {nmbd.Stderr}");
 
             return;
         }
